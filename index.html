@@ -180,7 +180,7 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">1</span>
+          <span class="site-state-item-count">3</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -189,7 +189,7 @@
         <span class="site-state-item-name">分类</span>
       </div>
       <div class="site-state-item site-state-tags">
-        <span class="site-state-item-count">4</span>
+        <span class="site-state-item-count">14</span>
         <span class="site-state-item-name">标签</span>
       </div>
   </nav>
@@ -211,96 +211,65 @@
   <h2 class="home-hero__title">你好，我是 Quellisya</h2>
   <p class="home-hero__desc">这里记录我的 CTF 与 Web 安全学习笔记，包括做题过程、payload 和踩坑记录。希望能写出对新手友好的 Writeup，帮你少走一点弯路。</p>
   <div class="home-hero__actions"><a class="home-hero__btn home-hero__btn--primary" href="&#x2F;categories&#x2F;CTF&#x2F;"><i class="fa fa-flag"></i><span>浏览全部 Writeup</span></a><a class="home-hero__btn" href="&#x2F;archives&#x2F;"><i class="fa fa-archive"></i><span>文章归档</span></a><a class="home-hero__btn" href="https:&#x2F;&#x2F;github.com&#x2F;Quellisya" target="_blank" rel="noopener"><i class="fa fa-github"></i><span>GitHub</span></a></div>
-  <div class="home-hero__meta"><span>已整理 <strong>1</strong> 篇 Writeup</span><span>最近更新 <strong>2026-10-22</strong></span></div>
-  <div class="home-hero__tags"><span>关注方向</span><a href="&#x2F;tags&#x2F;极客大挑战&#x2F;">极客大挑战</a><a href="&#x2F;tags&#x2F;information-schema&#x2F;">information_schema</a><a href="&#x2F;tags&#x2F;SQL-注入&#x2F;">SQL 注入</a><a href="&#x2F;tags&#x2F;UNION-注入&#x2F;">UNION 注入</a></div>
+  <div class="home-hero__meta"><span>已整理 <strong>3</strong> 篇 Writeup</span><span>最近更新 <strong>2026-10-25</strong></span></div>
+  <div class="home-hero__tags"><span>关注方向</span><a href="&#x2F;tags&#x2F;命令注入&#x2F;">命令注入</a><a href="&#x2F;tags&#x2F;文件上传&#x2F;">文件上传</a><a href="&#x2F;tags&#x2F;SQL-注入&#x2F;">SQL 注入</a></div>
 </section>
 <div class="home-section-head">
-  <h2>最新文章</h2>
-  <a href="&#x2F;archives&#x2F;">查看全部 →</a>
+  <h2>文章总览</h2>
+  <a href="&#x2F;archives&#x2F;">按时间浏览 →</a>
 </div>
+<div class="home-posts">
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;25&#x2F;web-ctf-command-injection&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">命令注入</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">Web 命令注入实战：[GXYCTF2019]Ping Ping Ping 详解</h3>
+  <p class="home-post-card__desc">从一道最经典的 ping 命令注入题出发，完整走一遍“找注入点 → 摸清过滤 → 逐个绕过 → 读 flag”的过程，重点讲清 $IFS 与 base64 这两种通用绕过手段。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-25</span><span><i class="far fa-clock"></i>约 11 分钟</span></div>
+  <div class="home-post-card__tags"><span>#命令注入</span><span>#命令执行</span><span>#空格绕过</span></div>
+</a>
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;24&#x2F;web-ctf-upload&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">文件上传</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">Web 文件上传实战：[ACTF2020 新生赛]Upload 详解</h3>
+  <p class="home-post-card__desc">从一道入门上传题出发，完整走一遍“看前端 → 试后端 → 判解析 → 传马 → 拿 flag”的流程，并记录几个真实踩过的坑。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-24</span><span><i class="far fa-clock"></i>约 13 分钟</span></div>
+  <div class="home-post-card__tags"><span>#文件上传</span><span>#后缀绕过</span><span>#.htaccess</span></div>
+</a>
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">SQL 注入</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">Web SQL 注入实战：EasySQL 与 LoveSQL 详解</h3>
+  <p class="home-post-card__desc">以两道入门题为例，完整走一遍 SQL 注入的排查与利用流程：判断注入类型、确定字段数、找回收显位、爆库、爆表、爆字段，最后拿到 flag。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-22</span><span><i class="far fa-clock"></i>约 9 分钟</span></div>
+  <div class="home-post-card__tags"><span>#SQL 注入</span><span>#UNION 注入</span><span>#information_schema</span></div>
+</a></div>
 
     
 
 
-<div class="post-block">
-  
-  
 
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="https://quellisya.github.io/2026/10/22/web-ctf-sql/">
 
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="Quellisya">
-    </span>
 
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Quellisya's Blog">
-      <meta itemprop="description" content="记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。">
-    </span>
 
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content=" | Quellisya's Blog">
-      <meta itemprop="description" content="">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2026/10/22/web-ctf-sql/" class="post-title-link" itemprop="url">Web SQL 注入实战：EasySQL 与 LoveSQL 详解</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-      
-
-      <time title="创建时间：2026-10-22 20:40:22 / 修改时间：22:10:00" itemprop="dateCreated datePublished" datetime="2026-10-22T20:40:22+08:00">2026-10-22</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/CTF/" itemprop="url" rel="index"><span itemprop="name">CTF</span></a>
-        </span>
-    </span>
-
-  
-</div>
-
-        </div>
-      </header>
 
     
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <p>以两道入门题为例，完整走一遍 SQL 注入的排查与利用流程：判断注入类型、确定字段数、找回收显位、爆库、爆表、爆字段，最后拿到 flag。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2026/10/22/web-ctf-sql/">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
+
+
+
+
+
+
 
     
-    
-    
 
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
+
+
 
 
 
