@@ -117,7 +117,7 @@
 
 
 <nav class="site-nav">
-  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-writeups"><a href="/categories/CTF/" rel="section"><i class="fa fa-flag fa-fw"></i>Writeups</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-rss"><a href="/atom.xml" rel="section"><i class="fa fa-rss fa-fw"></i>RSS</a></li>
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-rss"><a href="/atom.xml" rel="section"><i class="fa fa-rss fa-fw"></i>RSS</a></li>
       <li class="menu-item menu-item-search">
         <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
         </a>
@@ -180,17 +180,19 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">3</span>
+          <span class="site-state-item-count">9</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
-        <span class="site-state-item-count">1</span>
-        <span class="site-state-item-name">分类</span>
+          <a href="/categories/">
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
-        <span class="site-state-item-count">16</span>
-        <span class="site-state-item-name">标签</span>
+          <a href="/tags/">
+        <span class="site-state-item-count">23</span>
+        <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
 </div>
@@ -210,45 +212,161 @@
   <p class="home-hero__eyebrow">CTF · WEB SECURITY · NOTES</p>
   <h2 class="home-hero__title">你好，我是 Quellisya</h2>
   <p class="home-hero__desc">这里记录我的 CTF 与 Web 安全学习笔记，包括做题过程、payload 和踩坑记录。希望能写出对新手友好的 Writeup，帮你少走一点弯路。</p>
-  <div class="home-hero__actions"><a class="home-hero__btn home-hero__btn--primary" href="&#x2F;categories&#x2F;CTF&#x2F;"><i class="fa fa-flag"></i><span>浏览全部 Writeup</span></a><a class="home-hero__btn" href="&#x2F;archives&#x2F;"><i class="fa fa-archive"></i><span>文章归档</span></a><a class="home-hero__btn" href="https:&#x2F;&#x2F;github.com&#x2F;Quellisya" target="_blank" rel="noopener"><i class="fa fa-github"></i><span>GitHub</span></a></div>
-  <div class="home-hero__meta"><span>已整理 <strong>3</strong> 篇 Writeup</span><span>最近更新 <strong>2026-10-25</strong></span></div>
-  <div class="home-hero__tags"><span>关注方向</span><a href="&#x2F;tags&#x2F;命令注入&#x2F;">命令注入</a><a href="&#x2F;tags&#x2F;文件上传&#x2F;">文件上传</a><a href="&#x2F;tags&#x2F;SQL-注入&#x2F;">SQL 注入</a></div>
+  <div class="home-hero__actions"><a class="home-hero__btn home-hero__btn--primary" href="&#x2F;categories&#x2F;"><i class="fa fa-th"></i><span>按分类浏览</span></a><a class="home-hero__btn" href="&#x2F;archives&#x2F;"><i class="fa fa-archive"></i><span>文章归档</span></a><a class="home-hero__btn" href="https:&#x2F;&#x2F;github.com&#x2F;Quellisya" target="_blank" rel="noopener"><i class="fa fa-github"></i><span>GitHub</span></a></div>
+  <div class="home-hero__meta"><span>已整理 <strong>9</strong> 篇</span><span>共 <strong>3</strong> 个主题</span><span>最近更新 <strong>2026-10-25</strong></span></div>
+  <div class="home-hero__tags"><span>主题</span><a href="#topic-1">命令注入<span>2</span></a><a href="#topic-2">文件上传<span>3</span></a><a href="#topic-3">SQL 注入<span>4</span></a></div>
 </section>
-<div class="home-section-head">
-  <h2>文章总览</h2>
-  <a href="&#x2F;archives&#x2F;">按时间浏览 →</a>
+<div class="home-section-head" id="topic-1">
+  <h2>命令注入<span class="home-section-head__count">2 篇</span></h2>
+  <a href="&#x2F;categories&#x2F;ctf&#x2F;web&#x2F;command-injection&#x2F;">查看全部 →</a>
 </div>
 <div class="home-posts">
-<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;25&#x2F;web-ctf-command-injection&#x2F;">
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;25&#x2F;web-ctf-command-injection-pingping&#x2F;">
   <div class="home-post-card__head">
     <span class="home-post-card__topic">命令注入</span>
     <span class="home-post-card__level">入门</span>
   </div>
-  <h3 class="home-post-card__title">Web 命令注入实战：[GXYCTF2019]Ping Ping Ping 详解</h3>
-  <p class="home-post-card__desc">从一道最经典的 ping 命令注入题出发，完整走一遍“找注入点 → 摸清过滤 → 逐个绕过 → 读 flag”的过程，重点讲清 $IFS 与 base64 这两种通用绕过手段。</p>
-  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-25</span><span><i class="far fa-clock"></i>约 11 分钟</span></div>
+  <h3 class="home-post-card__title">[GXYCTF2019] Ping Ping Ping：空格与关键字的双重过滤</h3>
+  <p class="home-post-card__desc">一道 ping 命令注入题：先用回显报错反推后端正则，再用 $IFS$9 解决空格，最后把整条命令 base64 编码塞进去读 flag。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-25</span><span><i class="far fa-clock"></i>约 5 分钟</span></div>
   <div class="home-post-card__tags"><span>#命令注入</span><span>#命令执行</span><span>#空格绕过</span></div>
 </a>
-<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;24&#x2F;web-ctf-upload&#x2F;">
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;25&#x2F;web-knowledge-command-injection-basics&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">命令注入</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">命令注入基础：分隔符、$IFS 与过滤绕过</h3>
+  <p class="home-post-card__desc">命令注入的通用知识：漏洞是怎么产生的、shell 的几种分隔符、空格被过滤时用 $IFS 顶上、关键字被过滤时怎么换等价写法，附完整流程速查与常见问题。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-25</span><span><i class="far fa-clock"></i>约 6 分钟</span></div>
+  <div class="home-post-card__tags"><span>#命令注入</span><span>#命令执行</span><span>#$IFS</span></div>
+</a></div><div class="home-section-head" id="topic-2">
+  <h2>文件上传<span class="home-section-head__count">3 篇</span></h2>
+  <a href="&#x2F;categories&#x2F;ctf&#x2F;web&#x2F;file-upload&#x2F;">查看全部 →</a>
+</div>
+<div class="home-posts">
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;24&#x2F;web-ctf-upload-geek2019&#x2F;">
   <div class="home-post-card__head">
     <span class="home-post-card__topic">文件上传</span>
     <span class="home-post-card__level">入门</span>
   </div>
-  <h3 class="home-post-card__title">Web 文件上传实战：ACTF2020 与 极客大挑战 2019 Upload 详解</h3>
-  <p class="home-post-card__desc">用两道入门上传题走一遍“看前端 → 试后端 → 判解析 → 传马 → 拿 flag”的流程：一道靠 .htaccess 解析 .phtml，一道靠 GIF89a 文件头和 PHP 5 老式 script 标签绕过内容黑名单。</p>
-  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-24</span><span><i class="far fa-clock"></i>约 19 分钟</span></div>
+  <h3 class="home-post-card__title">[极客大挑战 2019] Upload：GIF89a 与 PHP 短标签绕过</h3>
+  <p class="home-post-card__desc">后缀黑名单、Content-Type、文件头、内容黑名单四层检查，全靠加一个 GIF89a 文件头和改用 标签绕过。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-24</span><span><i class="far fa-clock"></i>约 4 分钟</span></div>
+  <div class="home-post-card__tags"><span>#极客大挑战</span><span>#文件上传</span><span>#文件头伪造</span></div>
+</a>
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;24&#x2F;web-ctf-upload-actf2020&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">文件上传</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">[ACTF2020 新生赛] Upload：黑名单漏掉了 .phtml</h3>
+  <p class="home-post-card__desc">前端校验、后缀黑名单都试过之后，把后缀换成 .phtml 并把 .htaccess 传上去，让服务器认这个后缀，最后拿到 flag。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-24</span><span><i class="far fa-clock"></i>约 5 分钟</span></div>
   <div class="home-post-card__tags"><span>#文件上传</span><span>#后缀绕过</span><span>#.htaccess</span></div>
 </a>
-<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql&#x2F;">
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;24&#x2F;web-knowledge-upload-basics&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">文件上传</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">文件上传基础：校验点、可执行后缀与常见坑</h3>
+  <p class="home-post-card__desc">文件上传题的通用知识：漏洞从哪来、前端校验为什么不算防线、服务端会在哪些地方拦、哪些后缀可能被解析，外加 8 个新手常踩的坑和完整流程速查。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-24</span><span><i class="far fa-clock"></i>约 10 分钟</span></div>
+  <div class="home-post-card__tags"><span>#文件上传</span><span>#后缀绕过</span><span>#.htaccess</span></div>
+</a></div><div class="home-section-head" id="topic-3">
+  <h2>SQL 注入<span class="home-section-head__count">4 篇</span></h2>
+  <a href="&#x2F;categories&#x2F;ctf&#x2F;web&#x2F;sql-injection&#x2F;">查看全部 →</a>
+</div>
+<div class="home-posts">
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-suctf&#x2F;">
   <div class="home-post-card__head">
     <span class="home-post-card__topic">SQL 注入</span>
     <span class="home-post-card__level">入门</span>
   </div>
-  <h3 class="home-post-card__title">Web SQL 注入实战：EasySQL 与 LoveSQL 详解</h3>
-  <p class="home-post-card__desc">以两道入门题为例，完整走一遍 SQL 注入的排查与利用流程：判断注入类型、确定字段数、找回收显位、爆库、爆表、爆字段，最后拿到 flag。</p>
-  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-22</span><span><i class="far fa-clock"></i>约 9 分钟</span></div>
-  <div class="home-post-card__tags"><span>#极客大挑战</span><span>#SQL 注入</span><span>#UNION 注入</span></div>
+  <h3 class="home-post-card__title">[SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码</h3>
+  <p class="home-post-card__desc">UNION 用不了时怎么办：先用 Intruder 摸清黑名单，用分号堆叠查询，再根据回显反推后端结构，最后用 *,1 绕开关键字过滤。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-22</span><span><i class="far fa-clock"></i>约 12 分钟</span></div>
+  <div class="home-post-card__tags"><span>#SQL 注入</span><span>#堆叠注入</span><span>#黑名单绕过</span></div>
+</a>
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-lovesql&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">SQL 注入</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">[极客大挑战 2019] LoveSQL：UNION 注入的完整流程</h3>
+  <p class="home-post-card__desc">登录只是开始。用 order by 定列数、找回收显位，再用 UNION SELECT 依次爆库、爆表、爆字段，最后把 flag 拖出来。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-22</span><span><i class="far fa-clock"></i>约 3 分钟</span></div>
+  <div class="home-post-card__tags"><span>#SQL 注入</span><span>#极客大挑战</span><span>#UNION 注入</span></div>
+</a>
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-geek&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">SQL 注入</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">[极客大挑战 2019] EasySQL：从一个单引号到万能密码</h3>
+  <p class="home-post-card__desc">最经典的登录框注入：加一个单引号确认注入点，再用 1&#39;||1# 注释掉密码判断，不输入密码也能登录并拿到 flag。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-22</span><span><i class="far fa-clock"></i>约 2 分钟</span></div>
+  <div class="home-post-card__tags"><span>#SQL 注入</span><span>#万能密码</span><span>#极客大挑战</span></div>
+</a>
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-knowledge-sql-basics&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">SQL 注入</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">SQL 注入基础：原理、流程速查与防护</h3>
+  <p class="home-post-card__desc">SQL 注入入门笔记：漏洞是怎么产生的、必须记住的符号、字符型与数字型的判断、URL 编码，以及 UNION 注入的完整流程速查、常见问题和防护建议。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-22</span><span><i class="far fa-clock"></i>约 5 分钟</span></div>
+  <div class="home-post-card__tags"><span>#SQL 注入</span><span>#UNION 注入</span><span>#information_schema</span></div>
 </a></div>
+
+    
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
 
     
 

