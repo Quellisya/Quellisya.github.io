@@ -7,7 +7,8 @@ scheme: Pisces
 # 侧边栏菜单
 menu:
   home: / || fa fa-home
-  Writeups: /categories/CTF/ || fa fa-flag
+  categories: /categories/ || fa fa-th
+  tags: /tags/ || fa fa-tags
   archives: /archives/ || fa fa-archive
   RSS: /atom.xml || fa fa-rss
 
@@ -55,12 +56,13 @@ pangu: true
 # 图片点击放大（配合文章里的截图阅读）
 fancybox: true
 
-# 文章目录：显示完整层级
+# 文章目录：只到三级标题，序号由主题自动生成
 toc:
   enable: true
-  number: false
+  number: true
   wrap: true
   expand_all: true
+  max_depth: 3
 
 # 代码块：语言标签 + 一键复制
 codeblock:
