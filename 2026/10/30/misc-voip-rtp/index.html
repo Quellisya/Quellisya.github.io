@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.css" integrity="sha256-mdaMxrItEW6hMIVJJNPKuX0B7KCSJQVEv3mVY4N2we4=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"quellisya.github.io","root":"/","images":"/images","scheme":"Pisces","darkmode":true,"version":"8.29.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"mac"},"fold":{"enable":false,"height":500},"language":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"mediumzoom":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="一个 SIP 通话的 pcap。用 Wireshark 的 Telephony → VoIP Calls 找到通话，再用 RTP Player 播放，音频里直接念出了 flag。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[BUUCTF] voip：Wireshark RTP 播放器听出 flag">
+<meta property="og:url" content="https://quellisya.github.io/2026/10/30/misc-voip-rtp/index.html">
+<meta property="og:site_name" content="Quellisya&#39;s Blog">
+<meta property="og:description" content="一个 SIP 通话的 pcap。用 Wireshark 的 Telephony → VoIP Calls 找到通话，再用 RTP Player 播放，音频里直接念出了 flag。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/misc-voip-rtp/03-sip-flow.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/misc-voip-rtp/01-waveform.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/misc-voip-rtp/02-spectrogram.png">
+<meta property="article:published_time" content="2026-10-30T02:30:00.000Z">
+<meta property="article:modified_time" content="2026-10-30T02:30:00.000Z">
+<meta property="article:author" content="Quellisya">
+<meta property="article:tag" content="BUUCTF">
+<meta property="article:tag" content="Misc">
+<meta property="article:tag" content="RTP">
+<meta property="article:tag" content="SIP">
+<meta property="article:tag" content="VoIP">
+<meta property="article:tag" content="Wireshark">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://quellisya.github.io/2026/10/30/misc-voip-rtp/03-sip-flow.png">
+
+
+<link rel="canonical" href="https://quellisya.github.io/2026/10/30/misc-voip-rtp/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://quellisya.github.io/2026/10/30/misc-voip-rtp/","path":"/2026/10/30/misc-voip-rtp/","title":"[BUUCTF] voip：Wireshark RTP 播放器听出 flag"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>[BUUCTF] voip：Wireshark RTP 播放器听出 flag | Quellisya's Blog</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/next-theme-pjax/0.6.0/pjax.min.js" integrity="sha256-vxLn1tSKWD4dqbMRyv940UYw4sXgMtYcK6reefzZrao=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.umd.js" integrity="sha256-QnJV4HT5r8i89ovZGRD86iynZqHerEbT2xt69vDM36I=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pangu/7.2.1/pangu.umd.js" integrity="sha256-kRsxecBnwG6mULFPe2E6UKnNm8XfDOuDwCOprjLZuX8=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script><script src="/js/bookmark.js" defer></script><script src="/js/pjax.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+  <script src="/js/third-party/fancybox.js" defer></script>
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><script class="next-config" data-name="mathjax" type="application/json">{"enable":true,"tags":"none","display_overflow":"scroll","js":{"url":"https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-mml-chtml.js","integrity":"sha256-ihPtDDm7pTmSF9ViEsItlvsrBTsNkz0MOXMchzOwCQw="}}</script>
+<script src="/js/third-party/math/mathjax.js" defer></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Quellisya's Blog</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">CTF · Web Security · Writeups</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-rss"><a href="/atom.xml" rel="section"><i class="fa fa-rss fa-fw"></i>RSS</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E6%AD%A5%EF%BC%9A%E6%89%93%E5%BC%80-pcap%EF%BC%8C%E5%85%88%E8%AE%A4%E5%8D%8F%E8%AE%AE"><span class="nav-number">1.</span> <span class="nav-text">第一步：打开 pcap，先认协议</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%8C%E6%AD%A5%EF%BC%9ATelephony-%E2%86%92-VoIP-Calls"><span class="nav-number">2.</span> <span class="nav-text">第二步：Telephony → VoIP Calls</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%89%E6%AD%A5%EF%BC%9A%E7%9C%8B-SIP-%E4%BF%A1%E4%BB%A4%EF%BC%8C%E7%90%86%E8%A7%A3%E9%80%9A%E8%AF%9D%E8%BF%87%E7%A8%8B"><span class="nav-number">3.</span> <span class="nav-text">第三步：看 SIP 信令，理解通话过程</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%9B%9B%E6%AD%A5%EF%BC%9ARTP-Player-%E6%92%AD%E6%94%BE%E9%9F%B3%E9%A2%91"><span class="nav-number">4.</span> <span class="nav-text">第四步：RTP Player 播放音频</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%94%E6%AD%A5%EF%BC%9A%E4%BB%8E%E8%AF%AD%E9%9F%B3%E5%88%B0-flag"><span class="nav-number">5.</span> <span class="nav-text">第五步：从语音到 flag</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%85%AD%E6%AD%A5%EF%BC%9A%E6%B2%A1%E6%9C%89%E5%A3%B0%E9%9F%B3%EF%BC%9F%E7%9C%8B%E6%B3%A2%E5%BD%A2%E5%92%8C%E9%A2%91%E8%B0%B1"><span class="nav-number">6.</span> <span class="nav-text">第六步：没有声音？看波形和频谱</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%83%E6%AD%A5%EF%BC%9A%E8%B7%9F%E7%9D%80%E5%81%9A%E2%80%94%E2%80%94%E7%94%A8%E8%BF%87%E6%BB%A4%E5%99%A8%E5%AE%9A%E4%BD%8D-RTP"><span class="nav-number">7.</span> <span class="nav-text">第七步：跟着做——用过滤器定位 RTP</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B7%A5%E5%85%B7%E9%80%9F%E6%9F%A5%E5%8D%A1"><span class="nav-number">8.</span> <span class="nav-text">工具速查卡</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="nav-number">9.</span> <span class="nav-text">新手常见问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%EF%BC%9AVoIP-%E7%AA%83%E5%90%AC%E4%B8%8E%E9%98%B2%E6%8A%A4"><span class="nav-number">10.</span> <span class="nav-text">顺手聊聊：VoIP 窃听与防护</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Quellisya</p>
+  <div class="site-description" itemprop="description">记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">17</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">46</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://quellisya.github.io/2026/10/30/misc-voip-rtp/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Quellisya">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Quellisya's Blog">
+      <meta itemprop="description" content="记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="[BUUCTF] voip：Wireshark RTP 播放器听出 flag | Quellisya's Blog">
+      <meta itemprop="description" content="一个 SIP 通话的 pcap。用 Wireshark 的 Telephony → VoIP Calls 找到通话，再用 RTP Player 播放，音频里直接念出了 flag。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [BUUCTF] voip：Wireshark RTP 播放器听出 flag
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-10-30 10:30:00" itemprop="dateCreated datePublished" datetime="2026-10-30T10:30:00+08:00">2026-10-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/" itemprop="url" rel="index"><span itemprop="name">CTF</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/misc/" itemprop="url" rel="index"><span itemprop="name">Misc</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/misc/traffic-analysis/" itemprop="url" rel="index"><span itemprop="name">流量分析</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">一个 SIP 通话的 pcap。用 Wireshark 的 Telephony → VoIP Calls 找到通话，再用 RTP Player 播放，音频里直接念出了 flag。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+<nav class="series-nav">
+  <div class="series-nav__head">
+    <i class="fa fa-layer-group"></i>
+    <span class="series-nav__name">系列：Misc 入门</span>
+    <span class="series-nav__count">第 4 / 4 篇</span>
+  </div>
+  <ol class="series-nav__list"><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-lsb-mirror-world&#x2F;">[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-base64-nways&#x2F;">[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-traffic-easycap&#x2F;">[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符</a></li><li class="is-current"><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-voip-rtp&#x2F;">[BUUCTF] voip：Wireshark RTP 播放器听出 flag</a></li></ol>
+  <div class="series-nav__links"><a class="series-nav__prev" href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-traffic-easycap&#x2F;"><i class="fa fa-arrow-left"></i>[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符</a></div>
+</nav><div class="note primary"><p><strong>一分钟速览</strong></p>
+<ul>
+<li><strong>难度</strong>：入门</li>
+<li><strong>考点</strong>：Wireshark VoIP 分析、SIP 信令、RTP 音频</li>
+<li><strong>工具</strong>：Wireshark（Telephony 菜单 + RTP Player）</li>
+<li><strong>关键操作</strong>：<code>Telephony → VoIP Calls</code> 找到通话 → <code>Player</code> 播放 RTP 流</li>
+<li><strong>flag</strong>：<code>flag{9001IVR}</code></li>
+</ul>
+</div>
+
+<div class="note info"><p><strong>阅读说明</strong></p>
+<ul>
+<li><strong>前置知识</strong>：知道 UDP、端口、Wireshark 的包列表和过滤器</li>
+<li><strong>工具</strong>：Wireshark。RTP Player 需要能播放音频的环境；没有声音也可以看波形&#x2F;导出音频。</li>
+<li><strong>环境</strong>：本地分析 pcap，不需要靶机。</li>
+<li>本文仅用于<strong>授权题目和教学</strong>。窃听未授权的通话是违法的，请只在 CTF&#x2F;授权环境练习。</li>
+</ul>
+</div>
+
+<div class="note default"><p><strong>做题路线</strong></p>
+<p><code>打开 pcap</code> → <code>看协议分布</code> → <code>Telephony → VoIP Calls</code> → <code>找到 SIP 通话</code> → <code>打开 RTP Player</code> → <code>播放音频</code> → <code>听出 flag</code></p>
+</div>
+
+<h2 id="第一步：打开-pcap，先认协议"><a href="#第一步：打开-pcap，先认协议" class="headerlink" title="第一步：打开 pcap，先认协议"></a>第一步：打开 pcap，先认协议</h2><p>附件是一个 533 KB 的 pcap，2302 个包。用 Wireshark 打开，先看 <code>Statistics → Protocol Hierarchy</code>（协议分层）：</p>
+<table>
+<thead>
+<tr>
+<th>协议</th>
+<th>作用</th>
+<th>本题占比</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>SIP</code></td>
+<td>通话信令：建立、振铃、挂断</td>
+<td>很少，十几条</td>
+</tr>
+<tr>
+<td><code>RTP</code></td>
+<td>真正传输语音的协议</td>
+<td>绝大多数</td>
+</tr>
+<tr>
+<td><code>UDP</code></td>
+<td>SIP 和 RTP 的底层传输</td>
+<td>全部</td>
+</tr>
+<tr>
+<td><code>TCP</code></td>
+<td>本题几乎没有</td>
+<td>0</td>
+</tr>
+</tbody></table>
+<p>看到 SIP + RTP，基本可以确定这是一通 <strong>VoIP 电话</strong>。SIP 负责“打电话”（信令），RTP 负责“说话”（媒体）。</p>
+<div class="note info"><p><strong>SIP 和 RTP 的分工</strong></p>
+<ul>
+<li><strong>SIP</strong>（Session Initiation Protocol）：类似“拨号 + 振铃 + 接通 + 挂断”的信令。常见方法有 <code>INVITE</code>、<code>ACK</code>、<code>BYE</code>、<code>OPTIONS</code>。默认走 UDP 5060。</li>
+<li><strong>RTP</strong>（Real-time Transport Protocol）：真正承载语音&#x2F;视频的包。每个包有序列号、时间戳、SSRC，接收方按这些字段排序、播放。</li>
+<li><strong>SDP</strong>：SIP 消息体里的一段描述，告诉对方“我的媒体地址、端口、编码格式是什么”。</li>
+</ul>
+<p>本题的 SIP 走 UDP 5060，RTP 走 UDP 5066 ↔ 14728，编码是 PCMU（G.711 μ-law，8 kHz）。</p>
+</div>
+
+<h2 id="第二步：Telephony-→-VoIP-Calls"><a href="#第二步：Telephony-→-VoIP-Calls" class="headerlink" title="第二步：Telephony → VoIP Calls"></a>第二步：Telephony → VoIP Calls</h2><p>Wireshark 专门为 VoIP 准备了一个菜单：<strong><code>Telephony</code></strong>（电话）。</p>
+<p>点 <strong><code>Telephony → VoIP Calls</code></strong>，会弹出一个窗口，列出它识别到的所有 SIP 通话：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Call                       From              To                State</span><br><span class="line">8a9697a4-...@localhost     2001              9001              Completed</span><br></pre></td></tr></table></figure>
+
+<p>选中这通电话，底部有几个按钮：</p>
+<table>
+<thead>
+<tr>
+<th>按钮</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Flow</code></td>
+<td>画出 SIP 信令的时序图（谁发了 INVITE、谁回了 200 OK）</td>
+</tr>
+<tr>
+<td><code>Player</code></td>
+<td>打开 RTP Player，播放这通电话的音频</td>
+</tr>
+<tr>
+<td><code>Graph</code></td>
+<td>类似 Flow，带更多细节</td>
+</tr>
+<tr>
+<td><code>Prepare Filter</code></td>
+<td>自动生成过滤这通电话的显示过滤器</td>
+</tr>
+</tbody></table>
+<p>点 <strong><code>Player</code></strong>，就进入本题的核心：<strong>RTP Player</strong>。</p>
+<div class="note warning"><p>如果 <code>VoIP Calls</code> 窗口是空的，说明 Wireshark 没有把这段 SIP 识别成一通完整通话（可能缺少 SDP、端口不标准、或者 pcap 不完整）。别慌，直接走 <code>Telephony → RTP → RTP Player</code>，它会列出所有 RTP 流，手动选一条播放。</p>
+</div>
+
+<h2 id="第三步：看-SIP-信令，理解通话过程"><a href="#第三步：看-SIP-信令，理解通话过程" class="headerlink" title="第三步：看 SIP 信令，理解通话过程"></a>第三步：看 SIP 信令，理解通话过程</h2><p>点 <code>Flow</code> 可以看到类似下面的时序：</p>
+<p><img src="/2026/10/30/misc-voip-rtp/03-sip-flow.png" alt="SIP 通话时序"></p>
+<p><em>图 1：2001 呼叫 9001，先被 401 要求认证，带 Authorization 重发 INVITE，最后 200 OK 接通，通话结束后 BYE</em></p>
+<p>对应的关键消息：</p>
+<table>
+<thead>
+<tr>
+<th>方向</th>
+<th>消息</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>2001 → 9001</td>
+<td><code>INVITE sip:9001</code></td>
+<td>发起呼叫</td>
+</tr>
+<tr>
+<td>9001 → 2001</td>
+<td><code>401 Unauthorized</code></td>
+<td>要求认证</td>
+</tr>
+<tr>
+<td>2001 → 9001</td>
+<td><code>ACK</code></td>
+<td>确认收到 401</td>
+</tr>
+<tr>
+<td>2001 → 9001</td>
+<td><code>INVITE</code> + <code>Authorization</code></td>
+<td>带认证信息重发</td>
+</tr>
+<tr>
+<td>9001 → 2001</td>
+<td><code>100 Trying</code></td>
+<td>正在处理</td>
+</tr>
+<tr>
+<td>9001 → 2001</td>
+<td><code>200 OK</code></td>
+<td>接通，SDP 里带媒体地址&#x2F;端口&#x2F;编码</td>
+</tr>
+<tr>
+<td>2001 → 9001</td>
+<td><code>ACK</code></td>
+<td>确认接通</td>
+</tr>
+<tr>
+<td>双向</td>
+<td><code>RTP</code></td>
+<td>开始传语音</td>
+</tr>
+<tr>
+<td>9001 → 2001</td>
+<td><code>BYE</code></td>
+<td>挂断</td>
+</tr>
+<tr>
+<td>2001 → 9001</td>
+<td><code>200 OK</code></td>
+<td>确认挂断</td>
+</tr>
+</tbody></table>
+<p>在 <code>200 OK</code> 的 SDP 里，你能看到类似：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">m=audio 14728 RTP/AVP 0</span><br><span class="line">a=rtpmap:0 PCMU/8000</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>m=audio 14728</code>：媒体端口 14728；</li>
+<li><code>RTP/AVP 0</code>：payload type 0，对应 PCMU；</li>
+<li><code>PCMU/8000</code>：G.711 μ-law，8 kHz 采样。</li>
+</ul>
+<p>这些信息解释了为什么 RTP 流是 <code>5066 ↔ 14728</code>，以及为什么每个 RTP 包是 160 字节（20 ms 的 8 kHz μ-law 音频）。</p>
+<h2 id="第四步：RTP-Player-播放音频"><a href="#第四步：RTP-Player-播放音频" class="headerlink" title="第四步：RTP Player 播放音频"></a>第四步：RTP Player 播放音频</h2><p><code>Telephony → VoIP Calls → Player</code> 打开的 <strong>RTP Player</strong> 长这样（不同版本略有差异）：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">┌─ RTP Player ───────────────────────────────────────────────┐</span><br><span class="line">│  [▶ Play]  [■ Stop]  [Save]        Streams: 2              │</span><br><span class="line">│                                                            │</span><br><span class="line">│  SSRC 3857925270   ────────                               │</span><br><span class="line">│  SSRC 1503454853   ████████████████████████████████████    │</span><br><span class="line">│                                                            │</span><br><span class="line">│  Time: 0.0s ─────────────────────────────────────── 24.0s  │</span><br><span class="line">└────────────────────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p>操作顺序：</p>
+<ol>
+<li>在流列表里<strong>勾选</strong>要播放的流（本题有两条，两个方向各一条）；</li>
+<li>点 <strong><code>Play</code></strong>；</li>
+<li>听音频。</li>
+</ol>
+<p>本题的音频内容大致是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Hi, this is Echo IVR Service.</span><br><span class="line">Please press 1 to listen to the flag.</span><br><span class="line">Press 9 to exit.</span><br><span class="line">The flag is S-E-C-C-O-N, open brace 9-0-0-1-I-V-R, close brace.</span><br><span class="line">Only capital letters, no spaces.</span><br></pre></td></tr></table></figure>
+
+<p>也就是说，语音在念：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">SECCON&#123;9001IVR&#125;</span><br></pre></td></tr></table></figure>
+
+<div class="note success"><p><strong>听不清怎么办？</strong> RTP Player 里可以放大波形、拖动时间轴、单独播放某一条流。两个方向都听一遍，通常只有一条有声音（另一条是静音或回声）。如果电脑没有声音，可以点 <code>Save</code> 导出音频，再用播放器听。</p>
+</div>
+
+<h2 id="第五步：从语音到-flag"><a href="#第五步：从语音到-flag" class="headerlink" title="第五步：从语音到 flag"></a>第五步：从语音到 flag</h2><p>语音里念的是原始题目的 flag：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">SECCON&#123;9001IVR&#125;</span><br></pre></td></tr></table></figure>
+
+<p>BUUCTF 迁移后，题目要求提交 <code>flag&#123;&#125;</code> 格式。这里要注意：<strong><code>SECCON</code> 是原比赛的 flag 前缀，不是内容</strong>。实际提交时把里面的内容 <code>9001IVR</code> 包进 <code>flag&#123;&#125;</code>：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">flag&#123;9001IVR&#125;</span><br></pre></td></tr></table></figure>
+
+<div class="note warning"><p>这是一个很容易踩的坑：语音里明明念的是 <code>SECCON{9001IVR}</code>，但直接提交 <code>flag{SECCON{9001IVR}}</code> 会被判错。BUUCTF 的迁移题通常只保留<strong>花括号里的内容</strong>，再套上平台的 <code>flag{}</code>。做题时先看题目描述里的格式要求，再决定怎么包。</p>
+</div>
+
+<h2 id="第六步：没有声音？看波形和频谱"><a href="#第六步：没有声音？看波形和频谱" class="headerlink" title="第六步：没有声音？看波形和频谱"></a>第六步：没有声音？看波形和频谱</h2><p>如果 RTP Player 播不出声音（声卡、编码器、远程桌面等原因），可以从视觉上确认哪条流有语音。</p>
+<p><strong>波形</strong>：把 RTP 载荷按 PCMU 解码后，能看到明显的语音段落（有声音的地方振幅大，静音处接近 0）：</p>
+<p><img src="/2026/10/30/misc-voip-rtp/01-waveform.png" alt="RTP 语音波形"></p>
+<p><em>图 2：重建出来的 24 秒语音波形，中间有明显的说话段落和停顿</em></p>
+<p><strong>频谱</strong>：语音的共振峰在频谱图上看得很清楚，静音处几乎没有能量：</p>
+<p><img src="/2026/10/30/misc-voip-rtp/02-spectrogram.png" alt="RTP 语音频谱"></p>
+<p><em>图 3：0–4 kHz 的频谱图，横轴是时间，亮的地方是语音能量</em></p>
+<p>这两张图不是做题必需，但能帮你判断“这条流到底有没有人说话”，避免在静音流上浪费时间。</p>
+<div class="note info"><p>RTP 的 payload type 0 是 PCMU（G.711 μ-law），每个字节是一个 8 kHz 采样点。把 μ-law 解码成 16 位 PCM，再按 8000 Hz 写成 WAV，就能用任意播放器听。Wireshark 的 RTP Player 内部做的就是这件事。</p>
+</div>
+
+<h2 id="第七步：跟着做——用过滤器定位-RTP"><a href="#第七步：跟着做——用过滤器定位-RTP" class="headerlink" title="第七步：跟着做——用过滤器定位 RTP"></a>第七步：跟着做——用过滤器定位 RTP</h2><p>打开 pcap 后，依次在过滤器栏输入：</p>
+<table>
+<thead>
+<tr>
+<th>过滤器</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sip</code></td>
+<td>只看 SIP 信令</td>
+</tr>
+<tr>
+<td><code>rtp</code></td>
+<td>只看 RTP 媒体包</td>
+</tr>
+<tr>
+<td><code>udp.port == 5060</code></td>
+<td>只看 SIP</td>
+</tr>
+<tr>
+<td><code>udp.port == 5066</code></td>
+<td>只看其中一个方向的 RTP</td>
+</tr>
+<tr>
+<td><code>rtp.ssrc == 3857925270</code></td>
+<td>只看某个 SSRC 的流</td>
+</tr>
+</tbody></table>
+<p>再打开 <code>Statistics → Conversations → UDP</code>，按 <code>Packets</code> 排序，你会看到两条大的 RTP 流和几条小的 SIP&#x2F;RTCP 流。<strong>包数最多、持续最久的那两条就是语音。</strong></p>
+<div class="note success"><p>VoIP 题的标准流程：</p>
+<ol>
+<li><code>Telephony → VoIP Calls</code> 找通话；</li>
+<li><code>Player</code> 播放；</li>
+<li>听不清就 <code>Save</code> 导出；</li>
+<li>还是没有就 <code>Telephony → RTP → Show All Streams</code>，逐条分析。</li>
+</ol>
+<p>90% 的入门 VoIP 题，到第 2 步就结束了。</p>
+</div>
+
+<h2 id="工具速查卡"><a href="#工具速查卡" class="headerlink" title="工具速查卡"></a>工具速查卡</h2><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>路径</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>通话列表</td>
+<td><code>Telephony → VoIP Calls</code></td>
+<td>找 SIP 通话</td>
+</tr>
+<tr>
+<td>信令时序</td>
+<td><code>VoIP Calls → Flow</code></td>
+<td>看 INVITE&#x2F;200&#x2F;BYE</td>
+</tr>
+<tr>
+<td>播放音频</td>
+<td><code>VoIP Calls → Player</code></td>
+<td>本题核心</td>
+</tr>
+<tr>
+<td>RTP 流列表</td>
+<td><code>Telephony → RTP → Show All Streams</code></td>
+<td>没有 VoIP Calls 时用</td>
+</tr>
+<tr>
+<td>RTP 分析</td>
+<td><code>Telephony → RTP → RTP Player</code></td>
+<td>选流、播放、保存</td>
+</tr>
+<tr>
+<td>导出音频</td>
+<td>RTP Player → <code>Save</code></td>
+<td>保存为音频文件</td>
+</tr>
+<tr>
+<td>过滤器</td>
+<td><code>sip</code>、<code>rtp</code>、<code>udp.port ==</code></td>
+<td>快速定位</td>
+</tr>
+</tbody></table>
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><details class="note info"><summary><p><strong>Q1：VoIP Calls 窗口是空的？</strong></p>
+</summary>
+<p>说明 Wireshark 没识别出完整通话。直接走 <code>Telephony → RTP → RTP Player</code>，或者先用过滤器 <code>rtp</code> 看有没有 RTP 包。只要能播放 RTP，就能听到 flag。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q2：RTP Player 没有声音？</strong></p>
+</summary>
+<p>先确认系统音量、输出设备；再确认勾选了正确的流；然后点 <code>Play</code>。如果还是没声音，点 <code>Save</code> 导出音频，用本地播放器听。远程桌面&#x2F;虚拟机可能没有音频设备，导出是最稳的。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q3：两条流，听哪一条？</strong></p>
+</summary>
+<p>两个方向各一条。通常只有一条有说话声，另一条是静音&#x2F;回声。两条都点一下 <code>Play</code>，有声音的那条就是。也可以看波形：有振幅变化的那条有语音。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q4：音频是断断续续的？</strong></p>
+</summary>
+<p>RTP 包可能乱序、丢包，或者你只选了一条流。RTP Player 会按序列号&#x2F;时间戳排序；如果丢包严重，听起来会断。CTF 题一般不会故意丢包，检查是不是选错了流。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q5：为什么语音里是 <code>SECCON{...}</code>，提交却是 <code>flag{...}</code>？</strong></p>
+</summary>
+<p><code>SECCON</code> 是原比赛的 flag 前缀；BUUCTF 迁移后要求用平台的 <code>flag{}</code> 格式，只保留花括号里的内容。以题目描述为准。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q6：SIP 里的 401 和 Authorization 是什么？</strong></p>
+</summary>
+<p>SIP 的认证流程：服务器先回 <code>401 Unauthorized</code>，客户端带 <code>Authorization</code> 头重发 <code>INVITE</code>。这不是题目考点，但看懂时序图有帮助。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q7：RTP 和 RTCP 怎么区分？</strong></p>
+</summary>
+<p>RTP 通常走偶数端口，承载媒体；RTCP 走相邻的奇数端口，传统计信息。本题主要看 RTP。过滤器 <code>rtp</code> 只匹配 RTP，<code>rtcp</code> 匹配 RTCP。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q8：能用 tshark 提取音频吗？</strong></p>
+</summary>
+<p>可以，但初学不建议手写。Wireshark 的 RTP Player 已经帮你解码、排序、播放。需要批量处理时再研究 <code>tshark</code> 的 RTP 导出功能。</p>
+
+</details>
+
+<h2 id="顺手聊聊：VoIP-窃听与防护"><a href="#顺手聊聊：VoIP-窃听与防护" class="headerlink" title="顺手聊聊：VoIP 窃听与防护"></a>顺手聊聊：VoIP 窃听与防护</h2><p>VoIP 把电话搬到了 IP 网络上，方便的同时也带来了新风险：</p>
+<ul>
+<li><strong>SIP 默认不加密</strong>：信令里的号码、认证信息、媒体地址都可能被嗅探；</li>
+<li><strong>RTP 默认不加密</strong>：同一网段的人抓到包就能还原语音；</li>
+<li><strong>认证强度</strong>：弱口令&#x2F;默认密码的 SIP 账号容易被冒用；</li>
+<li><strong>网络边界</strong>：把 VoIP 和办公网混在一起，攻击面更大。</li>
+</ul>
+<p>防护思路：</p>
+<table>
+<thead>
+<tr>
+<th>措施</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>SIP over TLS</strong></td>
+<td>加密信令，防窃听&#x2F;篡改</td>
+</tr>
+<tr>
+<td><strong>SRTP</strong></td>
+<td>加密 RTP 媒体，抓包也听不到</td>
+</tr>
+<tr>
+<td><strong>网络分段</strong></td>
+<td>VoIP 走独立 VLAN，限制嗅探范围</td>
+</tr>
+<tr>
+<td><strong>强认证</strong></td>
+<td>复杂密码、定期更换、禁用默认账号</td>
+</tr>
+<tr>
+<td><strong>最小权限</strong></td>
+<td>SIP 账号只能呼指定号码&#x2F;区域</td>
+</tr>
+<tr>
+<td><strong>监控异常</strong></td>
+<td>大量短通话、异常注册、非工作时间呼叫</td>
+</tr>
+</tbody></table>
+<div class="note success"><p><strong>一条经验</strong>：CTF 里的 VoIP 题是“用 Wireshark 听电话”，真实世界里对应的就是“未加密的语音通话可以被窃听”。做题时学会工具，写代码时记得给信令和媒体都加上加密。</p>
+</div>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Misc/" rel="tag"># Misc</a>
+              <a href="/tags/BUUCTF/" rel="tag"># BUUCTF</a>
+              <a href="/tags/Wireshark/" rel="tag"># Wireshark</a>
+              <a href="/tags/VoIP/" rel="tag"># VoIP</a>
+              <a href="/tags/RTP/" rel="tag"># RTP</a>
+              <a href="/tags/SIP/" rel="tag"># SIP</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/10/30/misc-traffic-easycap/" rel="prev" title="[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符">
+                  <i class="fa fa-angle-left"></i> [BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/10/30/reverse-easyre-ida/" rel="next" title="[BUUCTF] easyre：IDA 里一眼看穿的两个整数比较">
+                  [BUUCTF] easyre：IDA 里一眼看穿的两个整数比较 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Quellisya</span>
+  </div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/pisces/" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+  <a href="https://github.com/Quellisya" class="github-corner" title="在 GitHub 上关注我" aria-label="在 GitHub 上关注我" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

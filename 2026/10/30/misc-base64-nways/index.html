@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.css" integrity="sha256-mdaMxrItEW6hMIVJJNPKuX0B7KCSJQVEv3mVY4N2we4=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"quellisya.github.io","root":"/","images":"/images","scheme":"Pisces","darkmode":true,"version":"8.29.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"mac"},"fold":{"enable":false,"height":500},"language":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"mediumzoom":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="附件叫 KEY.exe，file 一看却是 ASCII 文本。去掉 data:image&#x2F;...;base64, 前缀，用 CyberChef 的 From Base64 还原成二维码，扫码拿到 KEY，再包成 flag。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图">
+<meta property="og:url" content="https://quellisya.github.io/2026/10/30/misc-base64-nways/index.html">
+<meta property="og:site_name" content="Quellisya&#39;s Blog">
+<meta property="og:description" content="附件叫 KEY.exe，file 一看却是 ASCII 文本。去掉 data:image&#x2F;...;base64, 前缀，用 CyberChef 的 From Base64 还原成二维码，扫码拿到 KEY，再包成 flag。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/misc-base64-nways/02-data-uri.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/misc-base64-nways/01-key-qr.png">
+<meta property="article:published_time" content="2026-10-30T02:10:00.000Z">
+<meta property="article:modified_time" content="2026-10-30T02:10:00.000Z">
+<meta property="article:author" content="Quellisya">
+<meta property="article:tag" content="BUUCTF">
+<meta property="article:tag" content="Base64">
+<meta property="article:tag" content="CyberChef">
+<meta property="article:tag" content="Misc">
+<meta property="article:tag" content="二维码">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://quellisya.github.io/2026/10/30/misc-base64-nways/02-data-uri.png">
+
+
+<link rel="canonical" href="https://quellisya.github.io/2026/10/30/misc-base64-nways/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://quellisya.github.io/2026/10/30/misc-base64-nways/","path":"/2026/10/30/misc-base64-nways/","title":"[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图 | Quellisya's Blog</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/next-theme-pjax/0.6.0/pjax.min.js" integrity="sha256-vxLn1tSKWD4dqbMRyv940UYw4sXgMtYcK6reefzZrao=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.umd.js" integrity="sha256-QnJV4HT5r8i89ovZGRD86iynZqHerEbT2xt69vDM36I=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pangu/7.2.1/pangu.umd.js" integrity="sha256-kRsxecBnwG6mULFPe2E6UKnNm8XfDOuDwCOprjLZuX8=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script><script src="/js/bookmark.js" defer></script><script src="/js/pjax.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+  <script src="/js/third-party/fancybox.js" defer></script>
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><script class="next-config" data-name="mathjax" type="application/json">{"enable":true,"tags":"none","display_overflow":"scroll","js":{"url":"https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-mml-chtml.js","integrity":"sha256-ihPtDDm7pTmSF9ViEsItlvsrBTsNkz0MOXMchzOwCQw="}}</script>
+<script src="/js/third-party/math/mathjax.js" defer></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Quellisya's Blog</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">CTF · Web Security · Writeups</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-rss"><a href="/atom.xml" rel="section"><i class="fa fa-rss fa-fw"></i>RSS</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E6%AD%A5%EF%BC%9A%E9%99%84%E4%BB%B6%E5%8F%AA%E6%9C%89%E4%B8%80%E4%B8%AA-KEY-exe"><span class="nav-number">1.</span> <span class="nav-text">第一步：附件只有一个 KEY.exe</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%8C%E6%AD%A5%EF%BC%9A%E7%94%A8%E8%AE%B0%E4%BA%8B%E6%9C%AC%E6%89%93%E5%BC%80%EF%BC%8C%E7%9C%8B%E5%88%B0-Data-URI"><span class="nav-number">2.</span> <span class="nav-text">第二步：用记事本打开，看到 Data URI</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%89%E6%AD%A5%EF%BC%9ACyberChef-%E8%A7%A3%E7%A0%81%EF%BC%88%E5%9B%BE%E5%BD%A2%E7%95%8C%E9%9D%A2%E7%89%88%EF%BC%89"><span class="nav-number">3.</span> <span class="nav-text">第三步：CyberChef 解码（图形界面版）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%9B%9B%E6%AD%A5%EF%BC%9A%E6%89%AB%E7%A0%81%EF%BC%8C%E6%8B%BF%E5%88%B0-KEY"><span class="nav-number">4.</span> <span class="nav-text">第四步：扫码，拿到 KEY</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%94%E6%AD%A5%EF%BC%9A%E4%B8%8D%E7%94%A8-CyberChef-%E7%9A%84%E5%87%A0%E7%A7%8D%E6%96%B9%E6%B3%95"><span class="nav-number">5.</span> <span class="nav-text">第五步：不用 CyberChef 的几种方法</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%85%AD%E6%AD%A5%EF%BC%9A%E6%96%87%E4%BB%B6%E5%A4%B4%E9%80%9F%E6%9F%A5%E2%80%94%E2%80%94%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%80%E7%9C%BC%E7%9C%8B%E5%87%BA%E6%98%AF-PNG"><span class="nav-number">6.</span> <span class="nav-text">第六步：文件头速查——为什么一眼看出是 PNG</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%83%E6%AD%A5%EF%BC%9A%E8%B7%9F%E7%9D%80%E5%81%9A%E2%80%94%E2%80%94%E8%87%AA%E5%B7%B1%E5%81%9A%E4%B8%80%E4%B8%AA-Data-URI"><span class="nav-number">7.</span> <span class="nav-text">第七步：跟着做——自己做一个 Data URI</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B7%A5%E5%85%B7%E9%80%9F%E6%9F%A5%E5%8D%A1"><span class="nav-number">8.</span> <span class="nav-text">工具速查卡</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="nav-number">9.</span> <span class="nav-text">新手常见问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%EF%BC%9A%E6%96%87%E4%BB%B6%E7%B1%BB%E5%9E%8B%E8%AF%86%E5%88%AB%E4%B8%8E%E4%B8%8A%E4%BC%A0%E5%AE%89%E5%85%A8"><span class="nav-number">10.</span> <span class="nav-text">顺手聊聊：文件类型识别与上传安全</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Quellisya</p>
+  <div class="site-description" itemprop="description">记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">17</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">46</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://quellisya.github.io/2026/10/30/misc-base64-nways/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Quellisya">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Quellisya's Blog">
+      <meta itemprop="description" content="记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图 | Quellisya's Blog">
+      <meta itemprop="description" content="附件叫 KEY.exe，file 一看却是 ASCII 文本。去掉 data:image&#x2F;...;base64, 前缀，用 CyberChef 的 From Base64 还原成二维码，扫码拿到 KEY，再包成 flag。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-10-30 10:10:00" itemprop="dateCreated datePublished" datetime="2026-10-30T10:10:00+08:00">2026-10-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/" itemprop="url" rel="index"><span itemprop="name">CTF</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/misc/" itemprop="url" rel="index"><span itemprop="name">Misc</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/misc/steganography/" itemprop="url" rel="index"><span itemprop="name">隐写</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">附件叫 KEY.exe，file 一看却是 ASCII 文本。去掉 data:image/...;base64, 前缀，用 CyberChef 的 From Base64 还原成二维码，扫码拿到 KEY，再包成 flag。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+<nav class="series-nav">
+  <div class="series-nav__head">
+    <i class="fa fa-layer-group"></i>
+    <span class="series-nav__name">系列：Misc 入门</span>
+    <span class="series-nav__count">第 2 / 4 篇</span>
+  </div>
+  <ol class="series-nav__list"><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-lsb-mirror-world&#x2F;">[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写</a></li><li class="is-current"><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-base64-nways&#x2F;">[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-traffic-easycap&#x2F;">[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-voip-rtp&#x2F;">[BUUCTF] voip：Wireshark RTP 播放器听出 flag</a></li></ol>
+  <div class="series-nav__links"><a class="series-nav__prev" href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-lsb-mirror-world&#x2F;"><i class="fa fa-arrow-left"></i>[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写</a><a class="series-nav__next" href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-traffic-easycap&#x2F;">[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符<i class="fa fa-arrow-right"></i></a></div>
+</nav><div class="note primary"><p><strong>一分钟速览</strong></p>
+<ul>
+<li><strong>难度</strong>：入门</li>
+<li><strong>考点</strong>：文件类型识别、Data URI、Base64 解码、二维码</li>
+<li><strong>工具</strong>：<code>file</code> &#x2F; 记事本、CyberChef、二维码扫描器</li>
+<li><strong>关键操作</strong>：删掉 <code>data:image/jpg;base64,</code> 前缀，<code>From Base64</code>，得到 PNG，扫码</li>
+<li><strong>flag</strong>：<code>flag{dca57f966e4e4e31fd5b15417da63269}</code></li>
+</ul>
+</div>
+
+<div class="note info"><p><strong>阅读说明</strong></p>
+<ul>
+<li><strong>前置知识</strong>：知道 Base64 是一种文本编码、见过 <code>data:</code> 开头的图片链接</li>
+<li><strong>工具</strong>：CyberChef（网页版即可）、任意二维码扫描器（手机、ZXing、微信&#x2F;QQ 扫码都行）</li>
+<li><strong>环境</strong>：本地分析，不需要靶机。</li>
+<li>本文仅用于<strong>授权题目和教学</strong>。</li>
+</ul>
+</div>
+
+<div class="note default"><p><strong>做题路线</strong></p>
+<p><code>看附件</code> → <code>file 判断类型</code> → <code>记事本看开头</code> → <code>识别 Data URI</code> → <code>CyberChef From Base64</code> → <code>得到二维码</code> → <code>扫码</code> → <code>包 flag{}</code></p>
+</div>
+
+<h2 id="第一步：附件只有一个-KEY-exe"><a href="#第一步：附件只有一个-KEY-exe" class="headerlink" title="第一步：附件只有一个 KEY.exe"></a>第一步：附件只有一个 KEY.exe</h2><p>解压后只有一个文件：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">KEY.exe    3,870 字节</span><br></pre></td></tr></table></figure>
+
+<p>名字叫 <code>.exe</code>，但大小只有 3.8 KB，对 Windows 程序来说小得可疑。先别双击运行，用 <code>file</code> 看一下真实类型：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">file KEY.exe</span><br></pre></td></tr></table></figure>
+
+<p>输出：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">KEY.exe: ASCII text, with very long lines (3870), with no line terminators</span><br></pre></td></tr></table></figure>
+
+<p><strong>它根本不是可执行文件，而是一个纯文本文件。</strong> Windows 只认扩展名，<code>file</code> 认的是文件内容——这是 Misc 题最常见的第一层伪装。</p>
+<div class="note warning"><p>拿到陌生的 <code>.exe</code>，<strong>不要直接双击运行</strong>。先用 <code>file</code>、<code>strings</code>、十六进制查看器确认它到底是什么。CTF 附件也不例外，养成先看再做的好习惯。</p>
+</div>
+
+<h2 id="第二步：用记事本打开，看到-Data-URI"><a href="#第二步：用记事本打开，看到-Data-URI" class="headerlink" title="第二步：用记事本打开，看到 Data URI"></a>第二步：用记事本打开，看到 Data URI</h2><p>用记事本、VSCode 或任意文本编辑器打开 <code>KEY.exe</code>，会看到<strong>一行</strong>很长的文本，开头是：</p>
+<p><img src="/2026/10/30/misc-base64-nways/02-data-uri.png" alt="KEY.exe 的开头"></p>
+<p><em>图 1：文件开头是 <code>data:image/jpg;base64,</code>，后面跟着一长串 Base64</em></p>
+<p>完整结构是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">data:image/jpg;base64,iVBORw0KGgoAAAANSUhEUgAAAIUAAACFCAYAAAB12js8...</span><br></pre></td></tr></table></figure>
+
+<p>这是一种 <strong>Data URI</strong>（数据 URI），语法是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">data:[&lt;MIME 类型&gt;][;base64],&lt;数据&gt;</span><br></pre></td></tr></table></figure>
+
+<p>拆开看：</p>
+<table>
+<thead>
+<tr>
+<th>部分</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>data:</code></td>
+<td>协议头，表示“数据直接写在 URL 里”</td>
+</tr>
+<tr>
+<td><code>image/jpg</code></td>
+<td>声明的 MIME 类型</td>
+</tr>
+<tr>
+<td><code>;base64</code></td>
+<td>后面的数据用 Base64 编码</td>
+</tr>
+<tr>
+<td><code>,</code> 之后</td>
+<td>真正的 Base64 数据</td>
+</tr>
+</tbody></table>
+<p>所以这道题的意思很直白：<strong>把逗号后面的 Base64 解出来，就是一张图片。</strong></p>
+<div class="note info"><p>注意一个矛盾：MIME 写的是 <code>image/jpg</code>，但 Base64 的开头是 <code>iVBORw0KGgo</code>。</p>
+<p>Base64 的 <code>iVBORw0KGgo</code> 解码后是 PNG 的文件头 <code>89 50 4E 47 0D 0A 1A 0A</code>。也就是说，<strong>它其实是一张 PNG，不是 JPG</strong>。出题人故意把 MIME 写错，增加一点迷惑性。判断文件类型永远看<strong>文件头（magic bytes）</strong>，不要信扩展名，也不要信 MIME。</p>
+</div>
+
+<h2 id="第三步：CyberChef-解码（图形界面版）"><a href="#第三步：CyberChef-解码（图形界面版）" class="headerlink" title="第三步：CyberChef 解码（图形界面版）"></a>第三步：CyberChef 解码（图形界面版）</h2><p>打开 <a target="_blank" rel="noopener" href="https://gchq.github.io/CyberChef/">CyberChef</a>，按下面步骤操作：</p>
+<p><strong>1. 准备输入</strong></p>
+<p>把 <code>KEY.exe</code> 里的内容复制出来，<strong>删掉</strong>开头的：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">data:image/jpg;base64,</span><br></pre></td></tr></table></figure>
+
+<p>只保留逗号后面的 Base64。也可以直接把整行粘进去，再用 CyberChef 的 <code>Find / Replace</code> 把前缀替换成空。</p>
+<p><strong>2. 添加 From Base64</strong></p>
+<p>在左侧 <code>Operations</code> 搜索框输入 <code>From Base64</code>，把它拖到中间的 <code>Recipe</code> 区域。</p>
+<p><strong>3. 看 Output</strong></p>
+<p>Output 区域会从文本变成一堆乱码&#x2F;字节。CyberChef 右上角有一个小眼睛图标（<code>Render Image</code> &#x2F; <code>Preview</code>），点一下，就能直接看到图片：</p>
+<p><img src="/2026/10/30/misc-base64-nways/01-key-qr.png" alt="解码出来的二维码"></p>
+<p><em>图 2：Base64 解码后的 PNG，是一个 133×133 的二维码</em></p>
+<p><strong>4. 保存图片</strong></p>
+<p>点 Output 区域的下载按钮，保存为 <code>key.png</code>。如果 CyberChef 没有自动识别成图片，可以用 <code>Save output to file</code>，文件名写成 <code>key.png</code>。</p>
+<div class="note success"><p>CyberChef 的 <code>Magic</code> 操作也可以自动识别：把整行（含前缀）粘进去，<code>Magic</code> 通常会自动去掉 Data URI 前缀并做 Base64 解码。但初学建议手动做一遍，知道每一步在干什么。</p>
+</div>
+
+<h2 id="第四步：扫码，拿到-KEY"><a href="#第四步：扫码，拿到-KEY" class="headerlink" title="第四步：扫码，拿到 KEY"></a>第四步：扫码，拿到 KEY</h2><p>用手机、微信&#x2F;QQ、ZXing、或者任意在线二维码扫描器扫这张图，内容是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">KEY&#123;dca57f966e4e4e31fd5b15417da63269&#125;</span><br></pre></td></tr></table></figure>
+
+<p>题目要求提交 <code>flag&#123;&#125;</code> 格式，所以把 <code>KEY&#123;...&#125;</code> 里的内容取出来，包成：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">flag&#123;dca57f966e4e4e31fd5b15417da63269&#125;</span><br></pre></td></tr></table></figure>
+
+<div class="note info"><p>为什么不是直接提交 <code>KEY{...}</code>？因为 BUUCTF 的题目说明写了“得到的 flag 请包上 flag{} 提交”。不同平台的格式要求不同，做题前先看题目描述。</p>
+</div>
+
+<h2 id="第五步：不用-CyberChef-的几种方法"><a href="#第五步：不用-CyberChef-的几种方法" class="headerlink" title="第五步：不用 CyberChef 的几种方法"></a>第五步：不用 CyberChef 的几种方法</h2><p>这道题叫“N种方法解决”，确实有很多种做法。下面几种都可以，选你顺手的：</p>
+<p><strong>方法一：命令行 Base64</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sed <span class="string">&#x27;s|^data:image/jpg;base64,||&#x27;</span> KEY.exe | <span class="built_in">base64</span> -d &gt; key.png</span><br></pre></td></tr></table></figure>
+
+<p><code>sed</code> 删掉前缀，<code>base64 -d</code> 解码，输出重定向到 <code>key.png</code>。然后打开图片扫码。</p>
+<p><strong>方法二：Python</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> base64</span><br><span class="line"></span><br><span class="line">data = <span class="built_in">open</span>(<span class="string">&quot;KEY.exe&quot;</span>, <span class="string">&quot;r&quot;</span>).read()</span><br><span class="line">b64 = data.split(<span class="string">&quot;,&quot;</span>, <span class="number">1</span>)[<span class="number">1</span>]</span><br><span class="line"><span class="built_in">open</span>(<span class="string">&quot;key.png&quot;</span>, <span class="string">&quot;wb&quot;</span>).write(base64.b64decode(b64))</span><br></pre></td></tr></table></figure>
+
+<p><strong>方法三：浏览器地址栏</strong></p>
+<p>有些浏览器支持直接打开 Data URI：把整行 <code>data:image/jpg;base64,...</code> 粘到地址栏回车，图片会直接显示。但文本太长时地址栏可能截断，不如 CyberChef 稳。</p>
+<p><strong>方法四：在线 Base64 转图片</strong></p>
+<p>搜索“Base64 to image online”，把逗号后面的内容粘进去，下载图片。注意选对输出格式（PNG），或者让工具根据文件头自动判断。</p>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>适合谁</th>
+<th>注意点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CyberChef</td>
+<td>喜欢图形界面</td>
+<td>记得删前缀</td>
+</tr>
+<tr>
+<td><code>sed + base64 -d</code></td>
+<td>Linux&#x2F;macOS&#x2F;Git Bash</td>
+<td><code>base64 -d</code> 在 macOS 上可能是 <code>base64 -D</code></td>
+</tr>
+<tr>
+<td>Python</td>
+<td>会一点编程</td>
+<td>用 <code>split(&quot;,&quot;, 1)</code> 只切第一个逗号</td>
+</tr>
+<tr>
+<td>浏览器地址栏</td>
+<td>应急</td>
+<td>长文本可能被截断</td>
+</tr>
+</tbody></table>
+<h2 id="第六步：文件头速查——为什么一眼看出是-PNG"><a href="#第六步：文件头速查——为什么一眼看出是-PNG" class="headerlink" title="第六步：文件头速查——为什么一眼看出是 PNG"></a>第六步：文件头速查——为什么一眼看出是 PNG</h2><p>Base64 的开头能直接暴露文件类型。记住几个常见的：</p>
+<table>
+<thead>
+<tr>
+<th>文件类型</th>
+<th>文件头（十六进制）</th>
+<th>Base64 开头</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PNG</td>
+<td><code>89 50 4E 47 0D 0A 1A 0A</code></td>
+<td><code>iVBORw0KGgo</code></td>
+</tr>
+<tr>
+<td>JPEG</td>
+<td><code>FF D8 FF</code></td>
+<td><code>/9j/</code></td>
+</tr>
+<tr>
+<td>GIF</td>
+<td><code>47 49 46 38</code></td>
+<td><code>R0lGOD</code></td>
+</tr>
+<tr>
+<td>ZIP</td>
+<td><code>50 4B 03 04</code></td>
+<td><code>UEsDB</code></td>
+</tr>
+<tr>
+<td>PDF</td>
+<td><code>25 50 44 46</code></td>
+<td><code>JVBERi</code></td>
+</tr>
+</tbody></table>
+<p>本题开头是 <code>iVBORw0KGgo</code>，所以是 PNG。Data URI 里写的 <code>image/jpg</code> 是假的。</p>
+<div class="note warning"><p>CTF 里经常用“改扩展名”“改 MIME”“双扩展名”来迷惑人。判断文件类型的三板斧：</p>
+<ol>
+<li><code>file 文件名</code>；</li>
+<li><code>xxd 文件名 | head</code> 看文件头；</li>
+<li>看 Base64 解码后的前几个字节。</li>
+</ol>
+<p>扩展名只是给人看的，文件头才是文件真实的身份。</p>
+</div>
+
+<h2 id="第七步：跟着做——自己做一个-Data-URI"><a href="#第七步：跟着做——自己做一个-Data-URI" class="headerlink" title="第七步：跟着做——自己做一个 Data URI"></a>第七步：跟着做——自己做一个 Data URI</h2><p>想彻底理解，可以反过来做一遍：把一张图片编码成 Data URI，再用 CyberChef 解回来。</p>
+<p><strong>1. 准备一张小图片</strong>，比如 <code>test.png</code>。</p>
+<p><strong>2. 用 Python 生成 Data URI</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> base64</span><br><span class="line"></span><br><span class="line">raw = <span class="built_in">open</span>(<span class="string">&quot;test.png&quot;</span>, <span class="string">&quot;rb&quot;</span>).read()</span><br><span class="line">b64 = base64.b64encode(raw).decode()</span><br><span class="line">data_uri = <span class="string">&quot;data:image/png;base64,&quot;</span> + b64</span><br><span class="line"><span class="built_in">open</span>(<span class="string">&quot;test.txt&quot;</span>, <span class="string">&quot;w&quot;</span>).write(data_uri)</span><br></pre></td></tr></table></figure>
+
+<p><strong>3. 打开 <code>test.txt</code></strong>，会看到和题目一样的长文本。</p>
+<p><strong>4. 用 CyberChef 的 <code>From Base64</code> 解码</strong>，确认能还原成原图。</p>
+<p><strong>5. 试试把前缀改成 <code>data:image/jpg;base64,</code></strong>，再解码——图片依然是 PNG。这样你就亲手复现了题目里的“MIME 骗人”。</p>
+<div class="note success"><p>这个小实验能同时练三件事：Base64 编码、Data URI 结构、文件头识别。以后看到 <code>data:</code> 开头的东西，就不会陌生了。</p>
+</div>
+
+<h2 id="工具速查卡"><a href="#工具速查卡" class="headerlink" title="工具速查卡"></a>工具速查卡</h2><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>工具</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>判断文件类型</td>
+<td><code>file</code></td>
+<td>不信扩展名，信内容</td>
+</tr>
+<tr>
+<td>看十六进制</td>
+<td><code>xxd</code> &#x2F; <code>hexdump</code></td>
+<td>看文件头 magic bytes</td>
+</tr>
+<tr>
+<td>Base64 解码</td>
+<td>CyberChef <code>From Base64</code></td>
+<td>图形界面，最直观</td>
+</tr>
+<tr>
+<td>Base64 解码</td>
+<td><code>base64 -d</code></td>
+<td>命令行，配合 <code>sed</code> 去前缀</td>
+</tr>
+<tr>
+<td>扫码</td>
+<td>手机&#x2F;ZXing&#x2F;在线工具</td>
+<td>二维码内容可能是 flag 的一半</td>
+</tr>
+<tr>
+<td>图片预览</td>
+<td>CyberChef <code>Render Image</code></td>
+<td>不用保存也能看</td>
+</tr>
+</tbody></table>
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><details class="note info"><summary><p><strong>Q1：<code>file</code> 说 ASCII text，但它叫 <code>.exe</code>，能双击吗？</strong></p>
+</summary>
+<p>不能，也不建议。它只是文本文件，双击不会运行；更重要的是，<strong>陌生 exe 不要直接运行</strong>。先用 <code>file</code>、<code>strings</code>、十六进制确认。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q2：CyberChef 解码出来是乱码？</strong></p>
+</summary>
+<p>最常见的原因是没有删掉 <code>data:image/jpg;base64,</code> 前缀。前缀里的字母也是合法 Base64 字符，会混进解码结果。用 <code>Find / Replace</code> 或手动删除，只保留逗号后的内容。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q3：为什么 MIME 写 <code>image/jpg</code>，解出来却是 PNG？</strong></p>
+</summary>
+<p>MIME 是文本里写的，可以随便改；文件头 <code>iVBORw0KGgo</code> 才是真实格式。出题人故意写错，考你会不会看文件头。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q4：二维码扫不出来？</strong></p>
+</summary>
+<p>图片只有 133×133，比较小。用图片查看器放大，或者用 CyberChef 的 <code>Render Image</code> 放大；扫码时对准、保持清晰。也可以换一个扫码 App（ZXing、微信、QQ 都试试）。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q5：<code>base64 -d</code> 报错？</strong></p>
+</summary>
+<p>确认前缀已删掉，且没有换行&#x2F;空格混进去。macOS 的 <code>base64</code> 解码参数可能是 <code>-D</code>；Windows Git Bash 一般用 <code>-d</code>。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q6：扫码得到 <code>KEY{...}</code>，直接提交行不行？</strong></p>
+</summary>
+<p>看题目说明。BUUCTF 这题要求包 <code>flag{}</code>，所以提交 <code>flag{dca57f...}</code>。如果平台接受 <code>KEY{...}</code>，题目会明说。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q7：为什么叫“N种方法解决”？</strong></p>
+</summary>
+<p>因为解法很多：CyberChef、命令行、Python、浏览器、在线工具都能做。名字也在提醒你：<strong>Misc 题不要死磕一种工具</strong>。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q8：Data URI 有什么用？</strong></p>
+</summary>
+<p>前端开发里常用来把小图标直接嵌进 HTML&#x2F;CSS，减少请求。但它也能被滥用：钓鱼页面、恶意文件、绕过上传检查，都可能用 Data URI 藏内容。看到 <code>data:</code> 开头的长字符串，先警惕。</p>
+
+</details>
+
+<h2 id="顺手聊聊：文件类型识别与上传安全"><a href="#顺手聊聊：文件类型识别与上传安全" class="headerlink" title="顺手聊聊：文件类型识别与上传安全"></a>顺手聊聊：文件类型识别与上传安全</h2><p>这道题的核心不是 Base64，而是**“文件名&#x2F;扩展名&#x2F;MIME 都不可信”**。真实的安全场景里也一样：</p>
+<ul>
+<li>上传文件时，不能只看扩展名（<code>shell.php.jpg</code>）；</li>
+<li>不能只看 <code>Content-Type</code>（客户端可以随便改）；</li>
+<li>要检查文件头（magic bytes），必要时重新编码&#x2F;压缩；</li>
+<li>图片上传后最好用图像库重新生成，去掉隐藏的元数据和附加数据；</li>
+<li>不要把用户上传的文件放在可执行目录，文件名要重命名。</li>
+</ul>
+<div class="note success"><p><strong>一条经验</strong>：CTF Misc 里，<code>file</code>、<code>xxd</code>、<code>strings</code> 是三个最朴素也最有效的工具。先搞清楚“它到底是什么”，再谈怎么解。</p>
+</div>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Misc/" rel="tag"># Misc</a>
+              <a href="/tags/Base64/" rel="tag"># Base64</a>
+              <a href="/tags/CyberChef/" rel="tag"># CyberChef</a>
+              <a href="/tags/%E4%BA%8C%E7%BB%B4%E7%A0%81/" rel="tag"># 二维码</a>
+              <a href="/tags/BUUCTF/" rel="tag"># BUUCTF</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/10/30/misc-lsb-mirror-world/" rel="prev" title="[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写">
+                  <i class="fa fa-angle-left"></i> [BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/10/30/misc-traffic-easycap/" rel="next" title="[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符">
+                  [BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Quellisya</span>
+  </div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/pisces/" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+  <a href="https://github.com/Quellisya" class="github-corner" title="在 GitHub 上关注我" aria-label="在 GitHub 上关注我" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

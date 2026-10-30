@@ -180,18 +180,18 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">9</span>
+          <span class="site-state-item-count">17</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
           <a href="/categories/">
-        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-count">11</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
           <a href="/tags/">
-        <span class="site-state-item-count">23</span>
+        <span class="site-state-item-count">46</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -213,10 +213,146 @@
   <h2 class="home-hero__title">你好，我是 Quellisya</h2>
   <p class="home-hero__desc">这里记录我的 CTF 与 Web 安全学习笔记，包括做题过程、payload 和踩坑记录。希望能写出对新手友好的 Writeup，帮你少走一点弯路。</p>
   <div class="home-hero__actions"><a class="home-hero__btn home-hero__btn--primary" href="&#x2F;categories&#x2F;"><i class="fa fa-th"></i><span>按分类浏览</span></a><a class="home-hero__btn" href="&#x2F;archives&#x2F;"><i class="fa fa-archive"></i><span>文章归档</span></a><a class="home-hero__btn" href="https:&#x2F;&#x2F;github.com&#x2F;Quellisya" target="_blank" rel="noopener"><i class="fa fa-github"></i><span>GitHub</span></a></div>
-  <div class="home-hero__meta"><span>已整理 <strong>9</strong> 篇</span><span>共 <strong>3</strong> 个主题</span><span>最近更新 <strong>2026-10-25</strong></span></div>
-  <div class="home-hero__tags"><span>主题</span><a href="#topic-1">命令注入<span>2</span></a><a href="#topic-2">文件上传<span>3</span></a><a href="#topic-3">SQL 注入<span>4</span></a></div>
+  <div class="home-hero__meta"><span>已整理 <strong>17</strong> 篇</span><span>共 <strong>6</strong> 个主题</span><span>最近更新 <strong>2026-10-30</strong></span></div>
+  <div class="home-hero__tags"><span>主题</span><a href="#topic-1">逆向入门<span>1</span></a><a href="#topic-2">Misc<span>4</span></a><a href="#topic-3">SQL 注入<span>5</span></a><a href="#topic-4">文件包含<span>2</span></a><a href="#topic-5">命令注入<span>2</span></a><a href="#topic-6">文件上传<span>3</span></a></div>
 </section>
 <div class="home-section-head" id="topic-1">
+  <h2>逆向入门<span class="home-section-head__count">1 篇</span></h2>
+  <a href="&#x2F;categories&#x2F;ctf&#x2F;reverse&#x2F;reverse-basics&#x2F;">查看全部 →</a>
+</div>
+<div class="home-posts">
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;reverse-easyre-ida&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">逆向入门</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">[BUUCTF] easyre：IDA 里一眼看穿的两个整数比较</h3>
+  <p class="home-post-card__desc">第一次打开 IDA 也能做：Shift+F12 搜 flag 字符串，或者 F5 看 main——读入两个整数，相等就打印 flag。本文把 IDA 的界面、快捷键和反汇编都讲清楚。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-30</span><span><i class="far fa-clock"></i>约 8 分钟</span></div>
+  <div class="home-post-card__tags"><span>#BUUCTF</span><span>#Reverse</span><span>#IDA</span></div>
+</a></div><div class="home-section-head" id="topic-2">
+  <h2>Misc<span class="home-section-head__count">4 篇</span></h2>
+  <a href="&#x2F;categories&#x2F;ctf&#x2F;misc&#x2F;">查看全部 →</a>
+</div>
+<div class="home-posts">
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-voip-rtp&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">Misc</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">[BUUCTF] voip：Wireshark RTP 播放器听出 flag</h3>
+  <p class="home-post-card__desc">一个 SIP 通话的 pcap。用 Wireshark 的 Telephony → VoIP Calls 找到通话，再用 RTP Player 播放，音频里直接念出了 flag。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-30</span><span><i class="far fa-clock"></i>约 8 分钟</span></div>
+  <div class="home-post-card__tags"><span>#Misc</span><span>#BUUCTF</span><span>#Wireshark</span></div>
+</a>
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-traffic-easycap&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">Misc</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符</h3>
+  <p class="home-post-card__desc">一个只有 82 个包的小 pcap。用 Wireshark 的 Follow TCP Stream 跟一下，发现客户端每个包只发一个字符，拼起来就是 FLAG:...</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-30</span><span><i class="far fa-clock"></i>约 7 分钟</span></div>
+  <div class="home-post-card__tags"><span>#Misc</span><span>#BUUCTF</span><span>#Wireshark</span></div>
+</a>
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-base64-nways&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">Misc</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图</h3>
+  <p class="home-post-card__desc">附件叫 KEY.exe，file 一看却是 ASCII 文本。去掉 data:image&#x2F;...;base64, 前缀，用 CyberChef 的 From Base64 还原成二维码，扫码拿到 KEY，再包成 flag。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-30</span><span><i class="far fa-clock"></i>约 7 分钟</span></div>
+  <div class="home-post-card__tags"><span>#Misc</span><span>#Base64</span><span>#CyberChef</span></div>
+</a>
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-lsb-mirror-world&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">Misc</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写</h3>
+  <p class="home-post-card__desc">一张写着“Look very closely”的放大镜图片，真正的秘密藏在每个像素的最低位。用 StegSolve 的 Data Extract 勾选 R&#x2F;G&#x2F;B 的 bit 0，直接读出密钥。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-30</span><span><i class="far fa-clock"></i>约 8 分钟</span></div>
+  <div class="home-post-card__tags"><span>#Misc</span><span>#BUUCTF</span><span>#LSB</span></div>
+</a></div><div class="home-section-head" id="topic-3">
+  <h2>SQL 注入<span class="home-section-head__count">5 篇</span></h2>
+  <a href="&#x2F;categories&#x2F;ctf&#x2F;web&#x2F;sql-injection&#x2F;">查看全部 →</a>
+</div>
+<div class="home-posts">
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;web-ctf-sql-babysql&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">SQL 注入</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入</h3>
+  <p class="home-post-card__desc">关键字被过滤后怎么办？把 union、select、and、or、from、where、information、password 里的关键词各写两遍，服务器删掉一遍，正好剩下正确的 SQL。再用 UNION 一步步把 flag 拖出来。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-30</span><span><i class="far fa-clock"></i>约 12 分钟</span></div>
+  <div class="home-post-card__tags"><span>#极客大挑战</span><span>#SQL 注入</span><span>#双写绕过</span></div>
+</a>
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-suctf&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">SQL 注入</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">[SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码</h3>
+  <p class="home-post-card__desc">UNION 用不了时怎么办：先用 Intruder 摸清黑名单，用分号堆叠查询，再根据回显反推后端结构，最后用 *,1 绕开关键字过滤。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-22</span><span><i class="far fa-clock"></i>约 12 分钟</span></div>
+  <div class="home-post-card__tags"><span>#SQL 注入</span><span>#Burp Suite</span><span>#堆叠注入</span></div>
+</a>
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-lovesql&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">SQL 注入</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">[极客大挑战 2019] LoveSQL：UNION 注入的完整流程</h3>
+  <p class="home-post-card__desc">登录只是开始。用 order by 定列数、找回收显位，再用 UNION SELECT 依次爆库、爆表、爆字段，最后把 flag 拖出来。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-22</span><span><i class="far fa-clock"></i>约 3 分钟</span></div>
+  <div class="home-post-card__tags"><span>#极客大挑战</span><span>#SQL 注入</span><span>#UNION 注入</span></div>
+</a>
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-geek&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">SQL 注入</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">[极客大挑战 2019] EasySQL：从一个单引号到万能密码</h3>
+  <p class="home-post-card__desc">最经典的登录框注入：加一个单引号确认注入点，再用 1&#39;||1# 注释掉密码判断，不输入密码也能登录并拿到 flag。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-22</span><span><i class="far fa-clock"></i>约 2 分钟</span></div>
+  <div class="home-post-card__tags"><span>#极客大挑战</span><span>#SQL 注入</span><span>#万能密码</span></div>
+</a>
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-knowledge-sql-basics&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">SQL 注入</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">SQL 注入基础：原理、流程速查与防护</h3>
+  <p class="home-post-card__desc">SQL 注入入门笔记：漏洞是怎么产生的、必须记住的符号、字符型与数字型的判断、URL 编码，以及 UNION 注入的完整流程速查、常见问题和防护建议。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-22</span><span><i class="far fa-clock"></i>约 5 分钟</span></div>
+  <div class="home-post-card__tags"><span>#SQL 注入</span><span>#UNION 注入</span><span>#information_schema</span></div>
+</a></div><div class="home-section-head" id="topic-4">
+  <h2>文件包含<span class="home-section-head__count">2 篇</span></h2>
+  <a href="&#x2F;categories&#x2F;ctf&#x2F;web&#x2F;file-inclusion&#x2F;">查看全部 →</a>
+</div>
+<div class="home-posts">
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;web-ctf-file-inclusion-secret-file&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">文件包含</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">[极客大挑战 2019] Secret File：源码注释、302 跳转与 php:&#x2F;&#x2F;filter</h3>
+  <p class="home-post-card__desc">首页源码里藏着 Archive_room.php，SECRET 按钮又被 302 跳转藏住了响应体。用 Burp 看穿跳转、读到 secr3t.php 源码后，再用 php:&#x2F;&#x2F;filter 把 flag.php 以 base64 读出来。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-30</span><span><i class="far fa-clock"></i>约 11 分钟</span></div>
+  <div class="home-post-card__tags"><span>#文件包含</span><span>#php:&#x2F;&#x2F;filter</span><span>#伪协议</span></div>
+</a>
+<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;web-knowledge-file-inclusion-basics&#x2F;">
+  <div class="home-post-card__head">
+    <span class="home-post-card__topic">文件包含</span>
+    <span class="home-post-card__level">入门</span>
+  </div>
+  <h3 class="home-post-card__title">文件包含基础：include、伪协议与 LFI 利用链</h3>
+  <p class="home-post-card__desc">文件包含题的通用知识：include 和 require 的区别、怎么判断 LFI、php:&#x2F;&#x2F;filter 读源码、常见伪协议、日志包含&#x2F;图片马&#x2F;zip 包含等利用链，附流程速查和防护建议。</p>
+  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-30</span><span><i class="far fa-clock"></i>约 8 分钟</span></div>
+  <div class="home-post-card__tags"><span>#文件包含</span><span>#php:&#x2F;&#x2F;filter</span><span>#伪协议</span></div>
+</a></div><div class="home-section-head" id="topic-5">
   <h2>命令注入<span class="home-section-head__count">2 篇</span></h2>
   <a href="&#x2F;categories&#x2F;ctf&#x2F;web&#x2F;command-injection&#x2F;">查看全部 →</a>
 </div>
@@ -239,8 +375,8 @@
   <h3 class="home-post-card__title">命令注入基础：分隔符、$IFS 与过滤绕过</h3>
   <p class="home-post-card__desc">命令注入的通用知识：漏洞是怎么产生的、shell 的几种分隔符、空格被过滤时用 $IFS 顶上、关键字被过滤时怎么换等价写法，附完整流程速查与常见问题。</p>
   <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-25</span><span><i class="far fa-clock"></i>约 6 分钟</span></div>
-  <div class="home-post-card__tags"><span>#命令注入</span><span>#命令执行</span><span>#$IFS</span></div>
-</a></div><div class="home-section-head" id="topic-2">
+  <div class="home-post-card__tags"><span>#命令注入</span><span>#命令执行</span><span>#空格绕过</span></div>
+</a></div><div class="home-section-head" id="topic-6">
   <h2>文件上传<span class="home-section-head__count">3 篇</span></h2>
   <a href="&#x2F;categories&#x2F;ctf&#x2F;web&#x2F;file-upload&#x2F;">查看全部 →</a>
 </div>
@@ -274,51 +410,71 @@
   <p class="home-post-card__desc">文件上传题的通用知识：漏洞从哪来、前端校验为什么不算防线、服务端会在哪些地方拦、哪些后缀可能被解析，外加 8 个新手常踩的坑和完整流程速查。</p>
   <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-24</span><span><i class="far fa-clock"></i>约 10 分钟</span></div>
   <div class="home-post-card__tags"><span>#文件上传</span><span>#后缀绕过</span><span>#.htaccess</span></div>
-</a></div><div class="home-section-head" id="topic-3">
-  <h2>SQL 注入<span class="home-section-head__count">4 篇</span></h2>
-  <a href="&#x2F;categories&#x2F;ctf&#x2F;web&#x2F;sql-injection&#x2F;">查看全部 →</a>
-</div>
-<div class="home-posts">
-<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-suctf&#x2F;">
-  <div class="home-post-card__head">
-    <span class="home-post-card__topic">SQL 注入</span>
-    <span class="home-post-card__level">入门</span>
-  </div>
-  <h3 class="home-post-card__title">[SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码</h3>
-  <p class="home-post-card__desc">UNION 用不了时怎么办：先用 Intruder 摸清黑名单，用分号堆叠查询，再根据回显反推后端结构，最后用 *,1 绕开关键字过滤。</p>
-  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-22</span><span><i class="far fa-clock"></i>约 12 分钟</span></div>
-  <div class="home-post-card__tags"><span>#SQL 注入</span><span>#堆叠注入</span><span>#黑名单绕过</span></div>
-</a>
-<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-lovesql&#x2F;">
-  <div class="home-post-card__head">
-    <span class="home-post-card__topic">SQL 注入</span>
-    <span class="home-post-card__level">入门</span>
-  </div>
-  <h3 class="home-post-card__title">[极客大挑战 2019] LoveSQL：UNION 注入的完整流程</h3>
-  <p class="home-post-card__desc">登录只是开始。用 order by 定列数、找回收显位，再用 UNION SELECT 依次爆库、爆表、爆字段，最后把 flag 拖出来。</p>
-  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-22</span><span><i class="far fa-clock"></i>约 3 分钟</span></div>
-  <div class="home-post-card__tags"><span>#SQL 注入</span><span>#极客大挑战</span><span>#UNION 注入</span></div>
-</a>
-<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-geek&#x2F;">
-  <div class="home-post-card__head">
-    <span class="home-post-card__topic">SQL 注入</span>
-    <span class="home-post-card__level">入门</span>
-  </div>
-  <h3 class="home-post-card__title">[极客大挑战 2019] EasySQL：从一个单引号到万能密码</h3>
-  <p class="home-post-card__desc">最经典的登录框注入：加一个单引号确认注入点，再用 1&#39;||1# 注释掉密码判断，不输入密码也能登录并拿到 flag。</p>
-  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-22</span><span><i class="far fa-clock"></i>约 2 分钟</span></div>
-  <div class="home-post-card__tags"><span>#SQL 注入</span><span>#万能密码</span><span>#极客大挑战</span></div>
-</a>
-<a class="home-post-card" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-knowledge-sql-basics&#x2F;">
-  <div class="home-post-card__head">
-    <span class="home-post-card__topic">SQL 注入</span>
-    <span class="home-post-card__level">入门</span>
-  </div>
-  <h3 class="home-post-card__title">SQL 注入基础：原理、流程速查与防护</h3>
-  <p class="home-post-card__desc">SQL 注入入门笔记：漏洞是怎么产生的、必须记住的符号、字符型与数字型的判断、URL 编码，以及 UNION 注入的完整流程速查、常见问题和防护建议。</p>
-  <div class="home-post-card__meta"><span><i class="far fa-calendar"></i>2026-10-22</span><span><i class="far fa-clock"></i>约 5 分钟</span></div>
-  <div class="home-post-card__tags"><span>#SQL 注入</span><span>#UNION 注入</span><span>#information_schema</span></div>
 </a></div>
+
+    
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
 
     
 

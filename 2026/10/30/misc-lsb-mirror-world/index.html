@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.css" integrity="sha256-mdaMxrItEW6hMIVJJNPKuX0B7KCSJQVEv3mVY4N2we4=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"quellisya.github.io","root":"/","images":"/images","scheme":"Pisces","darkmode":true,"version":"8.29.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"mac"},"fold":{"enable":false,"height":500},"language":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"mediumzoom":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="一张写着“Look very closely”的放大镜图片，真正的秘密藏在每个像素的最低位。用 StegSolve 的 Data Extract 勾选 R&#x2F;G&#x2F;B 的 bit 0，直接读出密钥。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写">
+<meta property="og:url" content="https://quellisya.github.io/2026/10/30/misc-lsb-mirror-world/index.html">
+<meta property="og:site_name" content="Quellisya&#39;s Blog">
+<meta property="og:description" content="一张写着“Look very closely”的放大镜图片，真正的秘密藏在每个像素的最低位。用 StegSolve 的 Data Extract 勾选 R&#x2F;G&#x2F;B 的 bit 0，直接读出密钥。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/misc-lsb-mirror-world/01-steg.png">
+<meta property="og:image" content="https://quellisya.github.io/2026/10/30/misc-lsb-mirror-world/02-lsb-lab.png">
+<meta property="article:published_time" content="2026-10-30T02:00:00.000Z">
+<meta property="article:modified_time" content="2026-10-30T02:00:00.000Z">
+<meta property="article:author" content="Quellisya">
+<meta property="article:tag" content="BUUCTF">
+<meta property="article:tag" content="LSB">
+<meta property="article:tag" content="Misc">
+<meta property="article:tag" content="StegSolve">
+<meta property="article:tag" content="图片隐写">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://quellisya.github.io/2026/10/30/misc-lsb-mirror-world/01-steg.png">
+
+
+<link rel="canonical" href="https://quellisya.github.io/2026/10/30/misc-lsb-mirror-world/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://quellisya.github.io/2026/10/30/misc-lsb-mirror-world/","path":"/2026/10/30/misc-lsb-mirror-world/","title":"[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写 | Quellisya's Blog</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/next-theme-pjax/0.6.0/pjax.min.js" integrity="sha256-vxLn1tSKWD4dqbMRyv940UYw4sXgMtYcK6reefzZrao=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.umd.js" integrity="sha256-QnJV4HT5r8i89ovZGRD86iynZqHerEbT2xt69vDM36I=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pangu/7.2.1/pangu.umd.js" integrity="sha256-kRsxecBnwG6mULFPe2E6UKnNm8XfDOuDwCOprjLZuX8=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script><script src="/js/bookmark.js" defer></script><script src="/js/pjax.js" defer></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
+<script src="/js/third-party/search/local-search.js" defer></script>
+
+
+
+
+  <script src="/js/third-party/fancybox.js" defer></script>
+
+
+
+  
+
+
+
+
+  
+
+  <script class="next-config" data-name="enableMath" type="application/json">false</script><script class="next-config" data-name="mathjax" type="application/json">{"enable":true,"tags":"none","display_overflow":"scroll","js":{"url":"https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-mml-chtml.js","integrity":"sha256-ihPtDDm7pTmSF9ViEsItlvsrBTsNkz0MOXMchzOwCQw="}}</script>
+<script src="/js/third-party/math/mathjax.js" defer></script>
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+<link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Quellisya's Blog</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">CTF · Web Security · Writeups</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-rss"><a href="/atom.xml" rel="section"><i class="fa fa-rss fa-fw"></i>RSS</a></li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+      <div class="search-header">
+        <span class="search-icon">
+          <i class="fa fa-search"></i>
+        </span>
+        <div class="search-input-container">
+          <input autocomplete="off" autocapitalize="off" maxlength="80"
+                placeholder="搜索..." spellcheck="false"
+                type="search" class="search-input">
+        </div>
+        <span class="popup-btn-close" role="button">
+          <i class="fa fa-times-circle"></i>
+        </span>
+      </div>
+      <div class="search-result-container">
+        <div class="search-result-icon">
+          <i class="fa fa-spinner fa-pulse fa-5x"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</header>
+        
+  
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E6%AD%A5%EF%BC%9A%E8%A7%82%E5%AF%9F%E5%9B%BE%E7%89%87"><span class="nav-number">1.</span> <span class="nav-text">第一步：观察图片</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%8C%E6%AD%A5%EF%BC%9AStegSolve-%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">2.</span> <span class="nav-text">第二步：StegSolve 是什么</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%89%E6%AD%A5%EF%BC%9A%E7%94%A8-Data-Extract-%E6%8F%90%E5%8F%96-LSB"><span class="nav-number">3.</span> <span class="nav-text">第三步：用 Data Extract 提取 LSB</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%9B%9B%E6%AD%A5%EF%BC%9A%E4%BB%8E%E5%AF%86%E9%92%A5%E5%88%B0-flag"><span class="nav-number">4.</span> <span class="nav-text">第四步：从密钥到 flag</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%94%E6%AD%A5%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88%E5%8B%BE-R-G-B-%E7%9A%84-0-%E4%BD%8D%EF%BC%9F"><span class="nav-number">5.</span> <span class="nav-text">第五步：为什么勾 R&#x2F;G&#x2F;B 的 0 位？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%85%AD%E6%AD%A5%EF%BC%9A%E8%B7%9F%E7%9D%80%E5%81%9A%E2%80%94%E2%80%94%E7%94%A8%E7%BB%83%E4%B9%A0%E5%9B%BE%E5%A4%8D%E7%8E%B0"><span class="nav-number">6.</span> <span class="nav-text">第六步：跟着做——用练习图复现</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%83%E6%AD%A5%EF%BC%9A%E6%83%B3%E9%AA%8C%E8%AF%81%E5%8E%9F%E7%90%86%EF%BC%9F%E7%94%A8-Python-%E7%9C%8B%E4%B8%80%E7%9C%BC"><span class="nav-number">7.</span> <span class="nav-text">第七步：想验证原理？用 Python 看一眼</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B7%A5%E5%85%B7%E9%80%9F%E6%9F%A5%E5%8D%A1"><span class="nav-number">8.</span> <span class="nav-text">工具速查卡</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="nav-number">9.</span> <span class="nav-text">新手常见问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%EF%BC%9ALSB-%E4%B8%BA%E4%BB%80%E4%B9%88%E2%80%9C%E8%84%86%E5%BC%B1%E2%80%9D"><span class="nav-number">10.</span> <span class="nav-text">顺手聊聊：LSB 为什么“脆弱”</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Quellisya</p>
+  <div class="site-description" itemprop="description">记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。</div>
+</div>
+<div class="site-state-wrap animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">17</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">46</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+        </div>
+      </div>
+    </div>
+
+    
+  </aside>
+
+
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://quellisya.github.io/2026/10/30/misc-lsb-mirror-world/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Quellisya">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Quellisya's Blog">
+      <meta itemprop="description" content="记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写 | Quellisya's Blog">
+      <meta itemprop="description" content="一张写着“Look very closely”的放大镜图片，真正的秘密藏在每个像素的最低位。用 StegSolve 的 Data Extract 勾选 R&#x2F;G&#x2F;B 的 bit 0，直接读出密钥。">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          [BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-10-30 10:00:00" itemprop="dateCreated datePublished" datetime="2026-10-30T10:00:00+08:00">2026-10-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/" itemprop="url" rel="index"><span itemprop="name">CTF</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/misc/" itemprop="url" rel="index"><span itemprop="name">Misc</span></a>
+        </span>
+          ，
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/ctf/misc/steganography/" itemprop="url" rel="index"><span itemprop="name">隐写</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">一张写着“Look very closely”的放大镜图片，真正的秘密藏在每个像素的最低位。用 StegSolve 的 Data Extract 勾选 R/G/B 的 bit 0，直接读出密钥。</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+<nav class="series-nav">
+  <div class="series-nav__head">
+    <i class="fa fa-layer-group"></i>
+    <span class="series-nav__name">系列：Misc 入门</span>
+    <span class="series-nav__count">第 1 / 4 篇</span>
+  </div>
+  <ol class="series-nav__list"><li class="is-current"><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-lsb-mirror-world&#x2F;">[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-base64-nways&#x2F;">[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-traffic-easycap&#x2F;">[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-voip-rtp&#x2F;">[BUUCTF] voip：Wireshark RTP 播放器听出 flag</a></li></ol>
+  <div class="series-nav__links"><a class="series-nav__next" href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-base64-nways&#x2F;">[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图<i class="fa fa-arrow-right"></i></a></div>
+</nav><div class="note primary"><p><strong>一分钟速览</strong></p>
+<ul>
+<li><strong>难度</strong>：入门</li>
+<li><strong>考点</strong>：LSB 图片隐写、StegSolve 的 Data Extract</li>
+<li><strong>工具</strong>：StegSolve（Java 小工具）</li>
+<li><strong>关键操作</strong>：<code>Analyse → Data Extract</code>，勾选 <code>Red 0</code>、<code>Green 0</code>、<code>Blue 0</code>，<code>Bit Order</code> 选 <code>MSB First</code></li>
+<li><strong>flag</strong>：<code>flag{st3g0_saurus_wr3cks}</code></li>
+</ul>
+</div>
+
+<div class="note info"><p><strong>阅读说明</strong></p>
+<ul>
+<li><strong>前置知识</strong>：知道图片由像素组成、每个像素有 R&#x2F;G&#x2F;B 三个颜色通道（0–255）</li>
+<li><strong>工具</strong>：StegSolve（需要 Java）。文末给了一张<strong>练习图</strong>，可以下载后用同样的步骤提取，不用担心没有靶场。</li>
+<li><strong>环境</strong>：本地分析，不需要联网靶机。</li>
+<li>本文仅用于<strong>授权题目和教学</strong>，请勿用于未授权的图片分析。</li>
+</ul>
+</div>
+
+<div class="note default"><p><strong>做题路线</strong></p>
+<p><code>看图片</code> → <code>怀疑 LSB</code> → <code>StegSolve 打开</code> → <code>Analyse → Data Extract</code> → <code>勾 R/G/B 的 bit 0</code> → <code>Preview 读出文本</code> → <code>包上 flag{}</code></p>
+</div>
+
+<h2 id="第一步：观察图片"><a href="#第一步：观察图片" class="headerlink" title="第一步：观察图片"></a>第一步：观察图片</h2><p>解压附件，只有一张 PNG：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">镜子里面的世界/</span><br><span class="line">└── steg.png</span><br></pre></td></tr></table></figure>
+
+<p>打开一看，是一个放大镜，镜片里写着：</p>
+<p><img src="/2026/10/30/misc-lsb-mirror-world/01-steg.png" alt="题目图片"></p>
+<p><em>图 1：<code>Look very closely ;)</code>——“仔细看”，这基本就是隐写题的标准开场白</em></p>
+<p>图片本身没有二维码、没有明显的文字，文件也不大（约 233 KB）。这种“让你仔细看，但肉眼看不出”的题，第一反应就是 <strong>LSB 隐写</strong>。</p>
+<div class="note info"><p><strong>LSB 是什么？</strong></p>
+<p>每个像素的颜色由 R、G、B 三个 0–255 的整数组成。比如白色是 <code>(255, 255, 255)</code>，写成二进制：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">255 = 11111111</span><br></pre></td></tr></table></figure>
+
+<p>如果我把最后一位从 <code>1</code> 改成 <code>0</code>，颜色变成 <code>254</code>，肉眼看不出任何区别。<strong>最低位（Least Significant Bit，LSB）</strong> 就是用来藏数据的地方：把秘密的二进制位依次写进每个像素的最低位，图片看起来几乎不变。</p>
+</div>
+
+<h2 id="第二步：StegSolve-是什么"><a href="#第二步：StegSolve-是什么" class="headerlink" title="第二步：StegSolve 是什么"></a>第二步：StegSolve 是什么</h2><p>StegSolve 是一个用 Java 写的图片隐写分析小工具，界面很朴素，但功能很适合 Misc 入门：</p>
+<ul>
+<li>按通道&#x2F;位平面浏览图片（R&#x2F;G&#x2F;B&#x2F;A，bit 0–7）；</li>
+<li><code>Data Extract</code> 提取 LSB 数据；</li>
+<li><code>Frame Browser</code> 看 GIF 帧；</li>
+<li><code>Stereogram Solver</code> 解立体图；</li>
+<li><code>Image Combiner</code> 合并两张图。</li>
+</ul>
+<p><strong>安装&#x2F;启动</strong>：</p>
+<ol>
+<li>下载 <code>StegSolve.jar</code>（搜索引擎搜 “StegSolve jar 下载” 即可，很多 CTF 工具包里有）；</li>
+<li>电脑装好 Java（命令行能运行 <code>java -version</code>）；</li>
+<li>双击 jar，或者命令行：</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">java -jar StegSolve.jar</span><br></pre></td></tr></table></figure>
+
+<div class="note warning"><p>StegSolve 是 Java 程序，<strong>不是</strong>双击就能跑的 <code>.exe</code>。如果双击没反应，先确认 Java 装好了；Windows 上可以用 <code>java -jar</code> 启动，macOS&#x2F;Linux 同理。</p>
+</div>
+
+<p>打开后点 <code>File → Open</code>，选择 <code>steg.png</code>。主窗口下方有一排按钮，可以切换 R&#x2F;G&#x2F;B 通道和 bit 0–7 的位平面；键盘左右方向键也能切换。</p>
+<h2 id="第三步：用-Data-Extract-提取-LSB"><a href="#第三步：用-Data-Extract-提取-LSB" class="headerlink" title="第三步：用 Data Extract 提取 LSB"></a>第三步：用 Data Extract 提取 LSB</h2><p>这是本题的核心操作，跟着点就行：</p>
+<ol>
+<li>菜单栏点 <strong><code>Analyse</code></strong>；</li>
+<li>选择 <strong><code>Data Extract</code></strong>，会弹出一个对话框；</li>
+<li>在 <code>Bit Planes</code> 区域，勾选：<ul>
+<li><strong><code>Red 0</code></strong></li>
+<li><strong><code>Green 0</code></strong></li>
+<li><strong><code>Blue 0</code></strong></li>
+</ul>
+</li>
+<li><code>Bit Order</code> 选 <strong><code>MSB First</code></strong>（默认就是它）；</li>
+<li><code>Extract By</code> 保持 <strong><code>Row</code></strong>（按行扫描）；</li>
+<li>点 <strong><code>Preview</code></strong>。</li>
+</ol>
+<p>对话框大概长这样（不同版本文字略有差异）：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">┌─ Data Extract ─────────────────────────────┐</span><br><span class="line">│  Bit Planes                                │</span><br><span class="line">│   [x] Red 0    [ ] Red 1   ...             │</span><br><span class="line">│   [x] Green 0  [ ] Green 1 ...             │</span><br><span class="line">│   [x] Blue 0   [ ] Blue 1  ...             │</span><br><span class="line">│                                            │</span><br><span class="line">│  Bit Order:  (•) MSB First  ( ) LSB First  │</span><br><span class="line">│  Extract By: (•) Row        ( ) Column     │</span><br><span class="line">│                                            │</span><br><span class="line">│  [ Preview ]  [ Save Bin ]  [ Cancel ]     │</span><br><span class="line">└────────────────────────────────────────────┘</span><br></pre></td></tr></table></figure>
+
+<p>点 <code>Preview</code> 后，下方会显示提取出来的文本：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Hey I think we can write safely in this file without anyone seeing it.</span><br><span class="line">Anyway, the secret key is: st3g0_saurus_wr3cks</span><br></pre></td></tr></table></figure>
+
+<div class="note success"><p>看到可读英文，说明勾对了。点 <strong><code>Save Bin</code></strong> 可以保存为二进制文件，用记事本 &#x2F; VSCode 打开也能看到同样的内容。</p>
+</div>
+
+<h2 id="第四步：从密钥到-flag"><a href="#第四步：从密钥到-flag" class="headerlink" title="第四步：从密钥到 flag"></a>第四步：从密钥到 flag</h2><p>文本里写的是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">the secret key is: st3g0_saurus_wr3cks</span><br></pre></td></tr></table></figure>
+
+<p>题目要求提交 <code>flag&#123;&#125;</code> 格式，所以把密钥包进去：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">flag&#123;st3g0_saurus_wr3cks&#125;</span><br></pre></td></tr></table></figure>
+
+<div class="note info"><p>注意：图片里给的是 <strong>secret key</strong>，不是完整 flag。CTF 里经常这样：先给你一段 key&#x2F;口令，再让你按题目要求拼成 <code>flag{...}</code>。看清楚题目说明里的格式要求。</p>
+</div>
+
+<h2 id="第五步：为什么勾-R-G-B-的-0-位？"><a href="#第五步：为什么勾-R-G-B-的-0-位？" class="headerlink" title="第五步：为什么勾 R&#x2F;G&#x2F;B 的 0 位？"></a>第五步：为什么勾 R&#x2F;G&#x2F;B 的 0 位？</h2><p>这是 LSB 题最常问的问题。把三个通道的最低位拿出来，按 R→G→B 的顺序拼成比特流：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">像素 1: R=254(11111110) G=255(11111111) B=254(11111110)</span><br><span class="line">        LSB: 0 1 0</span><br><span class="line">像素 2: R=254(11111110) G=254(11111110) B=255(11111111)</span><br><span class="line">        LSB: 0 0 1</span><br><span class="line">...</span><br><span class="line">拼起来: 010001... → 每 8 位一个字节 → ASCII 文本</span><br></pre></td></tr></table></figure>
+
+<p>为什么是 <strong>0 位</strong>？因为 bit 0 是最低位，改动它只让颜色值变化 1，肉眼几乎察觉不到。bit 7 是最高位，改一下颜色就天差地别，没人会把秘密藏在那里。</p>
+<p>为什么三个通道都勾？因为出题人可能把数据依次写进 R、G、B 的最低位，三个通道一起取才能还原完整的字节流。只勾一个通道，提取出来的可能是乱码。</p>
+<table>
+<thead>
+<tr>
+<th>勾选</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>R&#x2F;G&#x2F;B 的 0 位</td>
+<td>✅ 本题正确，得到可读文本</td>
+</tr>
+<tr>
+<td>只勾 R 的 0 位</td>
+<td>❌ 只拿到 1&#x2F;3 的比特，乱码</td>
+</tr>
+<tr>
+<td>勾 1 位、2 位</td>
+<td>❌ 本题数据不在这些位</td>
+</tr>
+<tr>
+<td><code>Bit Order</code> 选 <code>LSB First</code></td>
+<td>❌ 本题会乱码（有些题需要）</td>
+</tr>
+</tbody></table>
+<div class="note warning"><p>如果 <code>Preview</code> 出来是乱码，不要急着放弃。按顺序试：</p>
+<ol>
+<li><code>Bit Order</code> 换成 <code>LSB First</code>；</li>
+<li>只勾一个通道（R&#x2F;G&#x2F;B 分别试）；</li>
+<li>换 bit 1、bit 2；</li>
+<li><code>Extract By</code> 换成 <code>Column</code>；</li>
+<li>用 <code>zsteg</code>、<code>stegonline</code>、<code>aperisolve</code> 等工具交叉验证。</li>
+</ol>
+<p>LSB 题没有“万能勾选”，但“RGB 的 0 位 + MSB First + Row”覆盖了大多数入门题。</p>
+</div>
+
+<h2 id="第六步：跟着做——用练习图复现"><a href="#第六步：跟着做——用练习图复现" class="headerlink" title="第六步：跟着做——用练习图复现"></a>第六步：跟着做——用练习图复现</h2><p>没有靶场也能练。下面这张图是我用同样的方法生成的练习图，隐藏信息在 R&#x2F;G&#x2F;B 的最低位：</p>
+<p><img src="/2026/10/30/misc-lsb-mirror-world/02-lsb-lab.png" alt="LSB 练习图"></p>
+<p><em>图 2：下载这张图，用 StegSolve 的 Data Extract 提取，看看你能不能读出 <code>flag&#123;lsb_practice&#125;</code></em></p>
+<p>操作步骤和上面完全一样：</p>
+<ol>
+<li><code>File → Open</code> 打开练习图；</li>
+<li><code>Analyse → Data Extract</code>；</li>
+<li>勾 <code>Red 0</code>、<code>Green 0</code>、<code>Blue 0</code>；</li>
+<li><code>Bit Order = MSB First</code>，<code>Extract By = Row</code>；</li>
+<li><code>Preview</code>。</li>
+</ol>
+<p>你应该能看到：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Practice makes perfect. The secret word is: flag&#123;lsb_practice&#125;</span><br></pre></td></tr></table></figure>
+
+<div class="note info"><p><code>Preview</code> 里文本后面可能跟着一长串空白&#x2F;NUL 字符，这是图片剩余像素的最低位都是 0 造成的，忽略即可。原题提取时也会看到类似情况。</p>
+</div>
+
+<div class="note success"><p><strong>练习的意义</strong>：当你能在一张自己知道答案的图上稳定提取出文本，再去做新题就不会慌了。换一张图、换一个 bit 位、换一个 Bit Order，多试几次，手感就出来了。</p>
+</div>
+
+<h2 id="第七步：想验证原理？用-Python-看一眼"><a href="#第七步：想验证原理？用-Python-看一眼" class="headerlink" title="第七步：想验证原理？用 Python 看一眼"></a>第七步：想验证原理？用 Python 看一眼</h2><p>GUI 够用，但如果你想知道 StegSolve 背后做了什么，可以用几行 Python 复现同样的提取过程。<strong>这一段不是做题必需，只是帮助理解。</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> PIL <span class="keyword">import</span> Image</span><br><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line">img = Image.<span class="built_in">open</span>(<span class="string">&quot;steg.png&quot;</span>).convert(<span class="string">&quot;RGB&quot;</span>)</span><br><span class="line">a = np.array(img)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 取 R/G/B 的最低位，按 R→G→B 顺序拼成一维比特流</span></span><br><span class="line">bits = np.stack([a[:, :, i] &amp; <span class="number">1</span> <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">3</span>)], axis=-<span class="number">1</span>).reshape(-<span class="number">1</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 每 8 位组成一个字节（MSB First）</span></span><br><span class="line">out = <span class="built_in">bytearray</span>()</span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">0</span>, <span class="built_in">len</span>(bits) - <span class="number">7</span>, <span class="number">8</span>):</span><br><span class="line">    byte = <span class="number">0</span></span><br><span class="line">    <span class="keyword">for</span> bit <span class="keyword">in</span> bits[i:i + <span class="number">8</span>]:</span><br><span class="line">        byte = (byte &lt;&lt; <span class="number">1</span>) | <span class="built_in">int</span>(bit)</span><br><span class="line">    out.append(byte)</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(out.split(<span class="string">b&quot;\x00&quot;</span>)[<span class="number">0</span>].decode(<span class="string">&quot;latin1&quot;</span>))</span><br></pre></td></tr></table></figure>
+
+<p>输出就是那段英文。对照一下 StegSolve 的 <code>Preview</code>，结果一致。</p>
+<div class="note info"><p>为什么按 <code>R→G→B</code> 的顺序？因为 StegSolve 的 Data Extract 就是按这个顺序把勾选的位平面串起来的。不同工具的顺序可能不同，所以换工具时要以实际输出为准。</p>
+</div>
+
+<h2 id="工具速查卡"><a href="#工具速查卡" class="headerlink" title="工具速查卡"></a>工具速查卡</h2><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>路径&#x2F;快捷键</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>打开图片</td>
+<td><code>File → Open</code></td>
+<td>支持 PNG&#x2F;BMP&#x2F;GIF 等</td>
+</tr>
+<tr>
+<td>切换位平面</td>
+<td>左右方向键 &#x2F; 底部按钮</td>
+<td>看 R&#x2F;G&#x2F;B 的 bit 0–7</td>
+</tr>
+<tr>
+<td>提取数据</td>
+<td><code>Analyse → Data Extract</code></td>
+<td>本题核心</td>
+</tr>
+<tr>
+<td>预览</td>
+<td><code>Preview</code></td>
+<td>直接看提取结果</td>
+</tr>
+<tr>
+<td>保存</td>
+<td><code>Save Bin</code></td>
+<td>保存为二进制，用文本编辑器打开</td>
+</tr>
+<tr>
+<td>看 GIF 帧</td>
+<td><code>Analyse → Frame Browser</code></td>
+<td>动图题常用</td>
+</tr>
+<tr>
+<td>合并图片</td>
+<td><code>Analyse → Image Combiner</code></td>
+<td>两张图做 XOR&#x2F;加法等</td>
+</tr>
+</tbody></table>
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><details class="note info"><summary><p><strong>Q1：StegSolve 双击没反应？</strong></p>
+</summary>
+<p>先装 Java，然后在命令行运行 <code>java -jar StegSolve.jar</code>。如果报 <code>UnsupportedClassVersionError</code>，说明 Java 版本太新&#x2F;太旧，换一个 Java 8 或 11 试试。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q2：Data Extract 里全是乱码？</strong></p>
+</summary>
+<p>按“Bit Order → 通道 → bit 位 → Extract By”的顺序逐个试。最常见的是 <code>MSB First</code> 和 <code>LSB First</code> 选错，或者只勾了一个通道。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q3：为什么不能直接看图片？</strong></p>
+</summary>
+<p>LSB 只改每个颜色值的最低位，肉眼分辨不出 254 和 255 的区别。要用工具把最低位单独抽出来看。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q4：JPG 图片也能做 LSB 吗？</strong></p>
+</summary>
+<p>JPG 是有损压缩，保存&#x2F;重新压缩会破坏最低位，所以 LSB 题通常用 PNG、BMP 这类无损格式。拿到 JPG 先看文件头，也可能是改了后缀的 PNG。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q5：除了 StegSolve 还有什么工具？</strong></p>
+</summary>
+<p><code>zsteg</code>（命令行，Ruby）、<code>stegonline</code>（网页）、<code>aperisolve</code>（网页，自动跑多种分析）、<code>Binwalk</code>（看文件结构）。入门先用 StegSolve 建立直觉，再换工具。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q6：提取出来的文本只有一半？</strong></p>
+</summary>
+<p>可能数据不在文件开头，或者 <code>Preview</code> 只显示了前几百字节。点 <code>Save Bin</code> 保存完整数据，再用文本编辑器搜索 <code>flag</code>、<code>key</code>、<code>secret</code>。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q7：flag 格式不对？</strong></p>
+</summary>
+<p>图片给的是 <code>st3g0_saurus_wr3cks</code>，题目要求包 <code>flag{}</code>，所以提交 <code>flag{st3g0_saurus_wr3cks}</code>。注意大小写和下划线，别手打错。</p>
+
+</details>
+
+<details class="note info"><summary><p><strong>Q8：为什么练习图能提取，原题却不行？</strong></p>
+</summary>
+<p>每道题的通道、bit 位、Bit Order 可能不同。练习图只是帮你熟悉操作，真正做题时要按上面的顺序多试几种组合。</p>
+
+</details>
+
+<h2 id="顺手聊聊：LSB-为什么“脆弱”"><a href="#顺手聊聊：LSB-为什么“脆弱”" class="headerlink" title="顺手聊聊：LSB 为什么“脆弱”"></a>顺手聊聊：LSB 为什么“脆弱”</h2><p>LSB 隐写的特点是<strong>容量大、实现简单、但非常脆弱</strong>：</p>
+<ul>
+<li>图片重新保存为 JPG、缩放、裁剪、调色，都可能破坏最低位；</li>
+<li>用统计方法（卡方分析、RS 分析）可以检测出 LSB 平面异常；</li>
+<li>所以真实场景里的隐写会用更鲁棒的方法（DCT 域、扩频、纠错码等）。</li>
+</ul>
+<p>CTF 里的 LSB 题主要是让你理解“<strong>数据可以藏在看起来无害的载体里</strong>”。做题时记住三件事：</p>
+<ol>
+<li>先看文件类型和大小；</li>
+<li>用 StegSolve 逐位看，重点看 bit 0；</li>
+<li>提取结果可能是文本、二维码、压缩包、另一张图——不要只盯着“flag”三个字母。</li>
+</ol>
+<div class="note success"><p><strong>一条经验</strong>：Misc 题不怕工具多，就怕不动手。StegSolve 的 Data Extract 点十次，比看十篇 writeup 更有用。</p>
+</div>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Misc/" rel="tag"># Misc</a>
+              <a href="/tags/BUUCTF/" rel="tag"># BUUCTF</a>
+              <a href="/tags/LSB/" rel="tag"># LSB</a>
+              <a href="/tags/StegSolve/" rel="tag"># StegSolve</a>
+              <a href="/tags/%E5%9B%BE%E7%89%87%E9%9A%90%E5%86%99/" rel="tag"># 图片隐写</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/10/30/web-ctf-sql-babysql/" rel="prev" title="[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入">
+                  <i class="fa fa-angle-left"></i> [极客大挑战 2019] BabySQL：双写绕过与 UNION 注入
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/10/30/misc-base64-nways/" rel="next" title="[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图">
+                  [BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Quellisya</span>
+  </div>
+  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/pisces/" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+  <div class="sidebar-dimmer"></div>
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+  <a href="https://github.com/Quellisya" class="github-corner" title="在 GitHub 上关注我" aria-label="在 GitHub 上关注我" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

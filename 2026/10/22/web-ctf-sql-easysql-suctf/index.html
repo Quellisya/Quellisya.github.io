@@ -197,18 +197,18 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">9</span>
+          <span class="site-state-item-count">17</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
           <a href="/categories/">
-        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-count">11</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
           <a href="/tags/">
-        <span class="site-state-item-count">23</span>
+        <span class="site-state-item-count">46</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -306,10 +306,10 @@
   <div class="series-nav__head">
     <i class="fa fa-layer-group"></i>
     <span class="series-nav__name">系列：SQL 注入</span>
-    <span class="series-nav__count">第 4 / 4 篇</span>
+    <span class="series-nav__count">第 4 / 5 篇</span>
   </div>
-  <ol class="series-nav__list"><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-knowledge-sql-basics&#x2F;">SQL 注入基础：原理、流程速查与防护</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-geek&#x2F;">[极客大挑战 2019] EasySQL：从一个单引号到万能密码</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-lovesql&#x2F;">[极客大挑战 2019] LoveSQL：UNION 注入的完整流程</a></li><li class="is-current"><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-suctf&#x2F;">[SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码</a></li></ol>
-  <div class="series-nav__links"><a class="series-nav__prev" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-lovesql&#x2F;"><i class="fa fa-arrow-left"></i>[极客大挑战 2019] LoveSQL：UNION 注入的完整流程</a></div>
+  <ol class="series-nav__list"><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-knowledge-sql-basics&#x2F;">SQL 注入基础：原理、流程速查与防护</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-geek&#x2F;">[极客大挑战 2019] EasySQL：从一个单引号到万能密码</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-lovesql&#x2F;">[极客大挑战 2019] LoveSQL：UNION 注入的完整流程</a></li><li class="is-current"><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-suctf&#x2F;">[SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;web-ctf-sql-babysql&#x2F;">[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入</a></li></ol>
+  <div class="series-nav__links"><a class="series-nav__prev" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-lovesql&#x2F;"><i class="fa fa-arrow-left"></i>[极客大挑战 2019] LoveSQL：UNION 注入的完整流程</a><a class="series-nav__next" href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;web-ctf-sql-babysql&#x2F;">[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入<i class="fa fa-arrow-right"></i></a></div>
 </nav><p>前两篇用的都是 <code>UNION</code>，思路很顺：数清列数，把数据塞进回显位，收工。这道题会把这个惯性彻底打破——<code>UNION</code> 一次都用不上。</p>
 <p>下面按<strong>我看到什么 → 我想到什么 → 我试了什么</strong>的顺序走一遍。中间遇到的每个新东西，都在用到它的当下解释清楚。</p>
 <h2 id="拿到题：只有一个输入框"><a href="#拿到题：只有一个输入框" class="headerlink" title="拿到题：只有一个输入框"></a>拿到题：只有一个输入框</h2><p>打开靶场，页面朴素得有点可疑：</p>
@@ -565,9 +565,9 @@
     <footer class="post-footer">
           <div class="post-tags">
               <a href="/tags/SQL-%E6%B3%A8%E5%85%A5/" rel="tag"># SQL 注入</a>
+              <a href="/tags/Burp-Suite/" rel="tag"># Burp Suite</a>
               <a href="/tags/%E5%A0%86%E5%8F%A0%E6%B3%A8%E5%85%A5/" rel="tag"># 堆叠注入</a>
               <a href="/tags/%E9%BB%91%E5%90%8D%E5%8D%95%E7%BB%95%E8%BF%87/" rel="tag"># 黑名单绕过</a>
-              <a href="/tags/Burp-Suite/" rel="tag"># Burp Suite</a>
               <a href="/tags/SUCTF/" rel="tag"># SUCTF</a>
           </div>
 
