@@ -1,35 +1,11 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width">
-<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 8.1.2">
-
-  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
-  <link rel="mask-icon" href="/images/logo.svg" color="#222">
-
-<link rel="stylesheet" href="/css/main.css">
-
-
-
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.css" integrity="sha256-mdaMxrItEW6hMIVJJNPKuX0B7KCSJQVEv3mVY4N2we4=" crossorigin="anonymous">
-
-<script class="next-config" data-name="main" type="application/json">{"hostname":"quellisya.github.io","root":"/","images":"/images","scheme":"Pisces","darkmode":true,"version":"8.29.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"mac"},"fold":{"enable":false,"height":500},"language":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"mediumzoom":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
-
-    <meta name="description" content="一张写着“Look very closely”的放大镜图片，真正的秘密藏在每个像素的最低位。用 StegSolve 的 Data Extract 勾选 R&#x2F;G&#x2F;B 的 bit 0，直接读出密钥。">
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写 | Quellisya's Blog</title><meta name="author" content="Quellisya"><meta name="copyright" content="Quellisya"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#f3fbf8"><meta name="description" content="一张写着“Look very closely”的放大镜图片，真正的秘密藏在每个像素的最低位。用 StegSolve 的 Data Extract 勾选 R&#x2F;G&#x2F;B 的 bit 0，直接读出密钥。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写">
 <meta property="og:url" content="https://quellisya.github.io/2026/10/30/misc-lsb-mirror-world/index.html">
 <meta property="og:site_name" content="Quellisya&#39;s Blog">
 <meta property="og:description" content="一张写着“Look very closely”的放大镜图片，真正的秘密藏在每个像素的最低位。用 StegSolve 的 Data Extract 勾选 R&#x2F;G&#x2F;B 的 bit 0，直接读出密钥。">
 <meta property="og:locale" content="zh_CN">
-<meta property="og:image" content="https://quellisya.github.io/2026/10/30/misc-lsb-mirror-world/01-steg.png">
-<meta property="og:image" content="https://quellisya.github.io/2026/10/30/misc-lsb-mirror-world/02-lsb-lab.png">
+<meta property="og:image" content="https://quellisya.github.io/img/avatar-seal.svg">
 <meta property="article:published_time" content="2026-10-30T02:00:00.000Z">
 <meta property="article:modified_time" content="2026-10-30T02:00:00.000Z">
 <meta property="article:author" content="Quellisya">
@@ -39,264 +15,207 @@
 <meta property="article:tag" content="StegSolve">
 <meta property="article:tag" content="图片隐写">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="https://quellisya.github.io/2026/10/30/misc-lsb-mirror-world/01-steg.png">
+<meta name="twitter:image" content="https://quellisya.github.io/img/avatar-seal.svg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写",
+  "url": "https://quellisya.github.io/2026/10/30/misc-lsb-mirror-world/",
+  "image": "https://quellisya.github.io/img/avatar-seal.svg",
+  "datePublished": "2026-10-30T02:00:00.000Z",
+  "dateModified": "2026-10-30T02:00:00.000Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Quellisya",
+      "url": "https://github.com/Quellisya"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/logo-seal.svg"><link rel="canonical" href="https://quellisya.github.io/2026/10/30/misc-lsb-mirror-world/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="stylesheet" href="/css/index.css?v=5.7.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        const data = { value }
 
+        if (ttl != null) {
+          data.expiry = Date.now() + ttl * 86400000
+        }
 
-<link rel="canonical" href="https://quellisya.github.io/2026/10/30/misc-lsb-mirror-world/">
+        localStorage.setItem(key, JSON.stringify(data))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return
 
+        try {
+          const data = JSON.parse(itemStr)
 
-<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://quellisya.github.io/2026/10/30/misc-lsb-mirror-world/","path":"/2026/10/30/misc-lsb-mirror-world/","title":"[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写"}</script>
+          if (data.expiry && Date.now() > data.expiry) {
+            localStorage.removeItem(key)
+            return
+          }
 
-<script class="next-config" data-name="calendar" type="application/json">""</script>
-<title>[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写 | Quellisya's Blog</title>
+          return data.value
+        } catch {
+          localStorage.removeItem(key)
+        }
+      }
+    }
+
+    const scriptCache = new Map()
+    const cssCache = new Map()
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => {
+        if (scriptCache.has(url)) {
+          return scriptCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const script = document.createElement('script')
+
+          script.src = url
+          script.async = true
+
+          for (const key in attr) {
+            script.setAttribute(key, attr[key])
+          }
+
+          script.onload = resolve
+          script.onerror = reject
+
+          document.head.appendChild(script)
+        })
+
+        scriptCache.set(url, promise)
+
+        return promise
+      },
+      getCSS: (url, id) => {
+        if (cssCache.has(url)) {
+          return cssCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const link = document.createElement('link')
+
+          link.rel = 'stylesheet'
+          link.href = url
+
+          if (id) {
+            link.id = id
+          }
+
+          link.onload = resolve
+          link.onerror = reject
+
+          document.head.appendChild(link)
+        })
+
+        cssCache.set(url, promise)
+
+        return promise
+      },
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
   
+      
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      const activateDarkMode = () => {
+        document.documentElement.dataset.theme = 'dark'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#0f1f22')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.dataset.theme = 'light'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#f3fbf8')
+        }
+      }
 
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
 
-
-
-
-
-
-
-  
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/next-theme-pjax/0.6.0/pjax.min.js" integrity="sha256-vxLn1tSKWD4dqbMRyv940UYw4sXgMtYcK6reefzZrao=" crossorigin="anonymous" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.umd.js" integrity="sha256-QnJV4HT5r8i89ovZGRD86iynZqHerEbT2xt69vDM36I=" crossorigin="anonymous" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pangu/7.2.1/pangu.umd.js" integrity="sha256-kRsxecBnwG6mULFPe2E6UKnNm8XfDOuDwCOprjLZuX8=" crossorigin="anonymous" defer></script>
-<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script><script src="/js/bookmark.js" defer></script><script src="/js/pjax.js" defer></script>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
-<script src="/js/third-party/search/local-search.js" defer></script>
-
-
-
-
-  <script src="/js/third-party/fancybox.js" defer></script>
-
-
-
-  
-
-
-
-
-  
-
-  <script class="next-config" data-name="enableMath" type="application/json">false</script><script class="next-config" data-name="mathjax" type="application/json">{"enable":true,"tags":"none","display_overflow":"scroll","js":{"url":"https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-mml-chtml.js","integrity":"sha256-ihPtDDm7pTmSF9ViEsItlvsrBTsNkz0MOXMchzOwCQw="}}</script>
-<script src="/js/third-party/math/mathjax.js" defer></script>
-
-
-
-  <noscript>
-    <link rel="stylesheet" href="/css/noscript.css">
-  </noscript>
-<link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
-</head>
-
-<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
-  <div class="headband"></div>
-
-  <main class="main">
-    <div class="column">
-      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
-  <div class="site-nav-toggle">
-    <div class="toggle" aria-label="切换导航栏" role="button">
-        <span class="toggle-line"></span>
-        <span class="toggle-line"></span>
-        <span class="toggle-line"></span>
-    </div>
-  </div>
-
-  <div class="site-meta">
-
-    <a href="/" class="brand" rel="start">
-      <i class="logo-line"></i>
-      <p class="site-title">Quellisya's Blog</p>
-      <i class="logo-line"></i>
-    </a>
-      <p class="site-subtitle" itemprop="description">CTF · Web Security · Writeups</p>
-  </div>
-
-  <div class="site-nav-right">
-    <div class="toggle popup-trigger" aria-label="搜索" role="button">
-        <i class="fa fa-search fa-fw fa-lg"></i>
-    </div>
-  </div>
-</div>
-
-
-
-<nav class="site-nav">
-  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-rss"><a href="/atom.xml" rel="section"><i class="fa fa-rss fa-fw"></i>RSS</a></li>
-      <li class="menu-item menu-item-search">
-        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
-        </a>
-      </li>
-  </ul>
-</nav>
-
-
-
-  <div class="search-pop-overlay">
-    <div class="popup search-popup">
-      <div class="search-header">
-        <span class="search-icon">
-          <i class="fa fa-search"></i>
-        </span>
-        <div class="search-input-container">
-          <input autocomplete="off" autocapitalize="off" maxlength="80"
-                placeholder="搜索..." spellcheck="false"
-                type="search" class="search-input">
-        </div>
-        <span class="popup-btn-close" role="button">
-          <i class="fa fa-times-circle"></i>
-        </span>
-      </div>
-      <div class="search-result-container">
-        <div class="search-result-icon">
-          <i class="fa fa-spinner fa-pulse fa-5x"></i>
-        </div>
-      </div>
-    </div>
-  </div>
-
-</header>
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
         
-  
-  <aside class="sidebar">
-
-    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
-      <ul class="sidebar-nav">
-        <li class="sidebar-nav-toc">
-          文章目录
-        </li>
-        <li class="sidebar-nav-overview">
-          站点概览
-        </li>
-      </ul>
-
-      <div class="sidebar-panel-container">
-        <!--noindex-->
-        <div class="post-toc-wrap sidebar-panel">
-            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E6%AD%A5%EF%BC%9A%E8%A7%82%E5%AF%9F%E5%9B%BE%E7%89%87"><span class="nav-number">1.</span> <span class="nav-text">第一步：观察图片</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%8C%E6%AD%A5%EF%BC%9AStegSolve-%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">2.</span> <span class="nav-text">第二步：StegSolve 是什么</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%89%E6%AD%A5%EF%BC%9A%E7%94%A8-Data-Extract-%E6%8F%90%E5%8F%96-LSB"><span class="nav-number">3.</span> <span class="nav-text">第三步：用 Data Extract 提取 LSB</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%9B%9B%E6%AD%A5%EF%BC%9A%E4%BB%8E%E5%AF%86%E9%92%A5%E5%88%B0-flag"><span class="nav-number">4.</span> <span class="nav-text">第四步：从密钥到 flag</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%94%E6%AD%A5%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88%E5%8B%BE-R-G-B-%E7%9A%84-0-%E4%BD%8D%EF%BC%9F"><span class="nav-number">5.</span> <span class="nav-text">第五步：为什么勾 R&#x2F;G&#x2F;B 的 0 位？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%85%AD%E6%AD%A5%EF%BC%9A%E8%B7%9F%E7%9D%80%E5%81%9A%E2%80%94%E2%80%94%E7%94%A8%E7%BB%83%E4%B9%A0%E5%9B%BE%E5%A4%8D%E7%8E%B0"><span class="nav-number">6.</span> <span class="nav-text">第六步：跟着做——用练习图复现</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%83%E6%AD%A5%EF%BC%9A%E6%83%B3%E9%AA%8C%E8%AF%81%E5%8E%9F%E7%90%86%EF%BC%9F%E7%94%A8-Python-%E7%9C%8B%E4%B8%80%E7%9C%BC"><span class="nav-number">7.</span> <span class="nav-text">第七步：想验证原理？用 Python 看一眼</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B7%A5%E5%85%B7%E9%80%9F%E6%9F%A5%E5%8D%A1"><span class="nav-number">8.</span> <span class="nav-text">工具速查卡</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="nav-number">9.</span> <span class="nav-text">新手常见问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%EF%BC%9ALSB-%E4%B8%BA%E4%BB%80%E4%B9%88%E2%80%9C%E8%84%86%E5%BC%B1%E2%80%9D"><span class="nav-number">10.</span> <span class="nav-text">顺手聊聊：LSB 为什么“脆弱”</span></a></li></ol></div>
-        </div>
-        <!--/noindex-->
-
-        <div class="site-overview-wrap sidebar-panel">
-          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
-  <p class="site-author-name" itemprop="name">Quellisya</p>
-  <div class="site-description" itemprop="description">记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。</div>
-</div>
-<div class="site-state-wrap animated">
-  <nav class="site-state">
-      <div class="site-state-item site-state-posts">
-        <a href="/archives/">
-          <span class="site-state-item-count">17</span>
-          <span class="site-state-item-name">日志</span>
-        </a>
-      </div>
-      <div class="site-state-item site-state-categories">
-          <a href="/categories/">
-        <span class="site-state-item-count">11</span>
-        <span class="site-state-item-name">分类</span></a>
-      </div>
-      <div class="site-state-item site-state-tags">
-          <a href="/tags/">
-        <span class="site-state-item-count">46</span>
-        <span class="site-state-item-name">标签</span></a>
-      </div>
-  </nav>
-</div>
-
-        </div>
-      </div>
-    </div>
-
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
     
-  </aside>
-
-
-    </div>
-
-    <div class="main-inner post posts-expand">
-
-
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
   
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://quellisya.github.io/2026/10/30/misc-lsb-mirror-world/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="Quellisya">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Quellisya's Blog">
-      <meta itemprop="description" content="记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写 | Quellisya's Blog">
-      <meta itemprop="description" content="一张写着“Look very closely”的放大镜图片，真正的秘密藏在每个像素的最低位。用 StegSolve 的 Data Extract 勾选 R&#x2F;G&#x2F;B 的 bit 0，直接读出密钥。">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          [BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写
-        </h1>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2026-10-30 10:00:00" itemprop="dateCreated datePublished" datetime="2026-10-30T10:00:00+08:00">2026-10-30</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/ctf/" itemprop="url" rel="index"><span itemprop="name">CTF</span></a>
-        </span>
-          ，
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/ctf/misc/" itemprop="url" rel="index"><span itemprop="name">Misc</span></a>
-        </span>
-          ，
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/ctf/misc/steganography/" itemprop="url" rel="index"><span itemprop="name">隐写</span></a>
-        </span>
-    </span>
-
-  
-</div>
-
-            <div class="post-description">一张写着“Look very closely”的放大镜图片，真正的秘密藏在每个像素的最低位。用 StegSolve 的 Data Extract 勾选 R/G/B 的 bit 0，直接读出密钥。</div>
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"pagination":{"enable":false,"hitsPerPage":8},"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":true},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: true,
+  percent: {
+    toc: true,
+    rightside: true,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><link rel="stylesheet" href="/css/butterfly-custom.css"><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head><body><div class="bg-animation" id="web_bg" style="background-image: url(/img/bg-ink-tech.svg);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">17</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">46</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">11</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg fixed" id="page-header" style="background-image: url(/img/banner-ink-tech.svg);"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><img class="site-icon" src="/img/logo-seal.svg" alt="Logo"><span class="site-name">Quellisya's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-10-30T02:00:00.000Z" title="发表于 2026-10-30 10:00:00">2026-10-30</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-10-30T02:00:00.000Z" title="更新于 2026-10-30 10:00:00">2026-10-30</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/">CTF</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/misc/">Misc</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/misc/steganography/">隐写</a></span></div><div class="meta-secondline"></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container">
 <nav class="series-nav">
   <div class="series-nav__head">
-    <i class="fa fa-layer-group"></i>
+    <i class="fas fa-layer-group"></i>
     <span class="series-nav__name">系列：Misc 入门</span>
     <span class="series-nav__count">第 1 / 4 篇</span>
   </div>
   <ol class="series-nav__list"><li class="is-current"><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-lsb-mirror-world&#x2F;">[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-base64-nways&#x2F;">[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-traffic-easycap&#x2F;">[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-voip-rtp&#x2F;">[BUUCTF] voip：Wireshark RTP 播放器听出 flag</a></li></ol>
-  <div class="series-nav__links"><a class="series-nav__next" href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-base64-nways&#x2F;">[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图<i class="fa fa-arrow-right"></i></a></div>
-</nav><div class="note primary"><p><strong>一分钟速览</strong></p>
+  <div class="series-nav__links"><a class="series-nav__next" href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-base64-nways&#x2F;">[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图<i class="fas fa-arrow-right"></i></a></div>
+</nav><div class="note primary flat"><p><strong>一分钟速览</strong></p>
 <ul>
 <li><strong>难度</strong>：入门</li>
 <li><strong>考点</strong>：LSB 图片隐写、StegSolve 的 Data Extract</li>
@@ -306,7 +225,7 @@
 </ul>
 </div>
 
-<div class="note info"><p><strong>阅读说明</strong></p>
+<div class="note info flat"><p><strong>阅读说明</strong></p>
 <ul>
 <li><strong>前置知识</strong>：知道图片由像素组成、每个像素有 R&#x2F;G&#x2F;B 三个颜色通道（0–255）</li>
 <li><strong>工具</strong>：StegSolve（需要 Java）。文末给了一张<strong>练习图</strong>，可以下载后用同样的步骤提取，不用担心没有靶场。</li>
@@ -315,7 +234,7 @@
 </ul>
 </div>
 
-<div class="note default"><p><strong>做题路线</strong></p>
+<div class="note default flat"><p><strong>做题路线</strong></p>
 <p><code>看图片</code> → <code>怀疑 LSB</code> → <code>StegSolve 打开</code> → <code>Analyse → Data Extract</code> → <code>勾 R/G/B 的 bit 0</code> → <code>Preview 读出文本</code> → <code>包上 flag{}</code></p>
 </div>
 
@@ -326,7 +245,7 @@
 <p><img src="/2026/10/30/misc-lsb-mirror-world/01-steg.png" alt="题目图片"></p>
 <p><em>图 1：<code>Look very closely ;)</code>——“仔细看”，这基本就是隐写题的标准开场白</em></p>
 <p>图片本身没有二维码、没有明显的文字，文件也不大（约 233 KB）。这种“让你仔细看，但肉眼看不出”的题，第一反应就是 <strong>LSB 隐写</strong>。</p>
-<div class="note info"><p><strong>LSB 是什么？</strong></p>
+<div class="note info flat"><p><strong>LSB 是什么？</strong></p>
 <p>每个像素的颜色由 R、G、B 三个 0–255 的整数组成。比如白色是 <code>(255, 255, 255)</code>，写成二进制：</p>
 <figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">255 = 11111111</span><br></pre></td></tr></table></figure>
 
@@ -349,7 +268,7 @@
 </ol>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">java -jar StegSolve.jar</span><br></pre></td></tr></table></figure>
 
-<div class="note warning"><p>StegSolve 是 Java 程序，<strong>不是</strong>双击就能跑的 <code>.exe</code>。如果双击没反应，先确认 Java 装好了；Windows 上可以用 <code>java -jar</code> 启动，macOS&#x2F;Linux 同理。</p>
+<div class="note warning flat"><p>StegSolve 是 Java 程序，<strong>不是</strong>双击就能跑的 <code>.exe</code>。如果双击没反应，先确认 Java 装好了；Windows 上可以用 <code>java -jar</code> 启动，macOS&#x2F;Linux 同理。</p>
 </div>
 
 <p>打开后点 <code>File → Open</code>，选择 <code>steg.png</code>。主窗口下方有一排按钮，可以切换 R&#x2F;G&#x2F;B 通道和 bit 0–7 的位平面；键盘左右方向键也能切换。</p>
@@ -373,7 +292,7 @@
 <p>点 <code>Preview</code> 后，下方会显示提取出来的文本：</p>
 <figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Hey I think we can write safely in this file without anyone seeing it.</span><br><span class="line">Anyway, the secret key is: st3g0_saurus_wr3cks</span><br></pre></td></tr></table></figure>
 
-<div class="note success"><p>看到可读英文，说明勾对了。点 <strong><code>Save Bin</code></strong> 可以保存为二进制文件，用记事本 &#x2F; VSCode 打开也能看到同样的内容。</p>
+<div class="note success flat"><p>看到可读英文，说明勾对了。点 <strong><code>Save Bin</code></strong> 可以保存为二进制文件，用记事本 &#x2F; VSCode 打开也能看到同样的内容。</p>
 </div>
 
 <h2 id="第四步：从密钥到-flag"><a href="#第四步：从密钥到-flag" class="headerlink" title="第四步：从密钥到 flag"></a>第四步：从密钥到 flag</h2><p>文本里写的是：</p>
@@ -382,7 +301,7 @@
 <p>题目要求提交 <code>flag&#123;&#125;</code> 格式，所以把密钥包进去：</p>
 <figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">flag&#123;st3g0_saurus_wr3cks&#125;</span><br></pre></td></tr></table></figure>
 
-<div class="note info"><p>注意：图片里给的是 <strong>secret key</strong>，不是完整 flag。CTF 里经常这样：先给你一段 key&#x2F;口令，再让你按题目要求拼成 <code>flag{...}</code>。看清楚题目说明里的格式要求。</p>
+<div class="note info flat"><p>注意：图片里给的是 <strong>secret key</strong>，不是完整 flag。CTF 里经常这样：先给你一段 key&#x2F;口令，再让你按题目要求拼成 <code>flag{...}</code>。看清楚题目说明里的格式要求。</p>
 </div>
 
 <h2 id="第五步：为什么勾-R-G-B-的-0-位？"><a href="#第五步：为什么勾-R-G-B-的-0-位？" class="headerlink" title="第五步：为什么勾 R&#x2F;G&#x2F;B 的 0 位？"></a>第五步：为什么勾 R&#x2F;G&#x2F;B 的 0 位？</h2><p>这是 LSB 题最常问的问题。把三个通道的最低位拿出来，按 R→G→B 的顺序拼成比特流：</p>
@@ -414,7 +333,7 @@
 <td>❌ 本题会乱码（有些题需要）</td>
 </tr>
 </tbody></table>
-<div class="note warning"><p>如果 <code>Preview</code> 出来是乱码，不要急着放弃。按顺序试：</p>
+<div class="note warning flat"><p>如果 <code>Preview</code> 出来是乱码，不要急着放弃。按顺序试：</p>
 <ol>
 <li><code>Bit Order</code> 换成 <code>LSB First</code>；</li>
 <li>只勾一个通道（R&#x2F;G&#x2F;B 分别试）；</li>
@@ -439,17 +358,17 @@
 <p>你应该能看到：</p>
 <figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Practice makes perfect. The secret word is: flag&#123;lsb_practice&#125;</span><br></pre></td></tr></table></figure>
 
-<div class="note info"><p><code>Preview</code> 里文本后面可能跟着一长串空白&#x2F;NUL 字符，这是图片剩余像素的最低位都是 0 造成的，忽略即可。原题提取时也会看到类似情况。</p>
+<div class="note info flat"><p><code>Preview</code> 里文本后面可能跟着一长串空白&#x2F;NUL 字符，这是图片剩余像素的最低位都是 0 造成的，忽略即可。原题提取时也会看到类似情况。</p>
 </div>
 
-<div class="note success"><p><strong>练习的意义</strong>：当你能在一张自己知道答案的图上稳定提取出文本，再去做新题就不会慌了。换一张图、换一个 bit 位、换一个 Bit Order，多试几次，手感就出来了。</p>
+<div class="note success flat"><p><strong>练习的意义</strong>：当你能在一张自己知道答案的图上稳定提取出文本，再去做新题就不会慌了。换一张图、换一个 bit 位、换一个 Bit Order，多试几次，手感就出来了。</p>
 </div>
 
 <h2 id="第七步：想验证原理？用-Python-看一眼"><a href="#第七步：想验证原理？用-Python-看一眼" class="headerlink" title="第七步：想验证原理？用 Python 看一眼"></a>第七步：想验证原理？用 Python 看一眼</h2><p>GUI 够用，但如果你想知道 StegSolve 背后做了什么，可以用几行 Python 复现同样的提取过程。<strong>这一段不是做题必需，只是帮助理解。</strong></p>
 <figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> PIL <span class="keyword">import</span> Image</span><br><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line">img = Image.<span class="built_in">open</span>(<span class="string">&quot;steg.png&quot;</span>).convert(<span class="string">&quot;RGB&quot;</span>)</span><br><span class="line">a = np.array(img)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 取 R/G/B 的最低位，按 R→G→B 顺序拼成一维比特流</span></span><br><span class="line">bits = np.stack([a[:, :, i] &amp; <span class="number">1</span> <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">3</span>)], axis=-<span class="number">1</span>).reshape(-<span class="number">1</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 每 8 位组成一个字节（MSB First）</span></span><br><span class="line">out = <span class="built_in">bytearray</span>()</span><br><span class="line"><span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">0</span>, <span class="built_in">len</span>(bits) - <span class="number">7</span>, <span class="number">8</span>):</span><br><span class="line">    byte = <span class="number">0</span></span><br><span class="line">    <span class="keyword">for</span> bit <span class="keyword">in</span> bits[i:i + <span class="number">8</span>]:</span><br><span class="line">        byte = (byte &lt;&lt; <span class="number">1</span>) | <span class="built_in">int</span>(bit)</span><br><span class="line">    out.append(byte)</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(out.split(<span class="string">b&quot;\x00&quot;</span>)[<span class="number">0</span>].decode(<span class="string">&quot;latin1&quot;</span>))</span><br></pre></td></tr></table></figure>
 
 <p>输出就是那段英文。对照一下 StegSolve 的 <code>Preview</code>，结果一致。</p>
-<div class="note info"><p>为什么按 <code>R→G→B</code> 的顺序？因为 StegSolve 的 Data Extract 就是按这个顺序把勾选的位平面串起来的。不同工具的顺序可能不同，所以换工具时要以实际输出为准。</p>
+<div class="note info flat"><p>为什么按 <code>R→G→B</code> 的顺序？因为 StegSolve 的 Data Extract 就是按这个顺序把勾选的位平面串起来的。不同工具的顺序可能不同，所以换工具时要以实际输出为准。</p>
 </div>
 
 <h2 id="工具速查卡"><a href="#工具速查卡" class="headerlink" title="工具速查卡"></a>工具速查卡</h2><table>
@@ -496,52 +415,60 @@
 <td>两张图做 XOR&#x2F;加法等</td>
 </tr>
 </tbody></table>
-<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><details class="note info"><summary><p><strong>Q1：StegSolve 双击没反应？</strong></p>
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><details class="note nx-note info">
+<summary><p><strong>Q1：StegSolve 双击没反应？</strong></p>
 </summary>
-<p>先装 Java，然后在命令行运行 <code>java -jar StegSolve.jar</code>。如果报 <code>UnsupportedClassVersionError</code>，说明 Java 版本太新&#x2F;太旧，换一个 Java 8 或 11 试试。</p>
-
+<div class="nx-note__body"><p>先装 Java，然后在命令行运行 <code>java -jar StegSolve.jar</code>。如果报 <code>UnsupportedClassVersionError</code>，说明 Java 版本太新&#x2F;太旧，换一个 Java 8 或 11 试试。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q2：Data Extract 里全是乱码？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q2：Data Extract 里全是乱码？</strong></p>
 </summary>
-<p>按“Bit Order → 通道 → bit 位 → Extract By”的顺序逐个试。最常见的是 <code>MSB First</code> 和 <code>LSB First</code> 选错，或者只勾了一个通道。</p>
-
+<div class="nx-note__body"><p>按“Bit Order → 通道 → bit 位 → Extract By”的顺序逐个试。最常见的是 <code>MSB First</code> 和 <code>LSB First</code> 选错，或者只勾了一个通道。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q3：为什么不能直接看图片？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q3：为什么不能直接看图片？</strong></p>
 </summary>
-<p>LSB 只改每个颜色值的最低位，肉眼分辨不出 254 和 255 的区别。要用工具把最低位单独抽出来看。</p>
-
+<div class="nx-note__body"><p>LSB 只改每个颜色值的最低位，肉眼分辨不出 254 和 255 的区别。要用工具把最低位单独抽出来看。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q4：JPG 图片也能做 LSB 吗？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q4：JPG 图片也能做 LSB 吗？</strong></p>
 </summary>
-<p>JPG 是有损压缩，保存&#x2F;重新压缩会破坏最低位，所以 LSB 题通常用 PNG、BMP 这类无损格式。拿到 JPG 先看文件头，也可能是改了后缀的 PNG。</p>
-
+<div class="nx-note__body"><p>JPG 是有损压缩，保存&#x2F;重新压缩会破坏最低位，所以 LSB 题通常用 PNG、BMP 这类无损格式。拿到 JPG 先看文件头，也可能是改了后缀的 PNG。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q5：除了 StegSolve 还有什么工具？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q5：除了 StegSolve 还有什么工具？</strong></p>
 </summary>
-<p><code>zsteg</code>（命令行，Ruby）、<code>stegonline</code>（网页）、<code>aperisolve</code>（网页，自动跑多种分析）、<code>Binwalk</code>（看文件结构）。入门先用 StegSolve 建立直觉，再换工具。</p>
-
+<div class="nx-note__body"><p><code>zsteg</code>（命令行，Ruby）、<code>stegonline</code>（网页）、<code>aperisolve</code>（网页，自动跑多种分析）、<code>Binwalk</code>（看文件结构）。入门先用 StegSolve 建立直觉，再换工具。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q6：提取出来的文本只有一半？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q6：提取出来的文本只有一半？</strong></p>
 </summary>
-<p>可能数据不在文件开头，或者 <code>Preview</code> 只显示了前几百字节。点 <code>Save Bin</code> 保存完整数据，再用文本编辑器搜索 <code>flag</code>、<code>key</code>、<code>secret</code>。</p>
-
+<div class="nx-note__body"><p>可能数据不在文件开头，或者 <code>Preview</code> 只显示了前几百字节。点 <code>Save Bin</code> 保存完整数据，再用文本编辑器搜索 <code>flag</code>、<code>key</code>、<code>secret</code>。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q7：flag 格式不对？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q7：flag 格式不对？</strong></p>
 </summary>
-<p>图片给的是 <code>st3g0_saurus_wr3cks</code>，题目要求包 <code>flag{}</code>，所以提交 <code>flag{st3g0_saurus_wr3cks}</code>。注意大小写和下划线，别手打错。</p>
-
+<div class="nx-note__body"><p>图片给的是 <code>st3g0_saurus_wr3cks</code>，题目要求包 <code>flag{}</code>，所以提交 <code>flag{st3g0_saurus_wr3cks}</code>。注意大小写和下划线，别手打错。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q8：为什么练习图能提取，原题却不行？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q8：为什么练习图能提取，原题却不行？</strong></p>
 </summary>
-<p>每道题的通道、bit 位、Bit Order 可能不同。练习图只是帮你熟悉操作，真正做题时要按上面的顺序多试几种组合。</p>
-
+<div class="nx-note__body"><p>每道题的通道、bit 位、Bit Order 可能不同。练习图只是帮你熟悉操作，真正做题时要按上面的顺序多试几种组合。</p>
+</div>
 </details>
 
 <h2 id="顺手聊聊：LSB-为什么“脆弱”"><a href="#顺手聊聊：LSB-为什么“脆弱”" class="headerlink" title="顺手聊聊：LSB 为什么“脆弱”"></a>顺手聊聊：LSB 为什么“脆弱”</h2><p>LSB 隐写的特点是<strong>容量大、实现简单、但非常脆弱</strong>：</p>
@@ -556,86 +483,6 @@
 <li>用 StegSolve 逐位看，重点看 bit 0；</li>
 <li>提取结果可能是文本、二维码、压缩包、另一张图——不要只盯着“flag”三个字母。</li>
 </ol>
-<div class="note success"><p><strong>一条经验</strong>：Misc 题不怕工具多，就怕不动手。StegSolve 的 Data Extract 点十次，比看十篇 writeup 更有用。</p>
+<div class="note success flat"><p><strong>一条经验</strong>：Misc 题不怕工具多，就怕不动手。StegSolve 的 Data Extract 点十次，比看十篇 writeup 更有用。</p>
 </div>
-
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-          <div class="post-tags">
-              <a href="/tags/Misc/" rel="tag"># Misc</a>
-              <a href="/tags/BUUCTF/" rel="tag"># BUUCTF</a>
-              <a href="/tags/LSB/" rel="tag"># LSB</a>
-              <a href="/tags/StegSolve/" rel="tag"># StegSolve</a>
-              <a href="/tags/%E5%9B%BE%E7%89%87%E9%9A%90%E5%86%99/" rel="tag"># 图片隐写</a>
-          </div>
-
-        
-
-          <div class="post-nav">
-            <div class="post-nav-item">
-                <a href="/2026/10/30/web-ctf-sql-babysql/" rel="prev" title="[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入">
-                  <i class="fa fa-angle-left"></i> [极客大挑战 2019] BabySQL：双写绕过与 UNION 注入
-                </a>
-            </div>
-            <div class="post-nav-item">
-                <a href="/2026/10/30/misc-base64-nways/" rel="next" title="[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图">
-                  [BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图 <i class="fa fa-angle-right"></i>
-                </a>
-            </div>
-          </div>
-    </footer>
-  </article>
-</div>
-
-
-
-
-
-
-</div>
-  </main>
-
-  <footer class="footer">
-    <div class="footer-inner">
-
-  <div class="copyright">
-    &copy; 
-    <span itemprop="copyrightYear">2026</span>
-    <span class="with-love">
-      <i class="fa fa-heart"></i>
-    </span>
-    <span class="author" itemprop="copyrightHolder">Quellisya</span>
-  </div>
-  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/pisces/" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
-  </div>
-
-    </div>
-  </footer>
-
-  
-  <div class="toggle sidebar-toggle" role="button">
-    <span class="toggle-line"></span>
-    <span class="toggle-line"></span>
-    <span class="toggle-line"></span>
-  </div>
-  <div class="sidebar-dimmer"></div>
-  <div class="back-to-top" role="button" aria-label="返回顶部">
-    <i class="fa fa-arrow-up fa-lg"></i>
-    <span>0%</span>
-  </div>
-  <div class="reading-progress-bar"></div>
-  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
-
-  <a href="https://github.com/Quellisya" class="github-corner" title="在 GitHub 上关注我" aria-label="在 GitHub 上关注我" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
-
-<noscript>
-  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
-</noscript>
-
-</body>
-</html>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/Quellisya">Quellisya</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://quellisya.github.io/2026/10/30/misc-lsb-mirror-world/">https://quellisya.github.io/2026/10/30/misc-lsb-mirror-world/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://Quellisya.github.io" target="_blank">Quellisya's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/Misc/">Misc</a><a class="post-meta__tags" href="/tags/BUUCTF/">BUUCTF</a><a class="post-meta__tags" href="/tags/LSB/">LSB</a><a class="post-meta__tags" href="/tags/StegSolve/">StegSolve</a><a class="post-meta__tags" href="/tags/%E5%9B%BE%E7%89%87%E9%9A%90%E5%86%99/">图片隐写</a></div><div class="post-share"><div class="social-share" data-image="/img/avatar-seal.svg" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/10/30/misc-base64-nways/" title="[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info"><div class="info-1"><div class="info-item-1">上一篇</div><div class="info-item-2">[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图</div></div><div class="info-2"><div class="info-item-1">附件叫 KEY.exe，file 一看却是 ASCII 文本。去掉 data:image/...;base64, 前缀，用 CyberChef 的 From Base64 还原成二维码，扫码拿到 KEY，再包成 flag。</div></div></div></a><a class="pagination-related" href="/2026/10/30/web-ctf-sql-babysql/" title="[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入</div></div><div class="info-2"><div class="info-item-1">关键字被过滤后怎么办？把 union、select、and、or、from、where、information、password 里的关键词各写两遍，服务器删掉一遍，正好剩下正确的 SQL。再用 UNION 一步步把 flag 拖出来。</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2026/10/30/misc-base64-nways/" title="[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-30</div><div class="info-item-2">[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图</div></div><div class="info-2"><div class="info-item-1">附件叫 KEY.exe，file 一看却是 ASCII 文本。去掉 data:image/...;base64, 前缀，用 CyberChef 的 From Base64 还原成二维码，扫码拿到 KEY，再包成 flag。</div></div></div></a><a class="pagination-related" href="/2026/10/30/misc-traffic-easycap/" title="[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-30</div><div class="info-item-2">[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符</div></div><div class="info-2"><div class="info-item-1">一个只有 82 个包的小 pcap。用 Wireshark 的 Follow TCP Stream 跟一下，发现客户端每个包只发一个字符，拼起来就是 FLAG:...</div></div></div></a><a class="pagination-related" href="/2026/10/30/misc-voip-rtp/" title="[BUUCTF] voip：Wireshark RTP 播放器听出 flag"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-30</div><div class="info-item-2">[BUUCTF] voip：Wireshark RTP 播放器听出 flag</div></div><div class="info-2"><div class="info-item-1">一个 SIP 通话的 pcap。用 Wireshark 的 Telephony → VoIP Calls 找到通话，再用 RTP Player 播放，音频里直接念出了 flag。</div></div></div></a></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Quellisya</div><div class="author-info-description">记录 CTF 与 Web 安全的学习笔记，把每一步讲清楚。</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">17</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">46</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">11</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/Quellisya" target="_blank" title="Github"><i class="fab fa-github" style="color: #0f2f32;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">循墨迹读代码，借微光见漏洞。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%80%E6%AD%A5%EF%BC%9A%E8%A7%82%E5%AF%9F%E5%9B%BE%E7%89%87"><span class="toc-text">第一步：观察图片</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%BA%8C%E6%AD%A5%EF%BC%9AStegSolve-%E6%98%AF%E4%BB%80%E4%B9%88"><span class="toc-text">第二步：StegSolve 是什么</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%89%E6%AD%A5%EF%BC%9A%E7%94%A8-Data-Extract-%E6%8F%90%E5%8F%96-LSB"><span class="toc-text">第三步：用 Data Extract 提取 LSB</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E5%9B%9B%E6%AD%A5%EF%BC%9A%E4%BB%8E%E5%AF%86%E9%92%A5%E5%88%B0-flag"><span class="toc-text">第四步：从密钥到 flag</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%BA%94%E6%AD%A5%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88%E5%8B%BE-R-G-B-%E7%9A%84-0-%E4%BD%8D%EF%BC%9F"><span class="toc-text">第五步：为什么勾 R&#x2F;G&#x2F;B 的 0 位？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E5%85%AD%E6%AD%A5%EF%BC%9A%E8%B7%9F%E7%9D%80%E5%81%9A%E2%80%94%E2%80%94%E7%94%A8%E7%BB%83%E4%B9%A0%E5%9B%BE%E5%A4%8D%E7%8E%B0"><span class="toc-text">第六步：跟着做——用练习图复现</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%83%E6%AD%A5%EF%BC%9A%E6%83%B3%E9%AA%8C%E8%AF%81%E5%8E%9F%E7%90%86%EF%BC%9F%E7%94%A8-Python-%E7%9C%8B%E4%B8%80%E7%9C%BC"><span class="toc-text">第七步：想验证原理？用 Python 看一眼</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B7%A5%E5%85%B7%E9%80%9F%E6%9F%A5%E5%8D%A1"><span class="toc-text">工具速查卡</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="toc-text">新手常见问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%EF%BC%9ALSB-%E4%B8%BA%E4%BB%80%E4%B9%88%E2%80%9C%E8%84%86%E5%BC%B1%E2%80%9D"><span class="toc-text">顺手聊聊：LSB 为什么“脆弱”</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/30/reverse-easyre-ida/" title="[BUUCTF] easyre：IDA 里一眼看穿的两个整数比较">[BUUCTF] easyre：IDA 里一眼看穿的两个整数比较</a><time datetime="2026-10-30T02:40:00.000Z" title="发表于 2026-10-30 10:40:00">2026-10-30</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/30/misc-voip-rtp/" title="[BUUCTF] voip：Wireshark RTP 播放器听出 flag">[BUUCTF] voip：Wireshark RTP 播放器听出 flag</a><time datetime="2026-10-30T02:30:00.000Z" title="发表于 2026-10-30 10:30:00">2026-10-30</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/30/misc-traffic-easycap/" title="[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符">[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符</a><time datetime="2026-10-30T02:20:00.000Z" title="发表于 2026-10-30 10:20:00">2026-10-30</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/30/misc-base64-nways/" title="[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图">[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图</a><time datetime="2026-10-30T02:10:00.000Z" title="发表于 2026-10-30 10:10:00">2026-10-30</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/30/misc-lsb-mirror-world/" title="[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写">[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写</a><time datetime="2026-10-30T02:00:00.000Z" title="发表于 2026-10-30 10:00:00">2026-10-30</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2025 - 2026 By Quellisya</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 8.1.2</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.7.0</a></span></div><div class="footer_custom_text">以墨为舟，以码为桨 · CTF & Web Security Notes</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.7.0"></script><script src="/js/main.js?v=5.7.0"></script><div class="js-pjax"></div><script defer src="/js/butterfly-custom.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><i class="fas fa-spinner fa-pulse" id="loading-status" hidden="hidden"></i><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="local-search-input"><input placeholder="搜索笔记、题目或 payload…" type="text"/></div><hr/><div id="local-search-results"></div><div class="ais-Pagination" id="local-search-pagination" style="display:none;"><ul class="ais-Pagination-list"></ul></div><div id="local-search-stats"></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.7.0"></script></div></div></body></html>

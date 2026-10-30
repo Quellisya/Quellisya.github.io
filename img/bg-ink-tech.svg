@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8fffc"/>
+      <stop offset=".55" stop-color="#eff9f5"/>
+      <stop offset="1" stop-color="#e2f2ed"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".78" cy=".18" r=".58">
+      <stop offset="0" stop-color="#7fd8ca" stop-opacity=".22"/>
+      <stop offset=".55" stop-color="#7fd8ca" stop-opacity=".05"/>
+      <stop offset="1" stop-color="#7fd8ca" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="m1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8fcfc3" stop-opacity=".34"/>
+      <stop offset="1" stop-color="#8fcfc3" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="m2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4c9c92" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#4c9c92" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="m3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f5d58" stop-opacity=".15"/>
+      <stop offset="1" stop-color="#1f5d58" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse">
+      <path d="M64 0H0V64" fill="none" stroke="#2bb3a3" stroke-width=".55" opacity=".12"/>
+    </pattern>
+    <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r=".7" fill="#2bb3a3" opacity=".16"/>
+    </pattern>
+    <filter id="blur"><feGaussianBlur stdDeviation="22"/></filter>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#sky)"/>
+  <rect width="1600" height="1000" fill="url(#glow)"/>
+  <rect width="1600" height="1000" fill="url(#grid)" opacity=".85"/>
+  <rect width="1600" height="1000" fill="url(#dots)" opacity=".75"/>
+
+  <text x="1250" y="540" font-family="Songti SC, STSong, SimSun, serif" font-size="460" fill="#2bb3a3" opacity=".032">墨</text>
+
+  <circle cx="1318" cy="222" r="96" fill="none" stroke="#c9a227" stroke-width="1.1" opacity=".22"/>
+  <circle cx="1318" cy="222" r="76" fill="#c9a227" opacity=".035"/>
+
+  <g fill="none" stroke="#5aa9a0" stroke-width="1.3" opacity=".2">
+    <path d="M170 240c0-14 12-25 27-25 5-17 21-29 40-29 19 0 35 12 40 29 16 0 29 11 29 25 0 15-13 26-29 26H199c-15 0-29-11-29-26Z"/>
+    <path d="M360 330c0-10 9-19 21-19 4-13 16-22 31-22 15 0 27 9 31 22 12 0 22 9 22 19 0 11-10 20-22 20H381c-12 0-21-9-21-20Z"/>
+    <path d="M1040 180c0-12 10-21 23-21 4-15 18-26 35-26 17 0 31 11 35 26 14 0 25 9 25 21 0 12-11 22-25 22h-70c-13 0-23-10-23-22Z"/>
+  </g>
+
+  <g fill="none" stroke="#2bb3a3" stroke-width="1" opacity=".24">
+    <path d="M70 610H236V542H360"/>
+    <path d="M70 610v86h96"/>
+    <path d="M1170 690h150v-72h110"/>
+    <path d="M1170 690v72h-92"/>
+    <path d="M470 520h120v-58h96"/>
+    <path d="M1460 560v96h-84"/>
+  </g>
+  <g fill="#2bb3a3" opacity=".34">
+    <circle cx="70" cy="610" r="3"/>
+    <circle cx="360" cy="542" r="3"/>
+    <circle cx="1170" cy="690" r="3"/>
+    <circle cx="1430" cy="560" r="3"/>
+  </g>
+  <g fill="#c9a227" opacity=".42">
+    <circle cx="686" cy="462" r="2.4"/>
+    <circle cx="1320" cy="618" r="2.4"/>
+    <circle cx="166" cy="696" r="2.4"/>
+  </g>
+
+  <path d="M0 762c118-58 196-24 300-72 104-48 170 6 262-28 96-34 168 32 266-4 96-36 166 30 266-6 100-36 176 26 276-8 100-34 170 18 230-2v358H0Z" fill="url(#m1)"/>
+  <path d="M0 840c92-40 172-8 262-46 92-38 174 12 268-18 100-30 176 36 276 4 96-32 174 30 272 0 98-30 176 34 274 2 90-30 158 12 248-4v222H0Z" fill="url(#m2)"/>
+  <path d="M0 920c108-28 200-8 300-38 100-30 202 22 302-6 100-28 200 26 300 0 100-26 200 22 300-4 100-26 200 18 300-2 52-10 78-4 98-2v132H0Z" fill="url(#m3)"/>
+
+  <path d="M0 762c118-58 196-24 300-72 104-48 170 6 262-28 96-34 168 32 266-4 96-36 166 30 266-6 100-36 176 26 276-8 100-34 170 18 230-2" fill="none" stroke="#c9a227" stroke-width="1" opacity=".2"/>
+
+  <circle cx="286" cy="760" r="82" fill="#2bb3a3" opacity=".035" filter="url(#blur)"/>
+  <circle cx="1210" cy="820" r="128" fill="#1f5d58" opacity=".03" filter="url(#blur)"/>
+</svg>

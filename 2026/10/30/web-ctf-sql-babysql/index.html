@@ -1,45 +1,11 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width">
-<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 8.1.2">
-
-  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
-  <link rel="mask-icon" href="/images/logo.svg" color="#222">
-
-<link rel="stylesheet" href="/css/main.css">
-
-
-
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.css" integrity="sha256-mdaMxrItEW6hMIVJJNPKuX0B7KCSJQVEv3mVY4N2we4=" crossorigin="anonymous">
-
-<script class="next-config" data-name="main" type="application/json">{"hostname":"quellisya.github.io","root":"/","images":"/images","scheme":"Pisces","darkmode":true,"version":"8.29.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"mac"},"fold":{"enable":false,"height":500},"language":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"mediumzoom":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
-
-    <meta name="description" content="关键字被过滤后怎么办？把 union、select、and、or、from、where、information、password 里的关键词各写两遍，服务器删掉一遍，正好剩下正确的 SQL。再用 UNION 一步步把 flag 拖出来。">
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入 | Quellisya's Blog</title><meta name="author" content="Quellisya"><meta name="copyright" content="Quellisya"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#f3fbf8"><meta name="description" content="关键字被过滤后怎么办？把 union、select、and、or、from、where、information、password 里的关键词各写两遍，服务器删掉一遍，正好剩下正确的 SQL。再用 UNION 一步步把 flag 拖出来。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入">
 <meta property="og:url" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/index.html">
 <meta property="og:site_name" content="Quellisya&#39;s Blog">
 <meta property="og:description" content="关键字被过滤后怎么办？把 union、select、and、or、from、where、information、password 里的关键词各写两遍，服务器删掉一遍，正好剩下正确的 SQL。再用 UNION 一步步把 flag 拖出来。">
 <meta property="og:locale" content="zh_CN">
-<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/01-login.png">
-<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/02-quote-error.png">
-<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/03-universal-password.png">
-<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/04-login-success.png">
-<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/05-union-filtered.png">
-<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/06-union-select-error.png">
-<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/07-intruder.png">
-<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/08-column-count-3.png">
-<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/09-column-count-4.png">
-<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/10-tables.png">
-<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/11-columns.png">
-<meta property="og:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/12-flag.png">
+<meta property="og:image" content="https://quellisya.github.io/img/avatar-seal.svg">
 <meta property="article:published_time" content="2026-10-30T01:20:00.000Z">
 <meta property="article:modified_time" content="2026-10-30T01:20:00.000Z">
 <meta property="article:author" content="Quellisya">
@@ -49,264 +15,207 @@
 <meta property="article:tag" content="双写绕过">
 <meta property="article:tag" content="极客大挑战">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/01-login.png">
+<meta name="twitter:image" content="https://quellisya.github.io/img/avatar-seal.svg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入",
+  "url": "https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/",
+  "image": "https://quellisya.github.io/img/avatar-seal.svg",
+  "datePublished": "2026-10-30T01:20:00.000Z",
+  "dateModified": "2026-10-30T01:20:00.000Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Quellisya",
+      "url": "https://github.com/Quellisya"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/logo-seal.svg"><link rel="canonical" href="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="stylesheet" href="/css/index.css?v=5.7.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        const data = { value }
 
+        if (ttl != null) {
+          data.expiry = Date.now() + ttl * 86400000
+        }
 
-<link rel="canonical" href="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/">
+        localStorage.setItem(key, JSON.stringify(data))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return
 
+        try {
+          const data = JSON.parse(itemStr)
 
-<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/","path":"/2026/10/30/web-ctf-sql-babysql/","title":"[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入"}</script>
+          if (data.expiry && Date.now() > data.expiry) {
+            localStorage.removeItem(key)
+            return
+          }
 
-<script class="next-config" data-name="calendar" type="application/json">""</script>
-<title>[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入 | Quellisya's Blog</title>
+          return data.value
+        } catch {
+          localStorage.removeItem(key)
+        }
+      }
+    }
+
+    const scriptCache = new Map()
+    const cssCache = new Map()
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => {
+        if (scriptCache.has(url)) {
+          return scriptCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const script = document.createElement('script')
+
+          script.src = url
+          script.async = true
+
+          for (const key in attr) {
+            script.setAttribute(key, attr[key])
+          }
+
+          script.onload = resolve
+          script.onerror = reject
+
+          document.head.appendChild(script)
+        })
+
+        scriptCache.set(url, promise)
+
+        return promise
+      },
+      getCSS: (url, id) => {
+        if (cssCache.has(url)) {
+          return cssCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const link = document.createElement('link')
+
+          link.rel = 'stylesheet'
+          link.href = url
+
+          if (id) {
+            link.id = id
+          }
+
+          link.onload = resolve
+          link.onerror = reject
+
+          document.head.appendChild(link)
+        })
+
+        cssCache.set(url, promise)
+
+        return promise
+      },
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
   
+      
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      const activateDarkMode = () => {
+        document.documentElement.dataset.theme = 'dark'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#0f1f22')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.dataset.theme = 'light'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#f3fbf8')
+        }
+      }
 
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
 
-
-
-
-
-
-
-  
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/next-theme-pjax/0.6.0/pjax.min.js" integrity="sha256-vxLn1tSKWD4dqbMRyv940UYw4sXgMtYcK6reefzZrao=" crossorigin="anonymous" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.umd.js" integrity="sha256-QnJV4HT5r8i89ovZGRD86iynZqHerEbT2xt69vDM36I=" crossorigin="anonymous" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pangu/7.2.1/pangu.umd.js" integrity="sha256-kRsxecBnwG6mULFPe2E6UKnNm8XfDOuDwCOprjLZuX8=" crossorigin="anonymous" defer></script>
-<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script><script src="/js/bookmark.js" defer></script><script src="/js/pjax.js" defer></script>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
-<script src="/js/third-party/search/local-search.js" defer></script>
-
-
-
-
-  <script src="/js/third-party/fancybox.js" defer></script>
-
-
-
-  
-
-
-
-
-  
-
-  <script class="next-config" data-name="enableMath" type="application/json">false</script><script class="next-config" data-name="mathjax" type="application/json">{"enable":true,"tags":"none","display_overflow":"scroll","js":{"url":"https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-mml-chtml.js","integrity":"sha256-ihPtDDm7pTmSF9ViEsItlvsrBTsNkz0MOXMchzOwCQw="}}</script>
-<script src="/js/third-party/math/mathjax.js" defer></script>
-
-
-
-  <noscript>
-    <link rel="stylesheet" href="/css/noscript.css">
-  </noscript>
-<link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
-</head>
-
-<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
-  <div class="headband"></div>
-
-  <main class="main">
-    <div class="column">
-      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
-  <div class="site-nav-toggle">
-    <div class="toggle" aria-label="切换导航栏" role="button">
-        <span class="toggle-line"></span>
-        <span class="toggle-line"></span>
-        <span class="toggle-line"></span>
-    </div>
-  </div>
-
-  <div class="site-meta">
-
-    <a href="/" class="brand" rel="start">
-      <i class="logo-line"></i>
-      <p class="site-title">Quellisya's Blog</p>
-      <i class="logo-line"></i>
-    </a>
-      <p class="site-subtitle" itemprop="description">CTF · Web Security · Writeups</p>
-  </div>
-
-  <div class="site-nav-right">
-    <div class="toggle popup-trigger" aria-label="搜索" role="button">
-        <i class="fa fa-search fa-fw fa-lg"></i>
-    </div>
-  </div>
-</div>
-
-
-
-<nav class="site-nav">
-  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-rss"><a href="/atom.xml" rel="section"><i class="fa fa-rss fa-fw"></i>RSS</a></li>
-      <li class="menu-item menu-item-search">
-        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
-        </a>
-      </li>
-  </ul>
-</nav>
-
-
-
-  <div class="search-pop-overlay">
-    <div class="popup search-popup">
-      <div class="search-header">
-        <span class="search-icon">
-          <i class="fa fa-search"></i>
-        </span>
-        <div class="search-input-container">
-          <input autocomplete="off" autocapitalize="off" maxlength="80"
-                placeholder="搜索..." spellcheck="false"
-                type="search" class="search-input">
-        </div>
-        <span class="popup-btn-close" role="button">
-          <i class="fa fa-times-circle"></i>
-        </span>
-      </div>
-      <div class="search-result-container">
-        <div class="search-result-icon">
-          <i class="fa fa-spinner fa-pulse fa-5x"></i>
-        </div>
-      </div>
-    </div>
-  </div>
-
-</header>
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
         
-  
-  <aside class="sidebar">
-
-    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
-      <ul class="sidebar-nav">
-        <li class="sidebar-nav-toc">
-          文章目录
-        </li>
-        <li class="sidebar-nav-overview">
-          站点概览
-        </li>
-      </ul>
-
-      <div class="sidebar-panel-container">
-        <!--noindex-->
-        <div class="post-toc-wrap sidebar-panel">
-            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%80%E6%AD%A5%EF%BC%9A%E8%A7%82%E5%AF%9F%E9%A2%98%E7%9B%AE"><span class="nav-number">1.</span> <span class="nav-text">第一步：观察题目</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%8C%E6%AD%A5%EF%BC%9A%E6%89%BE%E6%B3%A8%E5%85%A5%E7%82%B9"><span class="nav-number">2.</span> <span class="nav-text">第二步：找注入点</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%89%E6%AD%A5%EF%BC%9A%E5%85%88%E7%94%A8%E4%B8%87%E8%83%BD%E5%AF%86%E7%A0%81%E8%BF%9B%E5%8E%BB"><span class="nav-number">3.</span> <span class="nav-text">第三步：先用万能密码进去</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%9B%9B%E6%AD%A5%EF%BC%9A%E8%AF%95-UNION%EF%BC%8C%E5%8F%91%E7%8E%B0%E5%85%B3%E9%94%AE%E5%AD%97%E8%A2%AB%E5%90%83%E6%8E%89%E4%BA%86"><span class="nav-number">4.</span> <span class="nav-text">第四步：试 UNION，发现关键字被吃掉了</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%BA%94%E6%AD%A5%EF%BC%9A%E7%94%A8-Burp-Intruder-%E6%91%B8%E6%B8%85%E9%BB%91%E5%90%8D%E5%8D%95"><span class="nav-number">5.</span> <span class="nav-text">第五步：用 Burp Intruder 摸清黑名单</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%85%AD%E6%AD%A5%EF%BC%9A%E5%8F%8C%E5%86%99%E7%BB%95%E8%BF%87%E7%9A%84%E5%8E%9F%E7%90%86"><span class="nav-number">6.</span> <span class="nav-text">第六步：双写绕过的原理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B8%83%E6%AD%A5%EF%BC%9A%E7%A1%AE%E5%AE%9A%E5%88%97%E6%95%B0%EF%BC%88%E8%BF%99%E9%87%8C%E6%9C%89%E4%B8%AA%E5%9D%91%EF%BC%89"><span class="nav-number">7.</span> <span class="nav-text">第七步：确定列数（这里有个坑）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%85%AB%E6%AD%A5%EF%BC%9A%E7%88%86%E8%A1%A8%E5%90%8D"><span class="nav-number">8.</span> <span class="nav-text">第八步：爆表名</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E4%B9%9D%E6%AD%A5%EF%BC%9A%E7%88%86%E5%88%97%E5%90%8D"><span class="nav-number">9.</span> <span class="nav-text">第九步：爆列名</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%AC%E5%8D%81%E6%AD%A5%EF%BC%9A%E6%8A%8A-flag-%E6%8B%96%E5%87%BA%E6%9D%A5"><span class="nav-number">10.</span> <span class="nav-text">第十步：把 flag 拖出来</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%8C%E6%95%B4-payload-%E6%B1%87%E6%80%BB"><span class="nav-number">11.</span> <span class="nav-text">完整 payload 汇总</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%9C%AC%E5%9C%B0%E5%A4%8D%E7%8E%B0%E5%AE%9E%E9%AA%8C%EF%BC%88PHP-MySQL%EF%BC%89"><span class="nav-number">12.</span> <span class="nav-text">本地复现实验（PHP + MySQL）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B7%A5%E5%85%B7%E9%80%9F%E6%9F%A5%E5%8D%A1"><span class="nav-number">13.</span> <span class="nav-text">工具速查卡</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="nav-number">14.</span> <span class="nav-text">新手常见问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%E6%80%8E%E4%B9%88%E9%98%B2"><span class="nav-number">15.</span> <span class="nav-text">顺手聊聊怎么防</span></a></li></ol></div>
-        </div>
-        <!--/noindex-->
-
-        <div class="site-overview-wrap sidebar-panel">
-          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
-  <p class="site-author-name" itemprop="name">Quellisya</p>
-  <div class="site-description" itemprop="description">记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。</div>
-</div>
-<div class="site-state-wrap animated">
-  <nav class="site-state">
-      <div class="site-state-item site-state-posts">
-        <a href="/archives/">
-          <span class="site-state-item-count">17</span>
-          <span class="site-state-item-name">日志</span>
-        </a>
-      </div>
-      <div class="site-state-item site-state-categories">
-          <a href="/categories/">
-        <span class="site-state-item-count">11</span>
-        <span class="site-state-item-name">分类</span></a>
-      </div>
-      <div class="site-state-item site-state-tags">
-          <a href="/tags/">
-        <span class="site-state-item-count">46</span>
-        <span class="site-state-item-name">标签</span></a>
-      </div>
-  </nav>
-</div>
-
-        </div>
-      </div>
-    </div>
-
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
     
-  </aside>
-
-
-    </div>
-
-    <div class="main-inner post posts-expand">
-
-
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
   
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="Quellisya">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Quellisya's Blog">
-      <meta itemprop="description" content="记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入 | Quellisya's Blog">
-      <meta itemprop="description" content="关键字被过滤后怎么办？把 union、select、and、or、from、where、information、password 里的关键词各写两遍，服务器删掉一遍，正好剩下正确的 SQL。再用 UNION 一步步把 flag 拖出来。">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          [极客大挑战 2019] BabySQL：双写绕过与 UNION 注入
-        </h1>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2026-10-30 09:20:00" itemprop="dateCreated datePublished" datetime="2026-10-30T09:20:00+08:00">2026-10-30</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/ctf/" itemprop="url" rel="index"><span itemprop="name">CTF</span></a>
-        </span>
-          ，
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/ctf/web/" itemprop="url" rel="index"><span itemprop="name">Web</span></a>
-        </span>
-          ，
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/ctf/web/sql-injection/" itemprop="url" rel="index"><span itemprop="name">SQL 注入</span></a>
-        </span>
-    </span>
-
-  
-</div>
-
-            <div class="post-description">关键字被过滤后怎么办？把 union、select、and、or、from、where、information、password 里的关键词各写两遍，服务器删掉一遍，正好剩下正确的 SQL。再用 UNION 一步步把 flag 拖出来。</div>
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"pagination":{"enable":false,"hitsPerPage":8},"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":true},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: true,
+  percent: {
+    toc: true,
+    rightside: true,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><link rel="stylesheet" href="/css/butterfly-custom.css"><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head><body><div class="bg-animation" id="web_bg" style="background-image: url(/img/bg-ink-tech.svg);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">17</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">46</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">11</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg fixed" id="page-header" style="background-image: url(/img/banner-ink-tech.svg);"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><img class="site-icon" src="/img/logo-seal.svg" alt="Logo"><span class="site-name">Quellisya's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-10-30T01:20:00.000Z" title="发表于 2026-10-30 09:20:00">2026-10-30</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-10-30T01:20:00.000Z" title="更新于 2026-10-30 09:20:00">2026-10-30</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/">CTF</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/web/">Web</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/web/sql-injection/">SQL 注入</a></span></div><div class="meta-secondline"></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container">
 <nav class="series-nav">
   <div class="series-nav__head">
-    <i class="fa fa-layer-group"></i>
+    <i class="fas fa-layer-group"></i>
     <span class="series-nav__name">系列：SQL 注入</span>
     <span class="series-nav__count">第 5 / 5 篇</span>
   </div>
   <ol class="series-nav__list"><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-knowledge-sql-basics&#x2F;">SQL 注入基础：原理、流程速查与防护</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-geek&#x2F;">[极客大挑战 2019] EasySQL：从一个单引号到万能密码</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-lovesql&#x2F;">[极客大挑战 2019] LoveSQL：UNION 注入的完整流程</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-suctf&#x2F;">[SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码</a></li><li class="is-current"><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;web-ctf-sql-babysql&#x2F;">[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入</a></li></ol>
-  <div class="series-nav__links"><a class="series-nav__prev" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-suctf&#x2F;"><i class="fa fa-arrow-left"></i>[SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码</a></div>
-</nav><div class="note primary"><p><strong>一分钟速览</strong></p>
+  <div class="series-nav__links"><a class="series-nav__prev" href="&#x2F;2026&#x2F;10&#x2F;22&#x2F;web-ctf-sql-easysql-suctf&#x2F;"><i class="fas fa-arrow-left"></i>[SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码</a></div>
+</nav><div class="note primary flat"><p><strong>一分钟速览</strong></p>
 <ul>
 <li><strong>难度</strong>：入门（建议先看 <a href="/2026/10/22/web-ctf-sql-easysql-geek/">EasySQL</a> 和 <a href="/2026/10/22/web-ctf-sql-lovesql/">LoveSQL</a>）</li>
 <li><strong>考点</strong>：关键字过滤、双写绕过、Burp Intruder 摸黑名单、UNION 注入</li>
@@ -315,7 +224,7 @@
 </ul>
 </div>
 
-<div class="note info"><p><strong>阅读说明</strong></p>
+<div class="note info flat"><p><strong>阅读说明</strong></p>
 <ul>
 <li><strong>前置知识</strong>：<code>UNION SELECT</code> 的基本用法、<code>information_schema</code> 爆库爆表、URL 编码</li>
 <li><strong>工具</strong>：Burp Suite（Intruder 模块）。没有 Burp 也能做，文末给了 <code>curl</code> 循环和本地复现实验。</li>
@@ -324,7 +233,7 @@
 </ul>
 </div>
 
-<div class="note default"><p><strong>做题路线</strong></p>
+<div class="note default flat"><p><strong>做题路线</strong></p>
 <p><code>找注入点</code> → <code>万能密码登录</code> → <code>试 UNION 被过滤</code> → <code>Intruder 摸黑名单</code> → <code>双写绕过</code> → <code>定列数</code> → <code>爆表</code> → <code>爆列</code> → <code>拖数据</code></p>
 </div>
 
@@ -340,7 +249,7 @@
 <p><img src="/2026/10/30/web-ctf-sql-babysql/02-quote-error.png" alt="单引号报错"></p>
 <p><em>图 2：<code>You have an error in your SQL syntax ... near &#39;1&quot;&#39; at line 1</code></em></p>
 <p>报错说明单引号被带进了 SQL，闭合出了问题，注入点存在。报错里还透露了后端是 <strong>MariaDB</strong>，这对后面判断语法有帮助。</p>
-<div class="note warning"><p>报错只能说明“这里能注入”，不能说明是字符型还是数字型。真正的判断标准是：<strong>你构造的闭合语句能不能让页面恢复正常</strong>。下一句 <code>1&#39;||1#</code> 能登录，就说明这里是字符型，且 <code>#</code> 能注释掉后面的内容。</p>
+<div class="note warning flat"><p>报错只能说明“这里能注入”，不能说明是字符型还是数字型。真正的判断标准是：<strong>你构造的闭合语句能不能让页面恢复正常</strong>。下一句 <code>1&#39;||1#</code> 能登录，就说明这里是字符型，且 <code>#</code> 能注释掉后面的内容。</p>
 </div>
 
 <h2 id="第三步：先用万能密码进去"><a href="#第三步：先用万能密码进去" class="headerlink" title="第三步：先用万能密码进去"></a>第三步：先用万能密码进去</h2><p>在用户名里输入：</p>
@@ -357,7 +266,7 @@
 <li><code>||</code> 没有被过滤——黑名单拦的是<strong>单词</strong> <code>or</code>，不是符号 <code>||</code>；</li>
 <li>页面会回显 <strong>用户名</strong> 和 <strong>密码</strong> 两个位置，后面做 UNION 时要把数据放到对应的列。</li>
 </ol>
-<div class="note info"><p>为什么 <code>1&#39;||1#</code> 能登录？</p>
+<div class="note info flat"><p>为什么 <code>1&#39;||1#</code> 能登录？</p>
 <p>原 SQL 大概是：</p>
 <figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> ... <span class="keyword">FROM</span> users <span class="keyword">WHERE</span> username<span class="operator">=</span><span class="string">&#x27;$username&#x27;</span> <span class="keyword">AND</span> password<span class="operator">=</span><span class="string">&#x27;$password&#x27;</span></span><br></pre></td></tr></table></figure>
 
@@ -422,7 +331,7 @@
 <td>双写有效，过滤只删了一次</td>
 </tr>
 </tbody></table>
-<div class="note success"><p><strong>没有 Burp 也能摸</strong>：用 <code>curl</code> 循环，把每个关键字作为密码发一遍，比较 <code>size_download</code>。</p>
+<div class="note success flat"><p><strong>没有 Burp 也能摸</strong>：用 <code>curl</code> 循环，把每个关键字作为密码发一遍，比较 <code>size_download</code>。</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> w <span class="keyword">in</span> union <span class="keyword">select</span> and or from <span class="built_in">where</span> information; <span class="keyword">do</span></span><br><span class="line">  <span class="built_in">printf</span> <span class="string">&#x27;%-14s &#x27;</span> <span class="string">&quot;<span class="variable">$w</span>&quot;</span></span><br><span class="line">  curl -s -o /dev/null -w <span class="string">&#x27;%&#123;size_download&#125;\n&#x27;</span> -G <span class="string">&#x27;http://&lt;靶场地址&gt;/check.php&#x27;</span> \</span><br><span class="line">    --data-urlencode <span class="string">&#x27;username=admin&#x27;</span> \</span><br><span class="line">    --data-urlencode <span class="string">&quot;password=1&#x27;<span class="variable">$w</span> 1,2,2#&quot;</span></span><br><span class="line"><span class="keyword">done</span></span><br></pre></td></tr></table></figure>
 
 <p><code>--data-urlencode</code> 会自动处理引号、空格和 <code>#</code>，比手拼 URL 省心。</p>
@@ -484,7 +393,7 @@
 <td><code>password</code></td>
 </tr>
 </tbody></table>
-<div class="note warning"><p>最后两个容易漏：<code>information</code> 和 <code>password</code> 里本身含有 <code>or</code>。只要黑名单里有 <code>or</code>，这两个词也会被削掉，所以要把里面的 <code>or</code> 也双写。</p>
+<div class="note warning flat"><p>最后两个容易漏：<code>information</code> 和 <code>password</code> 里本身含有 <code>or</code>。只要黑名单里有 <code>or</code>，这两个词也会被削掉，所以要把里面的 <code>or</code> 也双写。</p>
 </div>
 
 <h2 id="第七步：确定列数（这里有个坑）"><a href="#第七步：确定列数（这里有个坑）" class="headerlink" title="第七步：确定列数（这里有个坑）"></a>第七步：确定列数（这里有个坑）</h2><p>先试 3 列：</p>
@@ -504,7 +413,7 @@
 <li>第 4 列回显在 <code>Your password is</code> 后面；</li>
 <li>第 1、3 列不回显。</li>
 </ul>
-<div class="note warning"><p><strong>别被表的列数骗了。</strong> 后面爆列时会看到 <code>b4bsql</code> 表本身只有 <code>id, username, password</code> 三列（图 11），但这里的 <code>UNION</code> 却需要 4 列。这说明后端的 <code>SELECT</code> 不是简单的 <code>SELECT *</code>，而是多查了一个表达式&#x2F;字段，例如：</p>
+<div class="note warning flat"><p><strong>别被表的列数骗了。</strong> 后面爆列时会看到 <code>b4bsql</code> 表本身只有 <code>id, username, password</code> 三列（图 11），但这里的 <code>UNION</code> 却需要 4 列。这说明后端的 <code>SELECT</code> 不是简单的 <code>SELECT *</code>，而是多查了一个表达式&#x2F;字段，例如：</p>
 <figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> id, username, <span class="number">1</span>, password <span class="keyword">FROM</span> b4bsql <span class="keyword">WHERE</span> ...</span><br></pre></td></tr></table></figure>
 
 <p>这样一来，表是 3 列，查询结果是 4 列，第 2 列是用户名，第 4 列是密码——和截图里的回显完全对得上。做题时<strong>以 <code>UNION</code> 的列数为准</strong>，不要拿表的列数去硬套。</p>
@@ -582,7 +491,7 @@
 <li>第三个成功，页面显示 <code>Hello 2! Your password is &#39;3&#39;</code>。</li>
 </ul>
 <p>然后继续用双写 payload 爆库、爆表、爆列、拖数据。你会得到和靶场一样的流程，只是 flag 换成了 <code>local_test_flag</code>。</p>
-<div class="note success"><p>这个实验的关键是 <code>str_ireplace</code> 的“单轮替换”行为。把 <code>str_ireplace</code> 换成 <code>preg_replace</code>（默认也是单轮）效果一样；如果换成 <code>while (strpos(...))</code> 循环删除，双写就会失效，这也是不同题目绕过方式不同的原因。</p>
+<div class="note success flat"><p>这个实验的关键是 <code>str_ireplace</code> 的“单轮替换”行为。把 <code>str_ireplace</code> 换成 <code>preg_replace</code>（默认也是单轮）效果一样；如果换成 <code>while (strpos(...))</code> 循环删除，双写就会失效，这也是不同题目绕过方式不同的原因。</p>
 </div>
 
 <h2 id="工具速查卡"><a href="#工具速查卡" class="headerlink" title="工具速查卡"></a>工具速查卡</h2><table>
@@ -624,67 +533,77 @@
 <td>一次改一个关键字，适合验证</td>
 </tr>
 </tbody></table>
-<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><p><details class="note info"><summary><p><strong>Q1：<code>or</code> 被过滤了，为什么 <code>1&#39;||1#</code> 还能用？</strong></p>
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><p><details class="note nx-note info">
+<summary><p><strong>Q1：<code>or</code> 被过滤了，为什么 <code>1&#39;||1#</code> 还能用？</strong></p>
 </summary>
-<p><br>黑名单过滤的是字符串 <code>or</code>，<code>||</code> 是逻辑或运算符，不是 <code>or</code> 这三个字符。同理，<code>&amp;&amp;</code>、<code>|</code>、<code>;</code> 这些符号能不能用，要看黑名单有没有单独拦。</p></p>
-
+<div class="nx-note__body"><p><br>黑名单过滤的是字符串 <code>or</code>，<code>||</code> 是逻辑或运算符，不是 <code>or</code> 这三个字符。同理，<code>&amp;&amp;</code>、<code>|</code>、<code>;</code> 这些符号能不能用，要看黑名单有没有单独拦。</p></p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q2：为什么双写能绕过？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q2：为什么双写能绕过？</strong></p>
 </summary>
-<p>因为过滤只做了一轮替换。<code>ununionion</code> 里只有一个 <code>union</code> 子串，删掉后剩下 <code>union</code>；如果过滤是循环删除直到没有关键字，双写就会失效。看到“双写有效”，基本可以判断后端用的是 <code>str_replace</code> &#x2F; <code>preg_replace</code> 这类单轮替换。</p>
-
+<div class="nx-note__body"><p>因为过滤只做了一轮替换。<code>ununionion</code> 里只有一个 <code>union</code> 子串，删掉后剩下 <code>union</code>；如果过滤是循环删除直到没有关键字，双写就会失效。看到“双写有效”，基本可以判断后端用的是 <code>str_replace</code> &#x2F; <code>preg_replace</code> 这类单轮替换。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q3：为什么 <code>1,2,2</code> 报列数错误，<code>1,2,2,3</code> 就成功？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q3：为什么 <code>1,2,2</code> 报列数错误，<code>1,2,2,3</code> 就成功？</strong></p>
 </summary>
-<p><code>UNION</code> 前后列数必须一致。<code>1,2,2</code> 是 3 列，原查询是 4 列；<code>1,2,2,3</code> 是 4 列，正好对上。<strong>以 <code>UNION</code> 的列数为准，不要用表的列数去猜。</strong></p>
-
+<div class="nx-note__body"><p><code>UNION</code> 前后列数必须一致。<code>1,2,2</code> 是 3 列，原查询是 4 列；<code>1,2,2,3</code> 是 4 列，正好对上。<strong>以 <code>UNION</code> 的列数为准，不要用表的列数去猜。</strong></p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q4：为什么表只有 3 列，查询却有 4 列？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q4：为什么表只有 3 列，查询却有 4 列？</strong></p>
 </summary>
-<p>后端 <code>SELECT</code> 里多查了一个表达式或字段，比如 <code>SELECT id, username, 1, password FROM ...</code>。表是 3 列，结果集是 4 列。这也是为什么第 2 列回显用户名、第 4 列回显密码。</p>
-
+<div class="nx-note__body"><p>后端 <code>SELECT</code> 里多查了一个表达式或字段，比如 <code>SELECT id, username, 1, password FROM ...</code>。表是 3 列，结果集是 4 列。这也是为什么第 2 列回显用户名、第 4 列回显密码。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q5：<code>passwoorrd</code> 为什么多了一个 <code>o</code> 和 <code>r</code>？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q5：<code>passwoorrd</code> 为什么多了一个 <code>o</code> 和 <code>r</code>？</strong></p>
 </summary>
-<p><code>password</code> 里含有 <code>or</code>，而 <code>or</code> 在黑名单里。把 <code>or</code> 写成 <code>oorr</code>，过滤删掉一个 <code>or</code>，剩下 <code>or</code>，整个词就恢复成 <code>password</code>。<code>infoorrmation</code> 同理。</p>
-
+<div class="nx-note__body"><p><code>password</code> 里含有 <code>or</code>，而 <code>or</code> 在黑名单里。把 <code>or</code> 写成 <code>oorr</code>，过滤删掉一个 <code>or</code>，剩下 <code>or</code>，整个词就恢复成 <code>password</code>。<code>infoorrmation</code> 同理。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q6：为什么 <code>union</code> 大写也被拦？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q6：为什么 <code>union</code> 大写也被拦？</strong></p>
 </summary>
-<p>过滤用的是 <code>str_ireplace</code> &#x2F; <code>preg_replace</code> 的 <code>i</code> 模式，不区分大小写。大小写绕过只对区分大小写的 <code>str_replace</code> 有效，别默认它一定行。</p>
-
+<div class="nx-note__body"><p>过滤用的是 <code>str_ireplace</code> &#x2F; <code>preg_replace</code> 的 <code>i</code> 模式，不区分大小写。大小写绕过只对区分大小写的 <code>str_replace</code> 有效，别默认它一定行。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q7：页面只显示了一部分数据怎么办？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q7：页面只显示了一部分数据怎么办？</strong></p>
 </summary>
-<p>CSS 可能把长文本截断。按 F12 看 Elements，或者在 Console 执行 <code>document.body.innerText</code>，复制完整内容。也可以直接在 payload 里用 <code>where password like &#39;CTF2%&#39;</code> 过滤，减少输出。</p>
-
+<div class="nx-note__body"><p>CSS 可能把长文本截断。按 F12 看 Elements，或者在 Console 执行 <code>document.body.innerText</code>，复制完整内容。也可以直接在 payload 里用 <code>where password like &#39;CTF2%&#39;</code> 过滤，减少输出。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q8：<code>group_concat</code> 结果被截断了？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q8：<code>group_concat</code> 结果被截断了？</strong></p>
 </summary>
-<p>MySQL 的 <code>group_concat_max_len</code> 默认 1024 字节。用 <code>substr()</code> 分段读：</p>
+<div class="nx-note__body"><p>MySQL 的 <code>group_concat_max_len</code> 默认 1024 字节。用 <code>substr()</code> 分段读：</p>
 <figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1&#x27;ununionion seselectlect 1,2,substr(group_concat(username,0x3a,passwoorrd),1,1024),3 frfromom b4bsql#</span><br></pre></td></tr></table></figure>
 
 <p>把 <code>1</code> 改成 <code>1025</code>、<code>2049</code>，继续往后读。</p>
-
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q9：<code>#</code> 为什么要写成 <code>%23</code>？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q9：<code>#</code> 为什么要写成 <code>%23</code>？</strong></p>
 </summary>
-<p>浏览器地址栏里 <code>#</code> 表示锚点，后面的内容不会发给服务器。用 Burp 或 <code>curl --data-urlencode</code> 会自动编码；手写 URL 时写成 <code>%23</code>。</p>
-
+<div class="nx-note__body"><p>浏览器地址栏里 <code>#</code> 表示锚点，后面的内容不会发给服务器。用 Burp 或 <code>curl --data-urlencode</code> 会自动编码；手写 URL 时写成 <code>%23</code>。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q10：怎么知道后端是 MariaDB？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q10：怎么知道后端是 MariaDB？</strong></p>
 </summary>
-<p>报错信息里直接写了 <code>MariaDB server version</code>。MariaDB 和 MySQL 语法基本兼容，<code>information_schema</code>、<code>group_concat</code> 都能用。</p>
-
+<div class="nx-note__body"><p>报错信息里直接写了 <code>MariaDB server version</code>。MariaDB 和 MySQL 语法基本兼容，<code>information_schema</code>、<code>group_concat</code> 都能用。</p>
+</div>
 </details>
 
 <h2 id="顺手聊聊怎么防"><a href="#顺手聊聊怎么防" class="headerlink" title="顺手聊聊怎么防"></a>顺手聊聊怎么防</h2><p>这道题的黑名单已经拦了 <code>union</code>、<code>select</code>、<code>and</code>、<code>or</code>、<code>from</code>、<code>where</code>、<code>information</code>，看起来挺全，但<strong>黑名单永远有遗漏</strong>：双写、大小写、注释、编码、等价函数、堆叠注入……攻击者的想象力比字典大。</p>
@@ -731,86 +650,6 @@
 <p>参数化查询的写法：</p>
 <figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$stmt</span> = <span class="variable">$pdo</span>-&gt;<span class="title function_ invoke__">prepare</span>(</span><br><span class="line">    <span class="string">&#x27;SELECT id, username, password FROM b4bsql WHERE username = ? AND password = ?&#x27;</span></span><br><span class="line">);</span><br><span class="line"><span class="variable">$stmt</span>-&gt;<span class="title function_ invoke__">execute</span>([<span class="variable">$username</span>, <span class="variable">$password</span>]);</span><br><span class="line"><span class="variable">$row</span> = <span class="variable">$stmt</span>-&gt;<span class="title function_ invoke__">fetch</span>();</span><br></pre></td></tr></table></figure>
 
-<div class="note success"><p><strong>一条原则</strong>：不要试图“过滤掉所有坏字符”，而是让用户输入<strong>没有机会变成 SQL 语法</strong>。预编译 + 白名单 + 最小权限，三件事做到，SQL 注入就很难成立。</p>
+<div class="note success flat"><p><strong>一条原则</strong>：不要试图“过滤掉所有坏字符”，而是让用户输入<strong>没有机会变成 SQL 语法</strong>。预编译 + 白名单 + 最小权限，三件事做到，SQL 注入就很难成立。</p>
 </div>
-
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-          <div class="post-tags">
-              <a href="/tags/%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98/" rel="tag"># 极客大挑战</a>
-              <a href="/tags/SQL-%E6%B3%A8%E5%85%A5/" rel="tag"># SQL 注入</a>
-              <a href="/tags/%E5%8F%8C%E5%86%99%E7%BB%95%E8%BF%87/" rel="tag"># 双写绕过</a>
-              <a href="/tags/UNION-%E6%B3%A8%E5%85%A5/" rel="tag"># UNION 注入</a>
-              <a href="/tags/Burp-Suite/" rel="tag"># Burp Suite</a>
-          </div>
-
-        
-
-          <div class="post-nav">
-            <div class="post-nav-item">
-                <a href="/2026/10/30/web-ctf-file-inclusion-secret-file/" rel="prev" title="[极客大挑战 2019] Secret File：源码注释、302 跳转与 php:&#x2F;&#x2F;filter">
-                  <i class="fa fa-angle-left"></i> [极客大挑战 2019] Secret File：源码注释、302 跳转与 php://filter
-                </a>
-            </div>
-            <div class="post-nav-item">
-                <a href="/2026/10/30/misc-lsb-mirror-world/" rel="next" title="[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写">
-                  [BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写 <i class="fa fa-angle-right"></i>
-                </a>
-            </div>
-          </div>
-    </footer>
-  </article>
-</div>
-
-
-
-
-
-
-</div>
-  </main>
-
-  <footer class="footer">
-    <div class="footer-inner">
-
-  <div class="copyright">
-    &copy; 
-    <span itemprop="copyrightYear">2026</span>
-    <span class="with-love">
-      <i class="fa fa-heart"></i>
-    </span>
-    <span class="author" itemprop="copyrightHolder">Quellisya</span>
-  </div>
-  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/pisces/" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
-  </div>
-
-    </div>
-  </footer>
-
-  
-  <div class="toggle sidebar-toggle" role="button">
-    <span class="toggle-line"></span>
-    <span class="toggle-line"></span>
-    <span class="toggle-line"></span>
-  </div>
-  <div class="sidebar-dimmer"></div>
-  <div class="back-to-top" role="button" aria-label="返回顶部">
-    <i class="fa fa-arrow-up fa-lg"></i>
-    <span>0%</span>
-  </div>
-  <div class="reading-progress-bar"></div>
-  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
-
-  <a href="https://github.com/Quellisya" class="github-corner" title="在 GitHub 上关注我" aria-label="在 GitHub 上关注我" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
-
-<noscript>
-  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
-</noscript>
-
-</body>
-</html>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/Quellisya">Quellisya</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/">https://quellisya.github.io/2026/10/30/web-ctf-sql-babysql/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://Quellisya.github.io" target="_blank">Quellisya's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/SQL-%E6%B3%A8%E5%85%A5/">SQL 注入</a><a class="post-meta__tags" href="/tags/%E5%8F%8C%E5%86%99%E7%BB%95%E8%BF%87/">双写绕过</a><a class="post-meta__tags" href="/tags/UNION-%E6%B3%A8%E5%85%A5/">UNION 注入</a><a class="post-meta__tags" href="/tags/Burp-Suite/">Burp Suite</a><a class="post-meta__tags" href="/tags/%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98/">极客大挑战</a></div><div class="post-share"><div class="social-share" data-image="/img/avatar-seal.svg" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/10/30/misc-lsb-mirror-world/" title="[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info"><div class="info-1"><div class="info-item-1">上一篇</div><div class="info-item-2">[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写</div></div><div class="info-2"><div class="info-item-1">一张写着“Look very closely”的放大镜图片，真正的秘密藏在每个像素的最低位。用 StegSolve 的 Data Extract 勾选 R/G/B 的 bit 0，直接读出密钥。</div></div></div></a><a class="pagination-related" href="/2026/10/30/web-ctf-file-inclusion-secret-file/" title="[极客大挑战 2019] Secret File：源码注释、302 跳转与 php://filter"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">[极客大挑战 2019] Secret File：源码注释、302 跳转与 php://filter</div></div><div class="info-2"><div class="info-item-1">首页源码里藏着 Archive_room.php，SECRET 按钮又被 302 跳转藏住了响应体。用 Burp 看穿跳转、读到 secr3t.php 源码后，再用 php://filter 把 flag.php 以 base64 读出来。</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2026/10/22/web-ctf-sql-lovesql/" title="[极客大挑战 2019] LoveSQL：UNION 注入的完整流程"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-22</div><div class="info-item-2">[极客大挑战 2019] LoveSQL：UNION 注入的完整流程</div></div><div class="info-2"><div class="info-item-1">登录只是开始。用 order by 定列数、找回收显位，再用 UNION SELECT 依次爆库、爆表、爆字段，最后把 flag 拖出来。</div></div></div></a><a class="pagination-related" href="/2026/10/22/web-ctf-sql-easysql-geek/" title="[极客大挑战 2019] EasySQL：从一个单引号到万能密码"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-22</div><div class="info-item-2">[极客大挑战 2019] EasySQL：从一个单引号到万能密码</div></div><div class="info-2"><div class="info-item-1">最经典的登录框注入：加一个单引号确认注入点，再用 1'||1# 注释掉密码判断，不输入密码也能登录并拿到 flag。</div></div></div></a><a class="pagination-related" href="/2026/10/22/web-ctf-sql-easysql-suctf/" title="[SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-22</div><div class="info-item-2">[SUCTF 2019] EasySQL：黑名单、堆叠注入与反推源码</div></div><div class="info-2"><div class="info-item-1">UNION 用不了时怎么办：先用 Intruder 摸清黑名单，用分号堆叠查询，再根据回显反推后端结构，最后用 *,1 绕开关键字过滤。</div></div></div></a></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Quellisya</div><div class="author-info-description">记录 CTF 与 Web 安全的学习笔记，把每一步讲清楚。</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">17</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">46</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">11</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/Quellisya" target="_blank" title="Github"><i class="fab fa-github" style="color: #0f2f32;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">循墨迹读代码，借微光见漏洞。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%80%E6%AD%A5%EF%BC%9A%E8%A7%82%E5%AF%9F%E9%A2%98%E7%9B%AE"><span class="toc-text">第一步：观察题目</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%BA%8C%E6%AD%A5%EF%BC%9A%E6%89%BE%E6%B3%A8%E5%85%A5%E7%82%B9"><span class="toc-text">第二步：找注入点</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%89%E6%AD%A5%EF%BC%9A%E5%85%88%E7%94%A8%E4%B8%87%E8%83%BD%E5%AF%86%E7%A0%81%E8%BF%9B%E5%8E%BB"><span class="toc-text">第三步：先用万能密码进去</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E5%9B%9B%E6%AD%A5%EF%BC%9A%E8%AF%95-UNION%EF%BC%8C%E5%8F%91%E7%8E%B0%E5%85%B3%E9%94%AE%E5%AD%97%E8%A2%AB%E5%90%83%E6%8E%89%E4%BA%86"><span class="toc-text">第四步：试 UNION，发现关键字被吃掉了</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%BA%94%E6%AD%A5%EF%BC%9A%E7%94%A8-Burp-Intruder-%E6%91%B8%E6%B8%85%E9%BB%91%E5%90%8D%E5%8D%95"><span class="toc-text">第五步：用 Burp Intruder 摸清黑名单</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E5%85%AD%E6%AD%A5%EF%BC%9A%E5%8F%8C%E5%86%99%E7%BB%95%E8%BF%87%E7%9A%84%E5%8E%9F%E7%90%86"><span class="toc-text">第六步：双写绕过的原理</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%83%E6%AD%A5%EF%BC%9A%E7%A1%AE%E5%AE%9A%E5%88%97%E6%95%B0%EF%BC%88%E8%BF%99%E9%87%8C%E6%9C%89%E4%B8%AA%E5%9D%91%EF%BC%89"><span class="toc-text">第七步：确定列数（这里有个坑）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E5%85%AB%E6%AD%A5%EF%BC%9A%E7%88%86%E8%A1%A8%E5%90%8D"><span class="toc-text">第八步：爆表名</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B9%9D%E6%AD%A5%EF%BC%9A%E7%88%86%E5%88%97%E5%90%8D"><span class="toc-text">第九步：爆列名</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E5%8D%81%E6%AD%A5%EF%BC%9A%E6%8A%8A-flag-%E6%8B%96%E5%87%BA%E6%9D%A5"><span class="toc-text">第十步：把 flag 拖出来</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%8C%E6%95%B4-payload-%E6%B1%87%E6%80%BB"><span class="toc-text">完整 payload 汇总</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9C%AC%E5%9C%B0%E5%A4%8D%E7%8E%B0%E5%AE%9E%E9%AA%8C%EF%BC%88PHP-MySQL%EF%BC%89"><span class="toc-text">本地复现实验（PHP + MySQL）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B7%A5%E5%85%B7%E9%80%9F%E6%9F%A5%E5%8D%A1"><span class="toc-text">工具速查卡</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="toc-text">新手常见问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%E6%80%8E%E4%B9%88%E9%98%B2"><span class="toc-text">顺手聊聊怎么防</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/30/reverse-easyre-ida/" title="[BUUCTF] easyre：IDA 里一眼看穿的两个整数比较">[BUUCTF] easyre：IDA 里一眼看穿的两个整数比较</a><time datetime="2026-10-30T02:40:00.000Z" title="发表于 2026-10-30 10:40:00">2026-10-30</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/30/misc-voip-rtp/" title="[BUUCTF] voip：Wireshark RTP 播放器听出 flag">[BUUCTF] voip：Wireshark RTP 播放器听出 flag</a><time datetime="2026-10-30T02:30:00.000Z" title="发表于 2026-10-30 10:30:00">2026-10-30</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/30/misc-traffic-easycap/" title="[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符">[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符</a><time datetime="2026-10-30T02:20:00.000Z" title="发表于 2026-10-30 10:20:00">2026-10-30</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/30/misc-base64-nways/" title="[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图">[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图</a><time datetime="2026-10-30T02:10:00.000Z" title="发表于 2026-10-30 10:10:00">2026-10-30</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/30/misc-lsb-mirror-world/" title="[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写">[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写</a><time datetime="2026-10-30T02:00:00.000Z" title="发表于 2026-10-30 10:00:00">2026-10-30</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2025 - 2026 By Quellisya</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 8.1.2</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.7.0</a></span></div><div class="footer_custom_text">以墨为舟，以码为桨 · CTF & Web Security Notes</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.7.0"></script><script src="/js/main.js?v=5.7.0"></script><div class="js-pjax"></div><script defer src="/js/butterfly-custom.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><i class="fas fa-spinner fa-pulse" id="loading-status" hidden="hidden"></i><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="local-search-input"><input placeholder="搜索笔记、题目或 payload…" type="text"/></div><hr/><div id="local-search-results"></div><div class="ais-Pagination" id="local-search-pagination" style="display:none;"><ul class="ais-Pagination-list"></ul></div><div id="local-search-stats"></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.7.0"></script></div></div></body></html>

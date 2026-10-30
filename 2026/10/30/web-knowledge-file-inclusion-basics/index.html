@@ -1,33 +1,11 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width">
-<meta name="theme-color" content="#222" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#222" media="(prefers-color-scheme: dark)"><meta name="generator" content="Hexo 8.1.2">
-
-  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
-  <link rel="mask-icon" href="/images/logo.svg" color="#222">
-
-<link rel="stylesheet" href="/css/main.css">
-
-
-
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.css" integrity="sha256-mdaMxrItEW6hMIVJJNPKuX0B7KCSJQVEv3mVY4N2we4=" crossorigin="anonymous">
-
-<script class="next-config" data-name="main" type="application/json">{"hostname":"quellisya.github.io","root":"/","images":"/images","scheme":"Pisces","darkmode":true,"version":"8.29.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"post","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"mac"},"fold":{"enable":false,"height":500},"language":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"mediumzoom":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"},"path":"/search.xml","localsearch":{"enable":true,"top_n_per_article":1,"unescape":false,"preload":false}}</script><script src="/js/config.js" defer></script>
-
-    <meta name="description" content="文件包含题的通用知识：include 和 require 的区别、怎么判断 LFI、php:&#x2F;&#x2F;filter 读源码、常见伪协议、日志包含&#x2F;图片马&#x2F;zip 包含等利用链，附流程速查和防护建议。">
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>文件包含基础：include、伪协议与 LFI 利用链 | Quellisya's Blog</title><meta name="author" content="Quellisya"><meta name="copyright" content="Quellisya"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#f3fbf8"><meta name="description" content="文件包含题的通用知识：include 和 require 的区别、怎么判断 LFI、php:&#x2F;&#x2F;filter 读源码、常见伪协议、日志包含&#x2F;图片马&#x2F;zip 包含等利用链，附流程速查和防护建议。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="文件包含基础：include、伪协议与 LFI 利用链">
 <meta property="og:url" content="https://quellisya.github.io/2026/10/30/web-knowledge-file-inclusion-basics/index.html">
 <meta property="og:site_name" content="Quellisya&#39;s Blog">
 <meta property="og:description" content="文件包含题的通用知识：include 和 require 的区别、怎么判断 LFI、php:&#x2F;&#x2F;filter 读源码、常见伪协议、日志包含&#x2F;图片马&#x2F;zip 包含等利用链，附流程速查和防护建议。">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://quellisya.github.io/img/avatar-seal.svg">
 <meta property="article:published_time" content="2026-10-30T00:30:00.000Z">
 <meta property="article:modified_time" content="2026-10-30T00:30:00.000Z">
 <meta property="article:author" content="Quellisya">
@@ -37,263 +15,207 @@
 <meta property="article:tag" content="入门基础">
 <meta property="article:tag" content="文件包含">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://quellisya.github.io/img/avatar-seal.svg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "文件包含基础：include、伪协议与 LFI 利用链",
+  "url": "https://quellisya.github.io/2026/10/30/web-knowledge-file-inclusion-basics/",
+  "image": "https://quellisya.github.io/img/avatar-seal.svg",
+  "datePublished": "2026-10-30T00:30:00.000Z",
+  "dateModified": "2026-10-30T00:30:00.000Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Quellisya",
+      "url": "https://github.com/Quellisya"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/logo-seal.svg"><link rel="canonical" href="https://quellisya.github.io/2026/10/30/web-knowledge-file-inclusion-basics/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="stylesheet" href="/css/index.css?v=5.7.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        const data = { value }
 
+        if (ttl != null) {
+          data.expiry = Date.now() + ttl * 86400000
+        }
 
-<link rel="canonical" href="https://quellisya.github.io/2026/10/30/web-knowledge-file-inclusion-basics/">
+        localStorage.setItem(key, JSON.stringify(data))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return
 
+        try {
+          const data = JSON.parse(itemStr)
 
-<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://quellisya.github.io/2026/10/30/web-knowledge-file-inclusion-basics/","path":"/2026/10/30/web-knowledge-file-inclusion-basics/","title":"文件包含基础：include、伪协议与 LFI 利用链"}</script>
+          if (data.expiry && Date.now() > data.expiry) {
+            localStorage.removeItem(key)
+            return
+          }
 
-<script class="next-config" data-name="calendar" type="application/json">""</script>
-<title>文件包含基础：include、伪协议与 LFI 利用链 | Quellisya's Blog</title>
+          return data.value
+        } catch {
+          localStorage.removeItem(key)
+        }
+      }
+    }
+
+    const scriptCache = new Map()
+    const cssCache = new Map()
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => {
+        if (scriptCache.has(url)) {
+          return scriptCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const script = document.createElement('script')
+
+          script.src = url
+          script.async = true
+
+          for (const key in attr) {
+            script.setAttribute(key, attr[key])
+          }
+
+          script.onload = resolve
+          script.onerror = reject
+
+          document.head.appendChild(script)
+        })
+
+        scriptCache.set(url, promise)
+
+        return promise
+      },
+      getCSS: (url, id) => {
+        if (cssCache.has(url)) {
+          return cssCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const link = document.createElement('link')
+
+          link.rel = 'stylesheet'
+          link.href = url
+
+          if (id) {
+            link.id = id
+          }
+
+          link.onload = resolve
+          link.onerror = reject
+
+          document.head.appendChild(link)
+        })
+
+        cssCache.set(url, promise)
+
+        return promise
+      },
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
   
+      
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      const activateDarkMode = () => {
+        document.documentElement.dataset.theme = 'dark'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#0f1f22')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.dataset.theme = 'light'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#f3fbf8')
+        }
+      }
 
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
 
-
-
-
-
-
-
-  
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/next-theme-pjax/0.6.0/pjax.min.js" integrity="sha256-vxLn1tSKWD4dqbMRyv940UYw4sXgMtYcK6reefzZrao=" crossorigin="anonymous" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/fancyapps-ui/6.1.14/fancybox/fancybox.umd.js" integrity="sha256-QnJV4HT5r8i89ovZGRD86iynZqHerEbT2xt69vDM36I=" crossorigin="anonymous" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pangu/7.2.1/pangu.umd.js" integrity="sha256-kRsxecBnwG6mULFPe2E6UKnNm8XfDOuDwCOprjLZuX8=" crossorigin="anonymous" defer></script>
-<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/sidebar.js" defer></script><script src="/js/next-boot.js" defer></script><script src="/js/bookmark.js" defer></script><script src="/js/pjax.js" defer></script>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/hexo-generator-searchdb/1.5.0/search.js" integrity="sha256-xFC6PJ82SL9b3WkGjFavNiA9gm5z6UBxWPiu4CYjptg=" crossorigin="anonymous" defer></script>
-<script src="/js/third-party/search/local-search.js" defer></script>
-
-
-
-
-  <script src="/js/third-party/fancybox.js" defer></script>
-
-
-
-  
-
-
-
-
-  
-
-  <script class="next-config" data-name="enableMath" type="application/json">false</script><script class="next-config" data-name="mathjax" type="application/json">{"enable":true,"tags":"none","display_overflow":"scroll","js":{"url":"https://cdnjs.cloudflare.com/ajax/libs/mathjax/4.1.3/tex-mml-chtml.js","integrity":"sha256-ihPtDDm7pTmSF9ViEsItlvsrBTsNkz0MOXMchzOwCQw="}}</script>
-<script src="/js/third-party/math/mathjax.js" defer></script>
-
-
-
-  <noscript>
-    <link rel="stylesheet" href="/css/noscript.css">
-  </noscript>
-<link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
-</head>
-
-<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
-  <div class="headband"></div>
-
-  <main class="main">
-    <div class="column">
-      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
-  <div class="site-nav-toggle">
-    <div class="toggle" aria-label="切换导航栏" role="button">
-        <span class="toggle-line"></span>
-        <span class="toggle-line"></span>
-        <span class="toggle-line"></span>
-    </div>
-  </div>
-
-  <div class="site-meta">
-
-    <a href="/" class="brand" rel="start">
-      <i class="logo-line"></i>
-      <p class="site-title">Quellisya's Blog</p>
-      <i class="logo-line"></i>
-    </a>
-      <p class="site-subtitle" itemprop="description">CTF · Web Security · Writeups</p>
-  </div>
-
-  <div class="site-nav-right">
-    <div class="toggle popup-trigger" aria-label="搜索" role="button">
-        <i class="fa fa-search fa-fw fa-lg"></i>
-    </div>
-  </div>
-</div>
-
-
-
-<nav class="site-nav">
-  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-rss"><a href="/atom.xml" rel="section"><i class="fa fa-rss fa-fw"></i>RSS</a></li>
-      <li class="menu-item menu-item-search">
-        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
-        </a>
-      </li>
-  </ul>
-</nav>
-
-
-
-  <div class="search-pop-overlay">
-    <div class="popup search-popup">
-      <div class="search-header">
-        <span class="search-icon">
-          <i class="fa fa-search"></i>
-        </span>
-        <div class="search-input-container">
-          <input autocomplete="off" autocapitalize="off" maxlength="80"
-                placeholder="搜索..." spellcheck="false"
-                type="search" class="search-input">
-        </div>
-        <span class="popup-btn-close" role="button">
-          <i class="fa fa-times-circle"></i>
-        </span>
-      </div>
-      <div class="search-result-container">
-        <div class="search-result-icon">
-          <i class="fa fa-spinner fa-pulse fa-5x"></i>
-        </div>
-      </div>
-    </div>
-  </div>
-
-</header>
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
         
-  
-  <aside class="sidebar">
-
-    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
-      <ul class="sidebar-nav">
-        <li class="sidebar-nav-toc">
-          文章目录
-        </li>
-        <li class="sidebar-nav-overview">
-          站点概览
-        </li>
-      </ul>
-
-      <div class="sidebar-panel-container">
-        <!--noindex-->
-        <div class="post-toc-wrap sidebar-panel">
-            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%96%87%E4%BB%B6%E5%8C%85%E5%90%AB%E6%BC%8F%E6%B4%9E%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">1.</span> <span class="nav-text">文件包含漏洞是什么</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%8E%E4%B9%88%E5%88%A4%E6%96%AD%E6%9C%89%E6%B2%A1%E6%9C%89%E6%96%87%E4%BB%B6%E5%8C%85%E5%90%AB"><span class="nav-number">2.</span> <span class="nav-text">怎么判断有没有文件包含</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AF%BB%E6%BA%90%E7%A0%81%EF%BC%8C%E8%80%8C%E4%B8%8D%E6%98%AF%E6%89%A7%E8%A1%8C"><span class="nav-number">3.</span> <span class="nav-text">读源码，而不是执行</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B8%B8%E8%A7%81%E4%BC%AA%E5%8D%8F%E8%AE%AE%E9%80%9F%E6%9F%A5"><span class="nav-number">4.</span> <span class="nav-text">常见伪协议速查</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B8%B8%E8%A7%81%E5%88%A9%E7%94%A8%E9%93%BE"><span class="nav-number">5.</span> <span class="nav-text">常见利用链</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E8%AF%BB%E6%BA%90%E7%A0%81%E6%89%BE-flag-%E9%85%8D%E7%BD%AE"><span class="nav-number">5.1.</span> <span class="nav-text">1. 读源码找 flag &#x2F; 配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-php-input-%E6%89%A7%E8%A1%8C-POST-%E4%BB%A3%E7%A0%81"><span class="nav-number">5.2.</span> <span class="nav-text">2. php:&#x2F;&#x2F;input 执行 POST 代码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-data-%E6%89%A7%E8%A1%8C%E4%BB%A3%E7%A0%81"><span class="nav-number">5.3.</span> <span class="nav-text">3. data:&#x2F;&#x2F; 执行代码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-%E6%97%A5%E5%BF%97%E5%8C%85%E5%90%AB"><span class="nav-number">5.4.</span> <span class="nav-text">4. 日志包含</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-%E5%9B%BE%E7%89%87%E9%A9%AC-%E6%96%87%E4%BB%B6%E5%8C%85%E5%90%AB"><span class="nav-number">5.5.</span> <span class="nav-text">5. 图片马 + 文件包含</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-zip-phar"><span class="nav-number">5.6.</span> <span class="nav-text">6. zip:&#x2F;&#x2F; &#x2F; phar:&#x2F;&#x2F;</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-Session-%E6%96%87%E4%BB%B6%E5%8C%85%E5%90%AB"><span class="nav-number">5.7.</span> <span class="nav-text">7. Session 文件包含</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%95%E8%BF%87%E6%8A%80%E5%B7%A7%E9%80%9F%E6%9F%A5"><span class="nav-number">6.</span> <span class="nav-text">绕过技巧速查</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%8C%E6%95%B4%E6%B5%81%E7%A8%8B%E9%80%9F%E6%9F%A5"><span class="nav-number">7.</span> <span class="nav-text">完整流程速查</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="nav-number">8.</span> <span class="nav-text">新手常见问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%E6%80%8E%E4%B9%88%E9%98%B2"><span class="nav-number">9.</span> <span class="nav-text">顺手聊聊怎么防</span></a></li></ol></div>
-        </div>
-        <!--/noindex-->
-
-        <div class="site-overview-wrap sidebar-panel">
-          <div class="site-author animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
-  <p class="site-author-name" itemprop="name">Quellisya</p>
-  <div class="site-description" itemprop="description">记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。</div>
-</div>
-<div class="site-state-wrap animated">
-  <nav class="site-state">
-      <div class="site-state-item site-state-posts">
-        <a href="/archives/">
-          <span class="site-state-item-count">17</span>
-          <span class="site-state-item-name">日志</span>
-        </a>
-      </div>
-      <div class="site-state-item site-state-categories">
-          <a href="/categories/">
-        <span class="site-state-item-count">11</span>
-        <span class="site-state-item-name">分类</span></a>
-      </div>
-      <div class="site-state-item site-state-tags">
-          <a href="/tags/">
-        <span class="site-state-item-count">46</span>
-        <span class="site-state-item-name">标签</span></a>
-      </div>
-  </nav>
-</div>
-
-        </div>
-      </div>
-    </div>
-
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
     
-  </aside>
-
-
-    </div>
-
-    <div class="main-inner post posts-expand">
-
-
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
   
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://quellisya.github.io/2026/10/30/web-knowledge-file-inclusion-basics/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="Quellisya">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Quellisya's Blog">
-      <meta itemprop="description" content="记录 CTF、Web 安全的学习笔记与 Writeup，尽量把每一步讲清楚。">
-    </span>
-
-    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
-      <meta itemprop="name" content="文件包含基础：include、伪协议与 LFI 利用链 | Quellisya's Blog">
-      <meta itemprop="description" content="文件包含题的通用知识：include 和 require 的区别、怎么判断 LFI、php:&#x2F;&#x2F;filter 读源码、常见伪协议、日志包含&#x2F;图片马&#x2F;zip 包含等利用链，附流程速查和防护建议。">
-    </span>
-      <header class="post-header">
-        <h1 class="post-title" itemprop="name headline">
-          文件包含基础：include、伪协议与 LFI 利用链
-        </h1>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">发表于</span>
-
-      <time title="创建时间：2026-10-30 08:30:00" itemprop="dateCreated datePublished" datetime="2026-10-30T08:30:00+08:00">2026-10-30</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">分类于</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/ctf/" itemprop="url" rel="index"><span itemprop="name">CTF</span></a>
-        </span>
-          ，
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/ctf/web/" itemprop="url" rel="index"><span itemprop="name">Web</span></a>
-        </span>
-          ，
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/ctf/web/file-inclusion/" itemprop="url" rel="index"><span itemprop="name">文件包含</span></a>
-        </span>
-    </span>
-
-  
-</div>
-
-            <div class="post-description">文件包含题的通用知识：include 和 require 的区别、怎么判断 LFI、php://filter 读源码、常见伪协议、日志包含/图片马/zip 包含等利用链，附流程速查和防护建议。</div>
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"pagination":{"enable":false,"hitsPerPage":8},"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":true},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: true,
+  percent: {
+    toc: true,
+    rightside: true,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '文件包含基础：include、伪协议与 LFI 利用链',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><link rel="stylesheet" href="/css/butterfly-custom.css"><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head><body><div class="bg-animation" id="web_bg" style="background-image: url(/img/bg-ink-tech.svg);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">17</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">46</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">11</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg fixed" id="page-header" style="background-image: url(/img/banner-ink-tech.svg);"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><img class="site-icon" src="/img/logo-seal.svg" alt="Logo"><span class="site-name">Quellisya's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">文件包含基础：include、伪协议与 LFI 利用链</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">文件包含基础：include、伪协议与 LFI 利用链</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-10-30T00:30:00.000Z" title="发表于 2026-10-30 08:30:00">2026-10-30</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-10-30T00:30:00.000Z" title="更新于 2026-10-30 08:30:00">2026-10-30</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/">CTF</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/web/">Web</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/web/file-inclusion/">文件包含</a></span></div><div class="meta-secondline"></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container">
 <nav class="series-nav">
   <div class="series-nav__head">
-    <i class="fa fa-layer-group"></i>
+    <i class="fas fa-layer-group"></i>
     <span class="series-nav__name">系列：文件包含</span>
     <span class="series-nav__count">第 1 / 2 篇</span>
   </div>
   <ol class="series-nav__list"><li class="is-current"><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;web-knowledge-file-inclusion-basics&#x2F;">文件包含基础：include、伪协议与 LFI 利用链</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;web-ctf-file-inclusion-secret-file&#x2F;">[极客大挑战 2019] Secret File：源码注释、302 跳转与 php:&#x2F;&#x2F;filter</a></li></ol>
-  <div class="series-nav__links"><a class="series-nav__next" href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;web-ctf-file-inclusion-secret-file&#x2F;">[极客大挑战 2019] Secret File：源码注释、302 跳转与 php:&#x2F;&#x2F;filter<i class="fa fa-arrow-right"></i></a></div>
-</nav><div class="note primary"><p><strong>一分钟速览</strong></p>
+  <div class="series-nav__links"><a class="series-nav__next" href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;web-ctf-file-inclusion-secret-file&#x2F;">[极客大挑战 2019] Secret File：源码注释、302 跳转与 php:&#x2F;&#x2F;filter<i class="fas fa-arrow-right"></i></a></div>
+</nav><div class="note primary flat"><p><strong>一分钟速览</strong></p>
 <ul>
 <li><strong>难度</strong>：入门</li>
 <li><strong>考点</strong>：本地文件包含（LFI）、<code>php://filter</code>、伪协议、日志包含、图片马</li>
@@ -302,7 +224,7 @@
 </ul>
 </div>
 
-<div class="note info"><p><strong>阅读说明</strong></p>
+<div class="note info flat"><p><strong>阅读说明</strong></p>
 <ul>
 <li><strong>前置知识</strong>：PHP 基础、HTTP GET 参数、知道 <code>include</code> 是干什么的</li>
 <li><strong>工具</strong>：浏览器、Burp Suite &#x2F; <code>curl</code>、CyberChef</li>
@@ -311,7 +233,7 @@
 </ul>
 </div>
 
-<div class="note default"><p><strong>做题路线</strong></p>
+<div class="note default flat"><p><strong>做题路线</strong></p>
 <p><code>找参数</code> → <code>判断是否包含</code> → <code>试目录穿越</code> → <code>读源码（php://filter）</code> → <code>找可利用文件</code> → <code>日志/图片马/zip 包含</code> → <code>拿 flag</code></p>
 </div>
 
@@ -387,7 +309,7 @@
 <td>绝对路径</td>
 </tr>
 </tbody></table>
-<div class="note warning"><p>不要只凭“报错”判断。很多题 <code>error_reporting(0)</code>，包含失败也不报错。真正的判断标准是：<strong>页面内容有没有变化</strong>。可以先用一个肯定存在的文件（如 <code>index.php</code>）做对照。</p>
+<div class="note warning flat"><p>不要只凭“报错”判断。很多题 <code>error_reporting(0)</code>，包含失败也不报错。真正的判断标准是：<strong>页面内容有没有变化</strong>。可以先用一个肯定存在的文件（如 <code>index.php</code>）做对照。</p>
 </div>
 
 <h2 id="读源码，而不是执行"><a href="#读源码，而不是执行" class="headerlink" title="读源码，而不是执行"></a>读源码，而不是执行</h2><p>这是新手最容易混淆的点：</p>
@@ -402,7 +324,7 @@
 <figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">include 打开 php://filter 流</span><br><span class="line">        ↓</span><br><span class="line">读取 flag.php 的原始字节</span><br><span class="line">        ↓</span><br><span class="line">convert.base64-encode 编码</span><br><span class="line">        ↓</span><br><span class="line">include 拿到 base64 文本（没有 &lt;?php）</span><br><span class="line">        ↓</span><br><span class="line">直接输出，不执行</span><br></pre></td></tr></table></figure>
 
 <p>拿到 base64 后，用 CyberChef 的 <code>From Base64</code> 或 <code>base64 -d</code> 解码，就能看到源码。</p>
-<div class="note success"><p><strong>一句话记</strong>：<code>include</code> 会执行，<code>php://filter</code> 让它“只读不执行”。读源码找 flag、找数据库密码、找 include 链，都靠它。</p>
+<div class="note success flat"><p><strong>一句话记</strong>：<code>include</code> 会执行，<code>php://filter</code> 让它“只读不执行”。读源码找 flag、找数据库密码、找 include 链，都靠它。</p>
 </div>
 
 <h2 id="常见伪协议速查"><a href="#常见伪协议速查" class="headerlink" title="常见伪协议速查"></a>常见伪协议速查</h2><p>PHP 的流包装器（wrapper）很多，CTF 常考这些：</p>
@@ -461,7 +383,7 @@
 <p>或者在命令行：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">php -i | grep allow_url_include</span><br></pre></td></tr></table></figure>
 
-<div class="note warning"><p>不同 PHP 版本对伪协议的限制不同。比如 <code>data://</code> 在较新版本默认需要 <code>allow_url_include=On</code>；<code>phar://</code> 在 PHP 8 之后对反序列化的限制也更多。做题时以目标环境的 <code>phpinfo</code> 为准。</p>
+<div class="note warning flat"><p>不同 PHP 版本对伪协议的限制不同。比如 <code>data://</code> 在较新版本默认需要 <code>allow_url_include=On</code>；<code>phar://</code> 在 PHP 8 之后对反序列化的限制也更多。做题时以目标环境的 <code>phpinfo</code> 为准。</p>
 </div>
 
 <h2 id="常见利用链"><a href="#常见利用链" class="headerlink" title="常见利用链"></a>常见利用链</h2><h3 id="1-读源码找-flag-配置"><a href="#1-读源码找-flag-配置" class="headerlink" title="1. 读源码找 flag &#x2F; 配置"></a>1. 读源码找 flag &#x2F; 配置</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">?file=php://filter/convert.base64-encode/resource=flag.php</span><br><span class="line">?file=php://filter/convert.base64-encode/resource=config.php</span><br><span class="line">?file=php://filter/convert.base64-encode/resource=index.php</span><br></pre></td></tr></table></figure>
@@ -552,7 +474,7 @@
 <td>从本地文件入手</td>
 </tr>
 </tbody></table>
-<div class="note warning"><p><code>%00</code> 截断在新版本 PHP 已经修复，不要默认它一定可用。做题时先 <code>phpinfo</code> 看版本，或者直接试别的链。</p>
+<div class="note warning flat"><p><code>%00</code> 截断在新版本 PHP 已经修复，不要默认它一定可用。做题时先 <code>phpinfo</code> 看版本，或者直接试别的链。</p>
 </div>
 
 <h2 id="完整流程速查"><a href="#完整流程速查" class="headerlink" title="完整流程速查"></a>完整流程速查</h2><table>
@@ -604,64 +526,74 @@
 <td><code>system(&#39;cat /flag&#39;)</code> 或读源码</td>
 </tr>
 </tbody></table>
-<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><details class="note info"><summary><p><strong>Q1：<code>include</code> 和 <code>require</code> 有什么区别？</strong></p>
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><details class="note nx-note info">
+<summary><p><strong>Q1：<code>include</code> 和 <code>require</code> 有什么区别？</strong></p>
 </summary>
-<p>文件不存在时，<code>include</code> 发 warning 继续，<code>require</code> 直接 fatal 停止。做题时 <code>include</code> 更常见，因为页面不会直接崩。</p>
-
+<div class="nx-note__body"><p>文件不存在时，<code>include</code> 发 warning 继续，<code>require</code> 直接 fatal 停止。做题时 <code>include</code> 更常见，因为页面不会直接崩。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q2：为什么 <code>?file=flag.php</code> 看不到 flag？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q2：为什么 <code>?file=flag.php</code> 看不到 flag？</strong></p>
 </summary>
-<p><code>include</code> 是执行，不是显示。<code>flag.php</code> 只赋值不 <code>echo</code>，所以页面上没有 flag。用 <code>php://filter</code> 读源码。</p>
-
+<div class="nx-note__body"><p><code>include</code> 是执行，不是显示。<code>flag.php</code> 只赋值不 <code>echo</code>，所以页面上没有 flag。用 <code>php://filter</code> 读源码。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q3：<code>php://filter</code> 为什么能读源码？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q3：<code>php://filter</code> 为什么能读源码？</strong></p>
 </summary>
-<p>它在读取文件时先做 base64 编码，<code>include</code> 拿到的是纯文本，没有 <code>&lt;?php</code>，所以不会执行，直接输出。</p>
-
+<div class="nx-note__body"><p>它在读取文件时先做 base64 编码，<code>include</code> 拿到的是纯文本，没有 <code>&lt;?php</code>，所以不会执行，直接输出。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q4：<code>allow_url_include</code> 和 <code>allow_url_fopen</code> 有什么区别？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q4：<code>allow_url_include</code> 和 <code>allow_url_fopen</code> 有什么区别？</strong></p>
 </summary>
-<p><code>allow_url_fopen</code> 控制 <code>file_get_contents</code>、<code>fopen</code> 等能不能打开 URL；<code>allow_url_include</code> 控制 <code>include</code>&#x2F;<code>require</code> 能不能包含 URL。RFI 需要后者为 <code>On</code>。</p>
-
+<div class="nx-note__body"><p><code>allow_url_fopen</code> 控制 <code>file_get_contents</code>、<code>fopen</code> 等能不能打开 URL；<code>allow_url_include</code> 控制 <code>include</code>&#x2F;<code>require</code> 能不能包含 URL。RFI 需要后者为 <code>On</code>。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q5：日志包含找不到日志路径？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q5：日志包含找不到日志路径？</strong></p>
 </summary>
-<p>常见路径：<code>/var/log/apache2/access.log</code>、<code>/var/log/httpd/access_log</code>、<code>/var/log/nginx/access.log</code>。也可以读 <code>/proc/self/environ</code>、<code>/proc/self/cmdline</code> 找线索。路径因环境而异，先读 <code>/etc/passwd</code> 确认能穿越。</p>
-
+<div class="nx-note__body"><p>常见路径：<code>/var/log/apache2/access.log</code>、<code>/var/log/httpd/access_log</code>、<code>/var/log/nginx/access.log</code>。也可以读 <code>/proc/self/environ</code>、<code>/proc/self/cmdline</code> 找线索。路径因环境而异，先读 <code>/etc/passwd</code> 确认能穿越。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q6：图片马为什么能执行？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q6：图片马为什么能执行？</strong></p>
 </summary>
-<p><code>include</code> 只看内容里有没有 <code>&lt;?php</code>，不看后缀。图片头 <code>GIF89a</code> 只是让上传检查通过，后面的 PHP 代码才是真正执行的部分。</p>
-
+<div class="nx-note__body"><p><code>include</code> 只看内容里有没有 <code>&lt;?php</code>，不看后缀。图片头 <code>GIF89a</code> 只是让上传检查通过，后面的 PHP 代码才是真正执行的部分。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q7：<code>zip://</code> 的 <code>#</code> 是什么？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q7：<code>zip://</code> 的 <code>#</code> 是什么？</strong></p>
 </summary>
-<p><code>#</code> 后面是 zip 内的文件名。URL 里 <code>#</code> 会被浏览器当锚点，所以要编码成 <code>%23</code>，或者用 Burp 发包。</p>
-
+<div class="nx-note__body"><p><code>#</code> 后面是 zip 内的文件名。URL 里 <code>#</code> 会被浏览器当锚点，所以要编码成 <code>%23</code>，或者用 Burp 发包。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q8：为什么 <code>php://input</code> 没反应？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q8：为什么 <code>php://input</code> 没反应？</strong></p>
 </summary>
-<p>需要 <code>allow_url_include=On</code>，且请求方法&#x2F;Content-Type 要对。用 POST 发 PHP 代码，不要用 GET。</p>
-
+<div class="nx-note__body"><p>需要 <code>allow_url_include=On</code>，且请求方法&#x2F;Content-Type 要对。用 POST 发 PHP 代码，不要用 GET。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q9：<code>php://filter</code> 被过滤了怎么办？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q9：<code>php://filter</code> 被过滤了怎么办？</strong></p>
 </summary>
-<p>试大小写、双写、<code>php://filter/read=...</code>、<code>convert.base64-encode</code> 的其他写法；也可以换 <code>data://</code>、日志包含、图片马。过滤器很多，黑名单很难列全。</p>
-
+<div class="nx-note__body"><p>试大小写、双写、<code>php://filter/read=...</code>、<code>convert.base64-encode</code> 的其他写法；也可以换 <code>data://</code>、日志包含、图片马。过滤器很多，黑名单很难列全。</p>
+</div>
 </details>
 
-<details class="note info"><summary><p><strong>Q10：文件包含和文件上传怎么配合？</strong></p>
+<details class="note nx-note info">
+<summary><p><strong>Q10：文件包含和文件上传怎么配合？</strong></p>
 </summary>
-<p>上传一个带 PHP 代码的图片&#x2F;压缩包，再用文件包含去执行它。上传负责“把文件放上去”，包含负责“让文件跑起来”。</p>
-
+<div class="nx-note__body"><p>上传一个带 PHP 代码的图片&#x2F;压缩包，再用文件包含去执行它。上传负责“把文件放上去”，包含负责“让文件跑起来”。</p>
+</div>
 </details>
 
 <h2 id="顺手聊聊怎么防"><a href="#顺手聊聊怎么防" class="headerlink" title="顺手聊聊怎么防"></a>顺手聊聊怎么防</h2><p>文件包含的根因是<strong>把用户输入当文件名</strong>。防护思路：</p>
@@ -717,86 +649,6 @@
 <p>白名单写法：</p>
 <figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$pages</span> = [</span><br><span class="line">    <span class="string">&#x27;about&#x27;</span>   =&gt; <span class="keyword">__DIR__</span> . <span class="string">&#x27;/pages/about.php&#x27;</span>,</span><br><span class="line">    <span class="string">&#x27;contact&#x27;</span> =&gt; <span class="keyword">__DIR__</span> . <span class="string">&#x27;/pages/contact.php&#x27;</span>,</span><br><span class="line">];</span><br><span class="line"></span><br><span class="line"><span class="variable">$key</span> = <span class="variable">$_GET</span>[<span class="string">&#x27;page&#x27;</span>] ?? <span class="string">&#x27;about&#x27;</span>;</span><br><span class="line"><span class="keyword">if</span> (!<span class="keyword">isset</span>(<span class="variable">$pages</span>[<span class="variable">$key</span>])) &#123;</span><br><span class="line">    <span class="keyword">exit</span>(<span class="string">&#x27;not found&#x27;</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">include</span> <span class="variable">$pages</span>[<span class="variable">$key</span>];</span><br></pre></td></tr></table></figure>
 
-<div class="note success"><p><strong>一条原则</strong>：文件名可以是用户选的“键”，但永远不该是用户拼的“路径”。白名单 + 敏感文件移出 Web 目录 + 关闭远程包含，三件事做到，文件包含就很难成立。</p>
+<div class="note success flat"><p><strong>一条原则</strong>：文件名可以是用户选的“键”，但永远不该是用户拼的“路径”。白名单 + 敏感文件移出 Web 目录 + 关闭远程包含，三件事做到，文件包含就很难成立。</p>
 </div>
-
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-          <div class="post-tags">
-              <a href="/tags/%E6%96%87%E4%BB%B6%E5%8C%85%E5%90%AB/" rel="tag"># 文件包含</a>
-              <a href="/tags/php-filter/" rel="tag"># php://filter</a>
-              <a href="/tags/%E4%BC%AA%E5%8D%8F%E8%AE%AE/" rel="tag"># 伪协议</a>
-              <a href="/tags/%E5%85%A5%E9%97%A8%E5%9F%BA%E7%A1%80/" rel="tag"># 入门基础</a>
-              <a href="/tags/LFI/" rel="tag"># LFI</a>
-          </div>
-
-        
-
-          <div class="post-nav">
-            <div class="post-nav-item">
-                <a href="/2026/10/25/web-ctf-command-injection-pingping/" rel="prev" title="[GXYCTF2019] Ping Ping Ping：空格与关键字的双重过滤">
-                  <i class="fa fa-angle-left"></i> [GXYCTF2019] Ping Ping Ping：空格与关键字的双重过滤
-                </a>
-            </div>
-            <div class="post-nav-item">
-                <a href="/2026/10/30/web-ctf-file-inclusion-secret-file/" rel="next" title="[极客大挑战 2019] Secret File：源码注释、302 跳转与 php:&#x2F;&#x2F;filter">
-                  [极客大挑战 2019] Secret File：源码注释、302 跳转与 php://filter <i class="fa fa-angle-right"></i>
-                </a>
-            </div>
-          </div>
-    </footer>
-  </article>
-</div>
-
-
-
-
-
-
-</div>
-  </main>
-
-  <footer class="footer">
-    <div class="footer-inner">
-
-  <div class="copyright">
-    &copy; 
-    <span itemprop="copyrightYear">2026</span>
-    <span class="with-love">
-      <i class="fa fa-heart"></i>
-    </span>
-    <span class="author" itemprop="copyrightHolder">Quellisya</span>
-  </div>
-  <div class="powered-by">由 <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/pisces/" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
-  </div>
-
-    </div>
-  </footer>
-
-  
-  <div class="toggle sidebar-toggle" role="button">
-    <span class="toggle-line"></span>
-    <span class="toggle-line"></span>
-    <span class="toggle-line"></span>
-  </div>
-  <div class="sidebar-dimmer"></div>
-  <div class="back-to-top" role="button" aria-label="返回顶部">
-    <i class="fa fa-arrow-up fa-lg"></i>
-    <span>0%</span>
-  </div>
-  <div class="reading-progress-bar"></div>
-  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
-
-  <a href="https://github.com/Quellisya" class="github-corner" title="在 GitHub 上关注我" aria-label="在 GitHub 上关注我" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
-
-<noscript>
-  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
-</noscript>
-
-</body>
-</html>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/Quellisya">Quellisya</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://quellisya.github.io/2026/10/30/web-knowledge-file-inclusion-basics/">https://quellisya.github.io/2026/10/30/web-knowledge-file-inclusion-basics/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://Quellisya.github.io" target="_blank">Quellisya's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E6%96%87%E4%BB%B6%E5%8C%85%E5%90%AB/">文件包含</a><a class="post-meta__tags" href="/tags/php-filter/">php://filter</a><a class="post-meta__tags" href="/tags/%E4%BC%AA%E5%8D%8F%E8%AE%AE/">伪协议</a><a class="post-meta__tags" href="/tags/LFI/">LFI</a><a class="post-meta__tags" href="/tags/%E5%85%A5%E9%97%A8%E5%9F%BA%E7%A1%80/">入门基础</a></div><div class="post-share"><div class="social-share" data-image="/img/avatar-seal.svg" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/10/30/web-ctf-file-inclusion-secret-file/" title="[极客大挑战 2019] Secret File：源码注释、302 跳转与 php://filter"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info"><div class="info-1"><div class="info-item-1">上一篇</div><div class="info-item-2">[极客大挑战 2019] Secret File：源码注释、302 跳转与 php://filter</div></div><div class="info-2"><div class="info-item-1">首页源码里藏着 Archive_room.php，SECRET 按钮又被 302 跳转藏住了响应体。用 Burp 看穿跳转、读到 secr3t.php 源码后，再用 php://filter 把 flag.php 以 base64 读出来。</div></div></div></a><a class="pagination-related" href="/2026/10/25/web-ctf-command-injection-pingping/" title="[GXYCTF2019] Ping Ping Ping：空格与关键字的双重过滤"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">[GXYCTF2019] Ping Ping Ping：空格与关键字的双重过滤</div></div><div class="info-2"><div class="info-item-1">一道 ping 命令注入题：先用回显报错反推后端正则，再用 $IFS$9 解决空格，最后把整条命令 base64 编码塞进去读 flag。</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2026/10/30/web-ctf-file-inclusion-secret-file/" title="[极客大挑战 2019] Secret File：源码注释、302 跳转与 php:&#x2F;&#x2F;filter"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-30</div><div class="info-item-2">[极客大挑战 2019] Secret File：源码注释、302 跳转与 php:&#x2F;&#x2F;filter</div></div><div class="info-2"><div class="info-item-1">首页源码里藏着 Archive_room.php，SECRET 按钮又被 302 跳转藏住了响应体。用 Burp 看穿跳转、读到 secr3t.php 源码后，再用 php://filter 把 flag.php 以 base64 读出来。</div></div></div></a><a class="pagination-related" href="/2026/10/25/web-knowledge-command-injection-basics/" title="命令注入基础：分隔符、$IFS 与过滤绕过"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-25</div><div class="info-item-2">命令注入基础：分隔符、$IFS 与过滤绕过</div></div><div class="info-2"><div class="info-item-1">命令注入的通用知识：漏洞是怎么产生的、shell 的几种分隔符、空格被过滤时用 $IFS 顶上、关键字被过滤时怎么换等价写法，附完整流程速查与常见问题。</div></div></div></a><a class="pagination-related" href="/2026/10/22/web-knowledge-sql-basics/" title="SQL 注入基础：原理、流程速查与防护"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-22</div><div class="info-item-2">SQL 注入基础：原理、流程速查与防护</div></div><div class="info-2"><div class="info-item-1">SQL 注入入门笔记：漏洞是怎么产生的、必须记住的符号、字符型与数字型的判断、URL 编码，以及 UNION 注入的完整流程速查、常见问题和防护建议。</div></div></div></a></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Quellisya</div><div class="author-info-description">记录 CTF 与 Web 安全的学习笔记，把每一步讲清楚。</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">17</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">46</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">11</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/Quellisya" target="_blank" title="Github"><i class="fab fa-github" style="color: #0f2f32;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">循墨迹读代码，借微光见漏洞。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%96%87%E4%BB%B6%E5%8C%85%E5%90%AB%E6%BC%8F%E6%B4%9E%E6%98%AF%E4%BB%80%E4%B9%88"><span class="toc-text">文件包含漏洞是什么</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%8E%E4%B9%88%E5%88%A4%E6%96%AD%E6%9C%89%E6%B2%A1%E6%9C%89%E6%96%87%E4%BB%B6%E5%8C%85%E5%90%AB"><span class="toc-text">怎么判断有没有文件包含</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%AF%BB%E6%BA%90%E7%A0%81%EF%BC%8C%E8%80%8C%E4%B8%8D%E6%98%AF%E6%89%A7%E8%A1%8C"><span class="toc-text">读源码，而不是执行</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B8%B8%E8%A7%81%E4%BC%AA%E5%8D%8F%E8%AE%AE%E9%80%9F%E6%9F%A5"><span class="toc-text">常见伪协议速查</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B8%B8%E8%A7%81%E5%88%A9%E7%94%A8%E9%93%BE"><span class="toc-text">常见利用链</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#1-%E8%AF%BB%E6%BA%90%E7%A0%81%E6%89%BE-flag-%E9%85%8D%E7%BD%AE"><span class="toc-text">1. 读源码找 flag &#x2F; 配置</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-php-input-%E6%89%A7%E8%A1%8C-POST-%E4%BB%A3%E7%A0%81"><span class="toc-text">2. php:&#x2F;&#x2F;input 执行 POST 代码</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-data-%E6%89%A7%E8%A1%8C%E4%BB%A3%E7%A0%81"><span class="toc-text">3. data:&#x2F;&#x2F; 执行代码</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-%E6%97%A5%E5%BF%97%E5%8C%85%E5%90%AB"><span class="toc-text">4. 日志包含</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-%E5%9B%BE%E7%89%87%E9%A9%AC-%E6%96%87%E4%BB%B6%E5%8C%85%E5%90%AB"><span class="toc-text">5. 图片马 + 文件包含</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-zip-phar"><span class="toc-text">6. zip:&#x2F;&#x2F; &#x2F; phar:&#x2F;&#x2F;</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-Session-%E6%96%87%E4%BB%B6%E5%8C%85%E5%90%AB"><span class="toc-text">7. Session 文件包含</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BB%95%E8%BF%87%E6%8A%80%E5%B7%A7%E9%80%9F%E6%9F%A5"><span class="toc-text">绕过技巧速查</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%8C%E6%95%B4%E6%B5%81%E7%A8%8B%E9%80%9F%E6%9F%A5"><span class="toc-text">完整流程速查</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="toc-text">新手常见问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%E6%80%8E%E4%B9%88%E9%98%B2"><span class="toc-text">顺手聊聊怎么防</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/30/reverse-easyre-ida/" title="[BUUCTF] easyre：IDA 里一眼看穿的两个整数比较">[BUUCTF] easyre：IDA 里一眼看穿的两个整数比较</a><time datetime="2026-10-30T02:40:00.000Z" title="发表于 2026-10-30 10:40:00">2026-10-30</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/30/misc-voip-rtp/" title="[BUUCTF] voip：Wireshark RTP 播放器听出 flag">[BUUCTF] voip：Wireshark RTP 播放器听出 flag</a><time datetime="2026-10-30T02:30:00.000Z" title="发表于 2026-10-30 10:30:00">2026-10-30</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/30/misc-traffic-easycap/" title="[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符">[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符</a><time datetime="2026-10-30T02:20:00.000Z" title="发表于 2026-10-30 10:20:00">2026-10-30</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/30/misc-base64-nways/" title="[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图">[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图</a><time datetime="2026-10-30T02:10:00.000Z" title="发表于 2026-10-30 10:10:00">2026-10-30</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/10/30/misc-lsb-mirror-world/" title="[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写">[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写</a><time datetime="2026-10-30T02:00:00.000Z" title="发表于 2026-10-30 10:00:00">2026-10-30</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2025 - 2026 By Quellisya</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 8.1.2</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.7.0</a></span></div><div class="footer_custom_text">以墨为舟，以码为桨 · CTF & Web Security Notes</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.7.0"></script><script src="/js/main.js?v=5.7.0"></script><div class="js-pjax"></div><script defer src="/js/butterfly-custom.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><i class="fas fa-spinner fa-pulse" id="loading-status" hidden="hidden"></i><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="local-search-input"><input placeholder="搜索笔记、题目或 payload…" type="text"/></div><hr/><div id="local-search-results"></div><div class="ais-Pagination" id="local-search-pagination" style="display:none;"><ul class="ais-Pagination-list"></ul></div><div id="local-search-stats"></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.7.0"></script></div></div></body></html>
