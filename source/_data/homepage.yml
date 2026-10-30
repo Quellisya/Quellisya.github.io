@@ -1,17 +1,19 @@
 # 首页欢迎区内容（由 scripts/homepage.js 读取）
 # 改这里的文字即可，不需要动主题源码
 eyebrow: CTF · WEB SECURITY · NOTES
-title: 你好，我是 Quellisya
-description: 这里记录我的 CTF 与 Web 安全学习笔记，包括做题过程、payload 和踩坑记录。希望能写出对新手友好的 Writeup，帮你少走一点弯路。
+title_prefix: 你好，我是
+name: Quellisya
+description: 这里记录我的 CTF 与 Web 安全学习笔记：做题过程、payload、踩坑记录和可以复用的排查思路。希望每一篇都能帮你少走一点弯路。
+index_title: 文章总览
 buttons:
   - text: 按分类浏览
     link: /categories/
-    icon: fa fa-th
+    icon: fas fa-layer-group
     primary: true
   - text: 文章归档
     link: /archives/
-    icon: fa fa-archive
+    icon: fas fa-archive
   - text: GitHub
     link: https://github.com/Quellisya
-    icon: fa fa-github
+    icon: fab fa-github
     external: true

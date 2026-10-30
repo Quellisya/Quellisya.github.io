@@ -1,13 +1,10 @@
 'use strict';
 
 /**
- * 首页：欢迎区 + 按主题分组的文章索引。
- * 文案在 source/_data/homepage.yml 中维护。
+ * 首页：水墨科技风欢迎区 + 按主题分组的文章索引。
  *
- * 文章索引根据 _posts 自动生成：新增文章后无需改这里，
- * 只要在 front-matter 里补上 topic / difficulty / series_order，首页会自动更新。
- *
- * 分组规则：按 topic 聚合。每个主题展示最近 N 篇，超过则给出「查看全部」。
+ * 文章索引从 _posts 自动生成；新增文章只要在 front-matter 里补
+ * topic / difficulty / series / series_order，首页会自动更新。
  */
 hexo.extend.filter.register('after_render:html', function(html, locals) {
   if (!locals || locals.path !== 'index.html') return html;
@@ -20,6 +17,7 @@ hexo.extend.filter.register('after_render:html', function(html, locals) {
 
   const root = hexo.config.root || '/';
   const PER_TOPIC = 6;
+  const NUMERALS = ['壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖', '拾'];
 
   const url = function(path) {
     if (!path) return '#';
@@ -49,7 +47,6 @@ hexo.extend.filter.register('after_render:html', function(html, locals) {
     return Math.max(1, Math.round(cjk / 400 + words / 200));
   };
 
-  // 分类对象，用来给「查看全部」找链接
   const categories = hexo.locals.get('categories').toArray();
   const categoryPath = function(name) {
     const category = categories.find(item => item.name === name);
@@ -61,9 +58,9 @@ hexo.extend.filter.register('after_render:html', function(html, locals) {
   const buttons = Array.isArray(data.buttons) && data.buttons.length
     ? data.buttons
     : [
-      { text: '按分类浏览', link: '/categories/', icon: 'fa fa-th', primary: true },
-      { text: '文章归档', link: '/archives/', icon: 'fa fa-archive' },
-      { text: 'GitHub', link: 'https://github.com/Quellisya', icon: 'fa fa-github', external: true }
+      { text: '按分类浏览', link: '/categories/', icon: 'fas fa-layer-group', primary: true },
+      { text: '文章归档', link: '/archives/', icon: 'fas fa-archive' },
+      { text: 'GitHub', link: 'https://github.com/Quellisya', icon: 'fab fa-github', external: true }
     ];
 
   const buttonHtml = buttons.map(button => {
@@ -83,20 +80,19 @@ hexo.extend.filter.register('after_render:html', function(html, locals) {
     groupMap.get(name).push(post);
   });
 
-  // 主题按「最近一篇的发布时间」倒序
   const groups = [...groupMap.entries()]
     .map(([name, items]) => ({ name, items, latest: items[0].date }))
-    .sort((a, b) => b.latest - a.latest);
+    .sort((a, b) => b.items.length - a.items.length || b.latest - a.latest);
 
   const latest = source[0];
 
   // ---------- 主题快捷入口 ----------
   const chips = groups.map((group, i) =>
-    `<a href="#topic-${i + 1}">${esc(group.name)}<span>${group.items.length}</span></a>`
+    `<a href="#topic-${i + 1}">${esc(group.name)}<em>${String(group.items.length).padStart(2, '0')}</em></a>`
   ).join('');
 
   // ---------- 卡片 ----------
-  const card = function(post) {
+  const card = function(post, index) {
     const topic = topicOf(post);
     const difficulty = post.difficulty || '';
     const tags = post.tags ? post.tags.toArray().slice(0, 3) : [];
@@ -105,66 +101,106 @@ hexo.extend.filter.register('after_render:html', function(html, locals) {
       .replace(/\s+/g, ' ')
       .trim();
     const metaLine = [
-      `<span><i class="far fa-calendar"></i>${esc(post.date.format('YYYY-MM-DD'))}</span>`,
-      `<span><i class="far fa-clock"></i>约 ${readingTime(post)} 分钟</span>`
+      `<span><i class="far fa-calendar-alt"></i>${esc(post.date.format('YYYY-MM-DD'))}</span>`,
+      `<span><i class="far fa-clock"></i>${readingTime(post)} min</span>`
     ].join('');
+    const seriesLine = post.series
+      ? `<span><i class="fas fa-layer-group"></i>${esc(post.series)}${post.series_order != null ? ' · ' + String(post.series_order).padStart(2, '0') : ''}</span>`
+      : '';
     const tagLine = tags.length
       ? `<div class="home-post-card__tags">${tags.map(tag => `<span>#${esc(tag.name)}</span>`).join('')}</div>`
       : '';
+
     return `
-<a class="home-post-card" href="${esc(url(post.path))}">
+<a class="home-post-card q-tilt" href="${esc(url(post.path))}">
   <div class="home-post-card__head">
+    <span class="home-post-card__index">${String(index + 1).padStart(2, '0')}</span>
     <span class="home-post-card__topic">${esc(topic)}</span>
     ${difficulty ? `<span class="home-post-card__level">${esc(difficulty)}</span>` : ''}
   </div>
   <h3 class="home-post-card__title">${esc(post.title)}</h3>
   <p class="home-post-card__desc">${esc(summary)}</p>
-  <div class="home-post-card__meta">${metaLine}</div>
+  <div class="home-post-card__meta">${metaLine}${seriesLine}</div>
   ${tagLine}
+  <span class="home-post-card__more">阅读笔记 <i class="fas fa-arrow-right"></i></span>
 </a>`;
   };
 
   // ---------- 每个主题一段 ----------
   const sections = groups.map((group, i) => {
     const shown = group.items.slice(0, PER_TOPIC).map(card).join('');
-    const rest = group.items.length - group.items.slice(0, PER_TOPIC).length;
+    const rest = group.items.length - Math.min(group.items.length, PER_TOPIC);
     const path = categoryPath(group.name);
     const more = path
-      ? `<a href="${esc(url(path))}">${rest > 0 ? `还有 ${rest} 篇 →` : '查看全部 →'}</a>`
+      ? `<a class="home-section-head__more" href="${esc(url(path))}">${rest > 0 ? `还有 ${rest} 篇` : '查看全部'} <i class="fas fa-arrow-right"></i></a>`
       : '';
     return `<div class="home-section-head" id="topic-${i + 1}">
-  <h2>${esc(group.name)}<span class="home-section-head__count">${group.items.length} 篇</span></h2>
+  <div class="home-section-head__title">
+    <span class="home-section-head__numeral">${NUMERALS[i] || String(i + 1).padStart(2, '0')}</span>
+    <h2>${esc(group.name)}</h2>
+    <span class="home-section-head__count">${String(group.items.length).padStart(2, '0')}</span>
+  </div>
   ${more}
 </div>
 <div class="home-posts">${shown}</div>`;
   }).join('');
 
   const meta = latest
-    ? `<div class="home-hero__meta"><span>已整理 <strong>${source.length}</strong> 篇</span><span>共 <strong>${groups.length}</strong> 个主题</span><span>最近更新 <strong>${latest.date.format('YYYY-MM-DD')}</strong></span></div>`
+    ? `<div class="home-hero__meta">
+      <span><b>${String(source.length).padStart(2, '0')}</b> 篇笔记</span>
+      <span><b>${String(groups.length).padStart(2, '0')}</b> 个主题</span>
+      <span>更新于 <b>${latest.date.format('YYYY-MM-DD')}</b></span>
+    </div>`
     : '';
 
   const tagHtml = chips
-    ? `<div class="home-hero__tags"><span>主题</span>${chips}</div>`
+    ? `<div class="home-hero__tags"><span class="home-hero__tags-label">主题</span>${chips}</div>`
     : '';
 
   const body = sections || `<div class="home-empty">还没有文章，去写第一篇吧。</div>`;
 
   const hero = `
+<div class="home-shell">
+<style id="home-custom-guard">#recent-posts,#pagination{display:none!important}#content-inner{display:block!important;max-width:1280px!important}#content-inner>.home-shell{width:100%!important;max-width:100%!important;padding:0!important;background:none!important;box-shadow:none!important}#content-inner>.home-shell~#aside-content{display:none!important}</style>
 <section class="home-hero">
-  <p class="home-hero__eyebrow">${esc(data.eyebrow || 'CTF · WEB SECURITY · NOTES')}</p>
-  <h2 class="home-hero__title">${esc(data.title || '你好，我是 Quellisya')}</h2>
-  <p class="home-hero__desc">${esc(data.description || '这里记录我的 CTF 与 Web 安全学习笔记。')}</p>
-  <div class="home-hero__actions">${buttonHtml}</div>
-  ${meta}
-  ${tagHtml}
+  <div class="home-hero__wash" aria-hidden="true"></div>
+  <div class="home-hero__inner">
+    <div class="home-hero__copy">
+      <p class="home-hero__eyebrow"><span class="home-hero__prompt">&gt;_</span>${esc(data.eyebrow || 'CTF · WEB SECURITY · NOTES')}</p>
+      <h2 class="home-hero__title">${esc(data.title_prefix || '你好，我是')} <span class="home-hero__name">${esc(data.name || 'Quellisya')}</span></h2>
+      <p class="home-hero__desc">${esc(data.description || '这里记录我的 CTF 与 Web 安全学习笔记。')}</p>
+      <div class="home-hero__actions">${buttonHtml}</div>
+      ${meta}
+      ${tagHtml}
+    </div>
+    <aside class="home-hero__side" aria-hidden="true">
+      <div class="home-seal">卷</div>
+      <div class="home-terminal">
+        <div class="home-terminal__bar"><i></i><i></i><i></i><span>quellisya@ctf</span></div>
+        <pre class="home-terminal__body"><code><span class="home-terminal__prompt">$</span> whoami
+Quellisya
+
+<span class="home-terminal__prompt">$</span> cat /focus
+CTF · Web Security
+
+<span class="home-terminal__prompt">$</span> <span class="home-terminal__cursor">▮</span></code></pre>
+      </div>
+      <p class="home-hero__vertical">网络空间安全笔记</p>
+    </aside>
+  </div>
+  <div class="home-hero__scroll"><span></span>向下阅读</div>
 </section>
-${body}`;
+<div class="home-section-head home-section-head--overview">
+  <div class="home-section-head__title">
+    <span class="home-section-head__numeral">录</span>
+    <h2>${esc(data.index_title || '文章总览')}</h2>
+  </div>
+  <a class="home-section-head__more" href="${esc(url('/archives/'))}">按时间浏览 <i class="fas fa-arrow-right"></i></a>
+</div>
+${body}
+</div>`;
 
-  html = html.replace(/(<div class="main-inner[^"]*">)/, match => match + hero);
-
-  // 首页已经用卡片展示文章，移除主题默认列表与分页，避免重复
-  html = html.replace(/<div class="post-block">[\s\S]*?<\/article>\s*<\/div>/g, '');
-  html = html.replace(/<nav class="pagination">[\s\S]*?<\/nav>/g, '');
+  html = html.replace(/(<main[^>]*id="content-inner"[^>]*>)/, match => match + hero);
 
   return html;
 }, 9);

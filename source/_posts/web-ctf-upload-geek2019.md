@@ -12,7 +12,7 @@ tags:
   - 一句话木马
   - PHP 短标签
   - 极客大挑战
-description: 后缀黑名单、Content-Type、文件头、内容黑名单四层检查，全靠加一个 GIF89a 文件头和改用 <script language="php"> 标签绕过。
+description: 后缀黑名单、Content-Type、文件头、内容黑名单四层检查，全靠加一个 GIF89a 文件头和改用 PHP 的 script language=php 老式标签绕过。
 difficulty: 入门
 topic: 文件上传
 series: 文件上传

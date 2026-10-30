@@ -1,0 +1,254 @@
+# Butterfly 主题配置（只写覆盖项，其余沿用主题默认值）
+# 主题文档：https://butterfly.js.org/
+
+# 导航
+nav:
+  logo: /img/logo-seal.svg
+  display_title: true
+  display_post_title: true
+  fixed: true
+
+menu:
+  首页: / || fas fa-home
+  分类: /categories/ || fas fa-layer-group
+  标签: /tags/ || fas fa-tags
+  归档: /archives/ || fas fa-archive
+  GitHub: https://github.com/Quellisya || fab fa-github
+
+social:
+  fab fa-github: https://github.com/Quellisya || Github || '#0f2f32'
+
+favicon: /img/logo-seal.svg
+
+avatar:
+  img: /img/avatar-seal.svg
+  effect: false
+
+# 顶部图：首页关闭，文章/归档/分类/标签统一使用水墨科技横幅
+disable_top_img: false
+default_top_img: /img/banner-ink-tech.svg
+index_img: false
+archive_img: /img/banner-ink-tech.svg
+tag_img: /img/banner-ink-tech.svg
+category_img: /img/banner-ink-tech.svg
+footer_img: false
+
+# 页面背景
+background: /img/bg-ink-tech.svg
+
+# 首页文章封面（首页由自定义卡片接管，这里关闭默认封面）
+cover:
+  index_enable: false
+  aside_enable: false
+  archives_enable: false
+  default_cover: []
+
+# 首页默认列表会被自定义卡片替换
+index_layout: 4
+index_post_content:
+  method: 1
+  length: 200
+
+# 文章元信息
+post_meta:
+  page:
+    date_type: created
+    date_format: date
+    categories: true
+    tags: true
+    label: true
+  post:
+    position: left
+    date_type: both
+    date_format: date
+    categories: true
+    tags: true
+    label: true
+
+# 目录
+toc:
+  post: true
+  page: false
+  number: false
+  expand: false
+  style_simple: false
+  scroll_percent: true
+
+# 版权
+post_copyright:
+  enable: true
+  decode: false
+  author_href: https://github.com/Quellisya
+  license: CC BY-NC-SA 4.0
+  license_url: https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+# 相关文章
+related_post:
+  enable: true
+  limit: 3
+  date_type: created
+
+# 上一篇 / 下一篇
+post_pagination: 1
+
+# 侧边栏
+aside:
+  enable: true
+  hide: false
+  button: true
+  mobile: true
+  position: right
+  display:
+    archive: true
+    tag: true
+    category: true
+  card_author:
+    enable: true
+    description: 记录 CTF 与 Web 安全的学习笔记，把每一步讲清楚。
+    button:
+      enable: true
+      icon: fab fa-github
+      text: Follow Me
+      link: https://github.com/Quellisya
+  card_announcement:
+    enable: true
+    content: 循墨迹读代码，借微光见漏洞。
+  card_recent_post:
+    enable: true
+    limit: 5
+    sort: date
+  card_categories:
+    enable: true
+    limit: 8
+    expand: none
+  card_tags:
+    enable: true
+    limit: 30
+    color: false
+    orderby: name
+    order: 1
+  card_archives:
+    enable: true
+    type: monthly
+    format: YYYY年MM月
+    order: -1
+    limit: 8
+  card_post_series:
+    enable: false
+    series_title: true
+    orderBy: date
+    order: -1
+  card_webinfo:
+    enable: true
+    post_count: true
+    last_push_date: true
+
+# 右下角按钮
+rightside_scroll_percent: true
+darkmode:
+  enable: true
+  button: true
+  autoChangeMode: false
+
+display_mode: light
+
+# 搜索
+search:
+  use: local_search
+  placeholder: 搜索笔记、题目或 payload…
+  local_search:
+    preload: false
+    top_n_per_article: 1
+    unescape: false
+    pagination:
+      enable: false
+
+# 主题色：青瓷 + 金 + 朱砂
+theme_color:
+  enable: true
+  main: "#2bb3a3"
+  paginator: "#2bb3a3"
+  button_hover: "#c9a227"
+  text_selection: "#9fe4da"
+  link_color: "#1d8f86"
+  meta_color: "#6b8582"
+  hr_color: "#b9e4dd"
+  code_foreground: "#b23a2e"
+  code_background: "rgba(43, 179, 163, .06)"
+  toc_color: "#2bb3a3"
+  blockquote_padding_color: "#2bb3a3"
+  blockquote_background_color: "#2bb3a3"
+  scrollbar_color: "#2bb3a3"
+  meta_theme_color_light: "#f3fbf8"
+  meta_theme_color_dark: "#0f1f22"
+
+# 字体
+font:
+  global_font_size: 15px
+  code_font_size: 13px
+  font_family: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif'
+  code_font_family: '"JetBrains Mono", "Cascadia Code", Consolas, "PingFang SC", monospace'
+
+blog_title_font:
+  font_link:
+  font_family: '"Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", "SimSun", serif'
+
+# 代码块
+code_blocks:
+  theme: light
+  macStyle: true
+  height_limit: false
+  word_wrap: false
+  copy: true
+  language: true
+  shrink: false
+  fullpage: false
+
+# 页脚
+footer:
+  nav:
+  owner:
+    enable: true
+    since: 2025
+  copyright:
+    enable: true
+    version: true
+  custom_text: 以墨为舟，以码为桨 · CTF & Web Security Notes
+
+# 杂项
+anchor:
+  auto_update: true
+  click_to_scroll: true
+copy:
+  enable: true
+  copyright:
+    enable: false
+wordcount:
+  enable: false
+busuanzi:
+  site_uv: false
+  site_pv: false
+  page_pv: false
+preloader:
+  enable: false
+beautify:
+  enable: false
+hr_icon:
+  enable: true
+  icon: '\f0c8'
+  icon_top: -10px
+
+# 关闭主题自带的背景特效，使用自定义粒子/光晕脚本
+canvas_ribbon:
+  enable: false
+canvas_fluttering_ribbon:
+  enable: false
+fireworks:
+  enable: false
+
+# 注入自定义样式与脚本
+inject:
+  head:
+    - <link rel="stylesheet" href="/css/butterfly-custom.css">
+  bottom:
+    - <script defer src="/js/butterfly-custom.js"></script>

@@ -51,14 +51,14 @@ hexo.extend.filter.register('after_render:html', function(html, locals) {
   const prev = members[index - 1];
   const next = members[index + 1];
   const arrows = [
-    prev ? `<a class="series-nav__prev" href="${esc(url(prev.path))}"><i class="fa fa-arrow-left"></i>${esc(prev.title)}</a>` : '',
-    next ? `<a class="series-nav__next" href="${esc(url(next.path))}">${esc(next.title)}<i class="fa fa-arrow-right"></i></a>` : ''
+    prev ? `<a class="series-nav__prev" href="${esc(url(prev.path))}"><i class="fas fa-arrow-left"></i>${esc(prev.title)}</a>` : '',
+    next ? `<a class="series-nav__next" href="${esc(url(next.path))}">${esc(next.title)}<i class="fas fa-arrow-right"></i></a>` : ''
   ].join('');
 
   const nav = `
 <nav class="series-nav">
   <div class="series-nav__head">
-    <i class="fa fa-layer-group"></i>
+    <i class="fas fa-layer-group"></i>
     <span class="series-nav__name">系列：${esc(page.series)}</span>
     <span class="series-nav__count">第 ${index + 1} / ${members.length} 篇</span>
   </div>
@@ -66,5 +66,5 @@ hexo.extend.filter.register('after_render:html', function(html, locals) {
   ${arrows ? `<div class="series-nav__links">${arrows}</div>` : ''}
 </nav>`;
 
-  return html.replace(/(<div class="post-body[^"]*"[^>]*>)/, '$1' + nav);
+  return html.replace(/(<article[^>]*id="article-container"[^>]*>)/, '$1' + nav);
 }, 10);
