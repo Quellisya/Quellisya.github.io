@@ -79,6 +79,11 @@ category_map:
   命令注入: command-injection
   文件上传: file-upload
   文件包含: file-inclusion
+  Misc: misc
+  隐写: steganography
+  流量分析: traffic-analysis
+  Reverse: reverse
+  逆向入门: reverse-basics
 tag_map:
 
 # 分类页按发布时间正序排列：同一个系列里，基础篇和第一篇排在最前面

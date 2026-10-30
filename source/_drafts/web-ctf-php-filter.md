@@ -1,3 +1,6 @@
+> **已整理为正式文章**：[极客大挑战 2019] Secret File：源码注释、302 跳转与 php://filter
+> 链接：`/2026/10/30/web-ctf-file-inclusion-secret-file/`
+
 [极客大挑战 2019]Secret File
 ![alt text](image.png)
 查看页面源码
