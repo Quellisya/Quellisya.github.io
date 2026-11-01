@@ -79,6 +79,8 @@ category_map:
   命令注入: command-injection
   文件上传: file-upload
   文件包含: file-inclusion
+  源码泄露: source-disclosure
+  SSTI: ssti
   Misc: misc
   隐写: steganography
   流量分析: traffic-analysis
