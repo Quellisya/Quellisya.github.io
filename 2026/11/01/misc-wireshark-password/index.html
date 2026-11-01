@@ -1,0 +1,682 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>[JBCTF] wireshark：从 HTTP 登录表单里找出 password | Quellisya's Blog</title><meta name="author" content="Quellisya"><meta name="copyright" content="Quellisya"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#f3fbf8"><meta name="description" content="题目要求找 password。pcap 里混着 DNS 和 TCP，但真正的线索是第 20 号包：一个发往登录接口的 HTTP POST，请求体是 application&#x2F;x-www-form-urlencoded，password 字段的值就是 flag 的内容。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[JBCTF] wireshark：从 HTTP 登录表单里找出 password">
+<meta property="og:url" content="https://quellisya.github.io/2026/11/01/misc-wireshark-password/index.html">
+<meta property="og:site_name" content="Quellisya&#39;s Blog">
+<meta property="og:description" content="题目要求找 password。pcap 里混着 DNS 和 TCP，但真正的线索是第 20 号包：一个发往登录接口的 HTTP POST，请求体是 application&#x2F;x-www-form-urlencoded，password 字段的值就是 flag 的内容。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://quellisya.github.io/img/avatar-seal.svg">
+<meta property="article:published_time" content="2026-11-01T02:20:00.000Z">
+<meta property="article:modified_time" content="2026-11-01T02:20:00.000Z">
+<meta property="article:author" content="Quellisya">
+<meta property="article:tag" content="HTTP">
+<meta property="article:tag" content="JBCTF">
+<meta property="article:tag" content="Misc">
+<meta property="article:tag" content="POST">
+<meta property="article:tag" content="Wireshark">
+<meta property="article:tag" content="流量分析">
+<meta property="article:tag" content="表单">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://quellisya.github.io/img/avatar-seal.svg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "[JBCTF] wireshark：从 HTTP 登录表单里找出 password",
+  "url": "https://quellisya.github.io/2026/11/01/misc-wireshark-password/",
+  "image": "https://quellisya.github.io/img/avatar-seal.svg",
+  "datePublished": "2026-11-01T02:20:00.000Z",
+  "dateModified": "2026-11-01T02:20:00.000Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Quellisya",
+      "url": "https://github.com/Quellisya"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/logo-seal.svg"><link rel="canonical" href="https://quellisya.github.io/2026/11/01/misc-wireshark-password/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="stylesheet" href="/css/index.css?v=5.7.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        const data = { value }
+
+        if (ttl != null) {
+          data.expiry = Date.now() + ttl * 86400000
+        }
+
+        localStorage.setItem(key, JSON.stringify(data))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return
+
+        try {
+          const data = JSON.parse(itemStr)
+
+          if (data.expiry && Date.now() > data.expiry) {
+            localStorage.removeItem(key)
+            return
+          }
+
+          return data.value
+        } catch {
+          localStorage.removeItem(key)
+        }
+      }
+    }
+
+    const scriptCache = new Map()
+    const cssCache = new Map()
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => {
+        if (scriptCache.has(url)) {
+          return scriptCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const script = document.createElement('script')
+
+          script.src = url
+          script.async = true
+
+          for (const key in attr) {
+            script.setAttribute(key, attr[key])
+          }
+
+          script.onload = resolve
+          script.onerror = reject
+
+          document.head.appendChild(script)
+        })
+
+        scriptCache.set(url, promise)
+
+        return promise
+      },
+      getCSS: (url, id) => {
+        if (cssCache.has(url)) {
+          return cssCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const link = document.createElement('link')
+
+          link.rel = 'stylesheet'
+          link.href = url
+
+          if (id) {
+            link.id = id
+          }
+
+          link.onload = resolve
+          link.onerror = reject
+
+          document.head.appendChild(link)
+        })
+
+        cssCache.set(url, promise)
+
+        return promise
+      },
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      const activateDarkMode = () => {
+        document.documentElement.dataset.theme = 'dark'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#0f1f22')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.dataset.theme = 'light'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#f3fbf8')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"pagination":{"enable":false,"hitsPerPage":8},"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":true},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: true,
+  percent: {
+    toc: true,
+    rightside: true,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '[JBCTF] wireshark：从 HTTP 登录表单里找出 password',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><link rel="stylesheet" href="/css/butterfly-custom.css"><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head><body><div class="bg-animation" id="web_bg" style="background-image: url(/img/bg-ink-tech.svg);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">22</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">63</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">13</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg fixed" id="page-header" style="background-image: url(/img/banner-ink-tech.svg);"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><img class="site-icon" src="/img/logo-seal.svg" alt="Logo"><span class="site-name">Quellisya's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">[JBCTF] wireshark：从 HTTP 登录表单里找出 password</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">[JBCTF] wireshark：从 HTTP 登录表单里找出 password</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-11-01T02:20:00.000Z" title="发表于 2026-11-01 10:20:00">2026-11-01</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-11-01T02:20:00.000Z" title="更新于 2026-11-01 10:20:00">2026-11-01</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/">CTF</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/misc/">Misc</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/misc/traffic-analysis/">流量分析</a></span></div><div class="meta-secondline"></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container">
+<nav class="series-nav">
+  <div class="series-nav__head">
+    <i class="fas fa-layer-group"></i>
+    <span class="series-nav__name">系列：Misc 入门</span>
+    <span class="series-nav__count">第 6 / 6 篇</span>
+  </div>
+  <ol class="series-nav__list"><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-lsb-mirror-world&#x2F;">[BUUCTF] 镜子里面的世界：用 StegSolve 提取 LSB 隐写</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-base64-nways&#x2F;">[BUUCTF] N种方法解决：一个假的 KEY.exe，真身是 Base64 藏图</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-traffic-easycap&#x2F;">[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;30&#x2F;misc-voip-rtp&#x2F;">[BUUCTF] voip：Wireshark RTP 播放器听出 flag</a></li><li><a href="&#x2F;2026&#x2F;11&#x2F;01&#x2F;misc-traffic-sniffed&#x2F;">[BUUCTF] 被嗅探的流量：用 HTTP 过滤器从 POST 上传里捞出 flag</a></li><li class="is-current"><a href="&#x2F;2026&#x2F;11&#x2F;01&#x2F;misc-wireshark-password&#x2F;">[JBCTF] wireshark：从 HTTP 登录表单里找出 password</a></li></ol>
+  <div class="series-nav__links"><a class="series-nav__prev" href="&#x2F;2026&#x2F;11&#x2F;01&#x2F;misc-traffic-sniffed&#x2F;"><i class="fas fa-arrow-left"></i>[BUUCTF] 被嗅探的流量：用 HTTP 过滤器从 POST 上传里捞出 flag</a></div>
+</nav><div class="note primary flat"><p><strong>一分钟速览</strong></p>
+<ul>
+<li><strong>难度</strong>：入门</li>
+<li><strong>考点</strong>：Wireshark 显示过滤器、HTTP POST、<code>application/x-www-form-urlencoded</code> 表单解析</li>
+<li><strong>工具</strong>：Wireshark（或 <code>tshark</code>）</li>
+<li><strong>关键过滤器</strong>：<code>http contains &quot;password&quot;</code>，也可以用 <code>http.request.method == &quot;POST&quot;</code></li>
+<li><strong>关键字段</strong>：<code>HTML Form URL Encoded → password</code></li>
+<li><strong>flag</strong>：<code>flag{ffb7567a1d4f4abdffdb54e022f8facd}</code></li>
+</ul>
+</div>
+
+<div class="note info flat"><p><strong>阅读说明</strong></p>
+<ul>
+<li><strong>前置知识</strong>：知道 HTTP 请求由请求行、请求头、请求体组成；见过 Wireshark 的包列表和包详情</li>
+<li><strong>工具</strong>：Wireshark 4.x（3.x 菜单基本一致）；不想开图形界面可以用 <code>tshark</code></li>
+<li><strong>环境</strong>：纯本地分析 pcap，不需要靶机，也不需要访问包里的域名</li>
+<li><strong>配套阅读</strong>：<a href="/2026/11/01/misc-traffic-sniffed/">被嗅探的流量：用 HTTP 过滤器从 POST 上传里捞出 flag</a> 讲的是「POST + 文件上传」，本文讲的是「POST + 登录表单」</li>
+<li>本文仅用于<strong>授权题目和教学</strong>。</li>
+</ul>
+</div>
+
+<div class="note default flat"><p><strong>做题路线</strong></p>
+<p><code>打开 pcap</code> → <code>看协议分布</code> → <code>过滤 http contains &quot;password&quot;</code> → <code>锁定登录 POST</code> → <code>展开 HTML Form URL Encoded</code> → <code>读出 password</code> → <code>包上 flag{}</code></p>
+</div>
+
+<h2 id="这道题在考什么"><a href="#这道题在考什么" class="headerlink" title="这道题在考什么"></a>这道题在考什么</h2><p>题目只有一句话：<strong>找 password</strong>。附件是一个 2015 年的抓包文件：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">dianli_jbctf_MISC_T10075_20150707_wireshark.pcap</span><br></pre></td></tr></table></figure>
+
+<p>这类题不考解密，也不考协议逆向。它考的是：</p>
+<ol>
+<li>能不能从一堆 DNS、TCP 握手里，快速定位到<strong>登录请求</strong>；</li>
+<li>知不知道 HTTP 的 <code>application/x-www-form-urlencoded</code> 表单在 Wireshark 里长什么样；</li>
+<li>能不能把表单里的 <code>password</code> 字段值准确抄下来。</li>
+</ol>
+<p>只要过滤器用对，这题一分钟就能出结果。</p>
+<h2 id="第一步：打开-pcap，先看全貌"><a href="#第一步：打开-pcap，先看全貌" class="headerlink" title="第一步：打开 pcap，先看全貌"></a>第一步：打开 pcap，先看全貌</h2><p>用 Wireshark 打开附件。包列表里有 DNS 查询、TCP 握手、HTTP 请求，看起来又是一道「混合流量」题：</p>
+<p><img src="/2026/11/01/misc-wireshark-password/image-2.png" alt="打开 pcap 后的包列表"></p>
+<p><em>图 1：第 20 号包是一条 POST 请求，Info 列写着 <code>/user.php?action=login&amp;do=login</code></em></p>
+<p>先看几列关键信息：</p>
+<table>
+<thead>
+<tr>
+<th>列</th>
+<th>第 20 号包的内容</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>No.</code></td>
+<td><code>20</code></td>
+<td>后面定位就靠它</td>
+</tr>
+<tr>
+<td><code>Source</code></td>
+<td><code>192.168.1.102</code></td>
+<td>客户端（内网主机）</td>
+</tr>
+<tr>
+<td><code>Destination</code></td>
+<td><code>115.231.236.116</code></td>
+<td>服务器</td>
+</tr>
+<tr>
+<td><code>Protocol</code></td>
+<td><code>HTTP</code></td>
+<td>明文 HTTP，内容可读</td>
+</tr>
+<tr>
+<td><code>Length</code></td>
+<td><code>863</code></td>
+<td>请求比较大，说明带了不少数据</td>
+</tr>
+<tr>
+<td><code>Info</code></td>
+<td><code>POST /user.php?action=login&amp;do=login HTTP/1.1 (application/x-www-form-urlencoded)</code></td>
+<td><strong>登录接口 + 表单提交</strong></td>
+</tr>
+</tbody></table>
+<p><code>Info</code> 列已经给了三个关键词：</p>
+<ul>
+<li><code>POST</code>：提交数据；</li>
+<li><code>login</code>：登录；</li>
+<li><code>application/x-www-form-urlencoded</code>：传统的 HTML 表单编码。</li>
+</ul>
+<p>题目要找 <code>password</code>，而登录请求的请求体里最可能出现的字段就是 <code>password</code>。方向明确了。</p>
+<div class="note info flat"><p><strong>看到混合流量，先做减法。</strong></p>
+<p>包列表上方 <code>Statistics → Protocol Hierarchy</code> 可以看协议分布；<code>Statistics → Conversations</code> 可以看哪条会话包最多。本题的 DNS 查询（<code>nslcick.baidu.com</code>、<code>hm.baidu.com</code> 等）和 TCP 握手都是噪音，真正带业务数据的是那条 HTTP 会话。</p>
+<p>减掉噪音之后，剩下的包越少，越不容易看漏。</p>
+</div>
+
+<h2 id="第二步：用过滤器把-password-筛出来"><a href="#第二步：用过滤器把-password-筛出来" class="headerlink" title="第二步：用过滤器把 password 筛出来"></a>第二步：用过滤器把 password 筛出来</h2><p>Wireshark 顶部有一条显示过滤器输入框。题目要找 <code>password</code>，最直接的办法就是按内容搜：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">http contains &quot;password&quot;</span><br></pre></td></tr></table></figure>
+
+<p>回车后，包列表只剩第 20 号包：</p>
+<p><img src="/2026/11/01/misc-wireshark-password/image-3.png" alt="过滤 http contains &quot;password&quot;"></p>
+<p><em>图 2：只有一条记录命中，说明这个 HTTP 请求里确实出现了 <code>password</code></em></p>
+<p>也可以换几种等价写法：</p>
+<table>
+<thead>
+<tr>
+<th>过滤器</th>
+<th>作用</th>
+<th>本题结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>http contains &quot;password&quot;</code></td>
+<td>在 HTTP 层按内容搜</td>
+<td>命中第 20 号</td>
+</tr>
+<tr>
+<td><code>http.request.method == &quot;POST&quot;</code></td>
+<td>只看 POST</td>
+<td>也能命中第 20 号</td>
+</tr>
+<tr>
+<td><code>http.request.uri contains &quot;login&quot;</code></td>
+<td>URI 里带 login</td>
+<td>也能命中</td>
+</tr>
+<tr>
+<td><code>urlencoded-form.key == &quot;password&quot;</code></td>
+<td>只看表单里 key 为 password 的字段</td>
+<td>精确命中</td>
+</tr>
+<tr>
+<td><code>http.host == &quot;www.wooyun.org&quot;</code></td>
+<td>按 Host 过滤</td>
+<td>命中同一条会话</td>
+</tr>
+</tbody></table>
+<div class="note warning flat"><p>两个常见的写法错误：</p>
+<ol>
+<li><strong>字符串必须加双引号</strong>：<code>http contains password</code> 是错的，要写 <code>http contains &quot;password&quot;</code>。</li>
+<li><strong>大小写</strong>：<code>contains</code> 默认区分大小写。表单里的字段名是小写 <code>password</code>，所以搜小写；如果题目写的是 <code>Password</code>，就要对应改。</li>
+</ol>
+<p>另外，<code>http contains</code> 搜的是<strong>单个包</strong>的 HTTP 层内容。如果表单被拆到多个 TCP 分段里，单个包可能搜不全；这时用 <code>Follow HTTP Stream</code> 或 <code>tcp contains</code> 配合分段查看。</p>
+</div>
+
+<h2 id="第三步：展开包详情，读表单字段"><a href="#第三步：展开包详情，读表单字段" class="headerlink" title="第三步：展开包详情，读表单字段"></a>第三步：展开包详情，读表单字段</h2><p>选中第 20 号包，看中间的包详情。展开 <code>Hypertext Transfer Protocol</code>，再展开 <code>HTML Form URL Encoded</code>，会看到：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">HTML Form URL Encoded: application/x-www-form-urlencoded</span><br><span class="line">    Form item: &quot;email&quot; = &quot;flag&quot;</span><br><span class="line">        Key: email</span><br><span class="line">        Value: flag</span><br><span class="line">    Form item: &quot;password&quot; = &quot;ffb7567a1d4f4abdffdb54e022f8facd&quot;</span><br><span class="line">        Key: password</span><br><span class="line">        Value: ffb7567a1d4f4abdffdb54e022f8facd</span><br><span class="line">    ...</span><br></pre></td></tr></table></figure>
+
+<p>其中最关键的两行：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Key: password</span><br><span class="line">Value: ffb7567a1d4f4abdffdb54e022f8facd</span><br></pre></td></tr></table></figure>
+
+<p>这就是题目要找的 <code>password</code>。右侧的十六进制&#x2F;ASCII 视图也能看到同一段数据：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">...password=ffb7567a1d4f4abdffdb54e022f8facd...</span><br></pre></td></tr></table></figure>
+
+<div class="note success flat"><p><strong>Wireshark 已经把表单拆好了，不需要自己解析。</strong></p>
+<p>看到 <code>application/x-www-form-urlencoded</code>，Wireshark 会自动把请求体解析成 <code>Form item</code> 列表。你只要展开 <code>HTML Form URL Encoded</code>，找到 <code>password</code> 对应的 <code>Value</code> 即可。</p>
+<p>如果包详情里没有这个节点，可能是版本差异，或者请求体没有被识别；这时用 <code>Follow → HTTP Stream</code> 看原始请求体，一样能找到。</p>
+</div>
+
+<h3 id="3-1-顺便看懂-x-www-form-urlencoded"><a href="#3-1-顺便看懂-x-www-form-urlencoded" class="headerlink" title="3.1 顺便看懂 x-www-form-urlencoded"></a>3.1 顺便看懂 <code>x-www-form-urlencoded</code></h3><p>请求体大概是这个形状：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">email=flag&amp;key=email&amp;value=flag&amp;password=ffb7567a1d4f4abdffdb54e022f8facd&amp;...</span><br></pre></td></tr></table></figure>
+
+<p>规则很简单：</p>
+<table>
+<thead>
+<tr>
+<th>规则</th>
+<th>例子</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>字段之间用 <code>&amp;</code> 分隔</td>
+<td><code>a=1&amp;b=2</code></td>
+</tr>
+<tr>
+<td>键和值用 <code>=</code> 连接</td>
+<td><code>password=xxx</code></td>
+</tr>
+<tr>
+<td>特殊字符做 URL 编码</td>
+<td>空格 → <code>+</code> 或 <code>%20</code>，中文&#x2F;符号 → <code>%XX</code></td>
+</tr>
+</tbody></table>
+<p>所以 <code>password=ffb7567a...</code> 就是「字段名 password，值 ffb7567a…」。</p>
+<h2 id="第四步：换一种看法——Follow-HTTP-Stream"><a href="#第四步：换一种看法——Follow-HTTP-Stream" class="headerlink" title="第四步：换一种看法——Follow HTTP Stream"></a>第四步：换一种看法——Follow HTTP Stream</h2><p>如果包详情里的字段太多、看不清，可以右键第 20 号包 → <strong><code>Follow → HTTP Stream</code></strong>。弹窗会把整个请求还原出来：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">POST</span> <span class="string">/user.php?action=login&amp;do=login</span> <span class="meta">HTTP/1.1</span></span><br><span class="line"><span class="attribute">Host</span><span class="punctuation">: </span>www.wooyun.org</span><br><span class="line"><span class="attribute">User-Agent</span><span class="punctuation">: </span>Mozilla/5.0 ...</span><br><span class="line"><span class="attribute">Content-Type</span><span class="punctuation">: </span>application/x-www-form-urlencoded</span><br><span class="line"><span class="attribute">Content-Length</span><span class="punctuation">: </span>65</span><br><span class="line"></span><br><span class="line"><span class="language-freedesktop"><span class="attr">email</span><span class="operator">=</span>flag&amp;key<span class="operator">=</span>email&amp;value<span class="operator">=</span>flag&amp;password<span class="operator">=</span>ffb7567a1d4f4abdffdb54e022f8facd&amp;...</span></span><br></pre></td></tr></table></figure>
+
+<p>在弹窗里按 <code>Ctrl+F</code> 搜 <code>password</code>，直接跳到对应位置。</p>
+<div class="note info flat"><p><strong>Follow HTTP Stream 和包详情的区别：</strong></p>
+<ul>
+<li>包详情：按协议字段分层展示，适合<strong>精确读某个字段</strong>；</li>
+<li>Follow HTTP Stream：按 HTTP 消息还原原始文本，适合<strong>看整体结构</strong>、搜关键字、确认请求体有没有被截断。</li>
+</ul>
+<p>两个都用一遍，互相验证，最稳。</p>
+</div>
+
+<h2 id="第五步：提交-flag"><a href="#第五步：提交-flag" class="headerlink" title="第五步：提交 flag"></a>第五步：提交 flag</h2><p>题目说「找到 value 的值，包裹 <code>flag&#123;&#125;</code>」。所以：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">password = ffb7567a1d4f4abdffdb54e022f8facd</span><br><span class="line">flag     = flag&#123;ffb7567a1d4f4abdffdb54e022f8facd&#125;</span><br></pre></td></tr></table></figure>
+
+<p>提交：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">flag&#123;ffb7567a1d4f4abdffdb54e022f8facd&#125;</span><br></pre></td></tr></table></figure>
+
+<div class="note warning flat"><p>抄写时注意：</p>
+<ul>
+<li>这是 32 位十六进制字符串，<strong>全是小写</strong>；</li>
+<li>不要漏字符、不要多空格；</li>
+<li>不要把它当成 MD5 去「解密」——题目要的就是这个值本身，flag 内容已经给出来了。</li>
+</ul>
+<p>如果不放心，可以在 Wireshark 里选中 <code>Value</code> 右键 → <code>Copy → Value</code>，避免手抄出错。</p>
+</div>
+
+<h2 id="第六步：用-tshark-验证（可选）"><a href="#第六步：用-tshark-验证（可选）" class="headerlink" title="第六步：用 tshark 验证（可选）"></a>第六步：用 tshark 验证（可选）</h2><p>不想开图形界面，可以用命令行版 Wireshark：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 只看命中 password 的请求 URI</span></span><br><span class="line">tshark -r dianli_jbctf_MISC_T10075_20150707_wireshark.pcap \</span><br><span class="line">  -Y <span class="string">&#x27;http contains &quot;password&quot;&#x27;</span> \</span><br><span class="line">  -T fields -e frame.number -e http.request.uri</span><br><span class="line"></span><br><span class="line"><span class="comment"># 直接提取表单里的 password 字段</span></span><br><span class="line">tshark -r dianli_jbctf_MISC_T10075_20150707_wireshark.pcap \</span><br><span class="line">  -Y <span class="string">&#x27;urlencoded-form.key == &quot;password&quot;&#x27;</span> \</span><br><span class="line">  -T fields -e urlencoded-form.value</span><br></pre></td></tr></table></figure>
+
+<p>第二条命令应该直接输出：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ffb7567a1d4f4abdffdb54e022f8facd</span><br></pre></td></tr></table></figure>
+
+<p>也可以先跑一遍 <code>strings</code> 做快速试探：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">strings dianli_jbctf_MISC_T10075_20150707_wireshark.pcap | grep -i password</span><br></pre></td></tr></table></figure>
+
+<p>如果 pcap 没有压缩，通常能看到：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">password=ffb7567a1d4f4abdffdb54e022f8facd</span><br></pre></td></tr></table></figure>
+
+<div class="note info flat"><p><code>strings</code> 只适合<strong>未压缩、未加密</strong>的明文流量。遇到 HTTPS、gzip 压缩或者二进制协议，<code>strings</code> 可能什么都搜不到，这时还是回到 Wireshark 的协议解析和 Follow Stream。</p>
+</div>
+
+<h2 id="过滤器与字段速查卡"><a href="#过滤器与字段速查卡" class="headerlink" title="过滤器与字段速查卡"></a>过滤器与字段速查卡</h2><table>
+<thead>
+<tr>
+<th>过滤器 &#x2F; 字段</th>
+<th>作用</th>
+<th>本题用法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>http</code></td>
+<td>所有 HTTP 报文</td>
+<td>先缩小到 HTTP</td>
+</tr>
+<tr>
+<td><code>http.request</code></td>
+<td>只看请求</td>
+<td>排除响应</td>
+</tr>
+<tr>
+<td><code>http.request.method == &quot;POST&quot;</code></td>
+<td>只看 POST</td>
+<td>找登录&#x2F;提交</td>
+</tr>
+<tr>
+<td><code>http.request.uri contains &quot;login&quot;</code></td>
+<td>URI 含 login</td>
+<td>定位登录接口</td>
+</tr>
+<tr>
+<td><code>http contains &quot;password&quot;</code></td>
+<td>HTTP 层按内容搜</td>
+<td><strong>本题核心</strong></td>
+</tr>
+<tr>
+<td><code>urlencoded-form.key == &quot;password&quot;</code></td>
+<td>表单 key 精确匹配</td>
+<td>最精确</td>
+</tr>
+<tr>
+<td><code>urlencoded-form.value</code></td>
+<td>表单 value 字段</td>
+<td>提取值</td>
+</tr>
+<tr>
+<td><code>tcp contains &quot;password&quot;</code></td>
+<td>TCP 载荷按内容搜</td>
+<td>备用</td>
+</tr>
+<tr>
+<td><code>frame contains &quot;password&quot;</code></td>
+<td>整帧按内容搜</td>
+<td>备用</td>
+</tr>
+<tr>
+<td><code>http.host == &quot;www.wooyun.org&quot;</code></td>
+<td>按 Host 过滤</td>
+<td>锁定站点</td>
+</tr>
+<tr>
+<td><code>tcp.stream eq N</code></td>
+<td>只看某条 TCP 流</td>
+<td>配合 Follow</td>
+</tr>
+</tbody></table>
+<div class="note info flat"><p><strong>怎么知道 <code>urlencoded-form</code> 这个字段名？</strong></p>
+<p>在包详情里点一下 <code>Form item: &quot;password&quot;</code> 那一行，Wireshark 底部状态栏会显示对应的显示过滤器字段名，例如 <code>urlencoded-form.key</code>。这是学习过滤器字段最快的方法：<strong>点字段，看底部提示</strong>。</p>
+</div>
+
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><details class="note nx-note info">
+<summary><p><strong>Q1：为什么 <code>http contains password</code> 能匹配到？</strong></p>
+</summary>
+<div class="nx-note__body"><p>因为这是明文 HTTP，<code>password=...</code> 直接出现在请求体里。<code>http contains</code> 会在 HTTP 协议层的数据中做字符串搜索，请求行、请求头、请求体都算在内。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q2：为什么我搜不到？</strong></p>
+</summary>
+<div class="nx-note__body"><p>常见原因：</p>
+<ol>
+<li>忘了加双引号；</li>
+<li>大小写写错（<code>contains</code> 区分大小写）；</li>
+<li>流量是 HTTPS，内容被 TLS 加密，Wireshark 只能看到加密数据；</li>
+<li>请求体被 gzip 压缩；</li>
+<li>关键字跨了多个 TCP 分段，单个包不含完整字符串。</li>
+</ol>
+<p>先确认协议和端口，再换 <code>Follow HTTP Stream</code> 看原始内容。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q3：<code>http contains</code>、<code>tcp contains</code>、<code>frame contains</code> 有什么区别？</strong></p>
+</summary>
+<div class="nx-note__body"><ul>
+<li><code>http contains</code>：只在 HTTP 协议层搜，适合 HTTP 题；</li>
+<li><code>tcp contains</code>：在 TCP 载荷里搜，范围比 HTTP 大；</li>
+<li><code>frame contains</code>：在整帧（包括链路层、IP 层）里搜，范围最大。</li>
+</ul>
+<p>一般优先用范围最小的那个，结果最干净。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q4：<code>application/x-www-form-urlencoded</code> 是什么？</strong></p>
+</summary>
+<div class="nx-note__body"><p>HTML 表单默认的提交编码。格式是 <code>key1=value1&amp;key2=value2</code>，特殊字符用 URL 编码。Wireshark 会自动把它解析成 <code>HTML Form URL Encoded</code> 节点。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q5：为什么 password 看起来像一串哈希？</strong></p>
+</summary>
+<div class="nx-note__body"><p>它是 32 位十六进制字符串，长度和 MD5 一样，很可能是客户端先对密码做了哈希再提交。但本题不要求还原明文，题目要的就是这个值本身。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q6：需要访问 <code>www.wooyun.org</code> 吗？</strong></p>
+</summary>
+<div class="nx-note__body"><p>不需要。这是 2015 年的历史抓包，域名现在早已不可用。所有分析都在本地 pcap 里完成。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q7：包列表里第 20 号包为什么这么大？</strong></p>
+</summary>
+<div class="nx-note__body"><p><code>Length</code> 是 863 字节，里面除了请求行和请求头，还有 Cookie、User-Agent、Referer 和表单请求体。登录请求通常比普通 GET 大。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q8：<code>Follow HTTP Stream</code> 里内容显示不全 &#x2F; 乱码？</strong></p>
+</summary>
+<div class="nx-note__body"><p>在弹窗底部切换 <code>Show data as</code>：<code>ASCII</code> 看文本，<code>Hex Dump</code> 看字节。如果请求体是 gzip 压缩的，需要先解压；本题是明文表单，直接看 ASCII 即可。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q9：flag 要不要去掉 <code>flag{}</code> 再提交？</strong></p>
+</summary>
+<div class="nx-note__body"><p>不要。题目要求「包裹 flag{}」，最终就是 <code>flag{ffb7567a1d4f4abdffdb54e022f8facd}</code> 整体提交。不同平台格式可能不同，以题目说明为准。</p>
+</div>
+</details>
+
+<h2 id="工具速查卡"><a href="#工具速查卡" class="headerlink" title="工具速查卡"></a>工具速查卡</h2><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>路径 &#x2F; 命令</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>打开 pcap</td>
+<td><code>File → Open</code></td>
+<td>支持 pcap &#x2F; pcapng</td>
+</tr>
+<tr>
+<td>协议分布</td>
+<td><code>Statistics → Protocol Hierarchy</code></td>
+<td>先做减法</td>
+</tr>
+<tr>
+<td>会话统计</td>
+<td><code>Statistics → Conversations</code></td>
+<td>找主要会话</td>
+</tr>
+<tr>
+<td>显示过滤器</td>
+<td>顶部输入框</td>
+<td><code>http contains &quot;password&quot;</code></td>
+</tr>
+<tr>
+<td>包详情字段</td>
+<td>展开协议树</td>
+<td><code>HTML Form URL Encoded</code></td>
+</tr>
+<tr>
+<td>跟随 HTTP 流</td>
+<td>右键 → <code>Follow → HTTP Stream</code></td>
+<td>看原始请求体</td>
+</tr>
+<tr>
+<td>搜索</td>
+<td><code>Ctrl+F</code>（Follow 窗口内）</td>
+<td>搜 <code>password</code></td>
+</tr>
+<tr>
+<td>复制字段值</td>
+<td>右键 → <code>Copy → Value</code></td>
+<td>避免手抄错</td>
+</tr>
+<tr>
+<td>命令行过滤</td>
+<td><code>tshark -Y &#39;...&#39;</code></td>
+<td>批量&#x2F;脚本化</td>
+</tr>
+<tr>
+<td>快速试探</td>
+<td><code>strings pcap | grep password</code></td>
+<td>仅限明文</td>
+</tr>
+</tbody></table>
+<h2 id="顺手聊聊：明文登录的代价"><a href="#顺手聊聊：明文登录的代价" class="headerlink" title="顺手聊聊：明文登录的代价"></a>顺手聊聊：明文登录的代价</h2><p>这道题的现实意义非常直接：<strong>登录请求里的 password 是明文传输的</strong>（这里虽然看起来像哈希，但仍然是一个可直接使用的凭证值）。</p>
+<p>在同一局域网、同一 Wi-Fi、或者任何一个能抓到包的位置，攻击者都能看到：</p>
+<ul>
+<li>你登录了哪个站点、哪个接口；</li>
+<li>你提交了哪些字段；</li>
+<li><code>password</code> 字段的值是什么；</li>
+<li>Cookie、Token、Referer 等信息。</li>
+</ul>
+<p>对应的防护思路：</p>
+<table>
+<thead>
+<tr>
+<th>风险</th>
+<th>防护</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>HTTP 明文传输</td>
+<td>全站 HTTPS，登录页强制 TLS</td>
+</tr>
+<tr>
+<td>降级攻击</td>
+<td>开启 HSTS，禁用 HTTP</td>
+</tr>
+<tr>
+<td>抓包泄露凭证</td>
+<td>网络分段、无线加密（WPA2&#x2F;WPA3）、802.1X</td>
+</tr>
+<tr>
+<td>日志&#x2F;抓包留存</td>
+<td>对 pcap 和日志做脱敏，限制访问权限</td>
+</tr>
+<tr>
+<td>客户端哈希密码</td>
+<td>不能替代 TLS；哈希值同样可能被重放</td>
+</tr>
+</tbody></table>
+<div class="note success flat"><p><strong>一条经验</strong>：流量分析题先看「协议 + 内容关键词」，再看「字段」。本题的两个关键词就是 <code>POST</code> 和 <code>password</code>；找到包之后，Wireshark 已经把表单拆成了 <code>Key/Value</code>，直接读就行。真正需要练的不是逐包点，而是<strong>知道该搜什么</strong>。</p>
+</div>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/Quellisya">Quellisya</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://quellisya.github.io/2026/11/01/misc-wireshark-password/">https://quellisya.github.io/2026/11/01/misc-wireshark-password/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://Quellisya.github.io" target="_blank">Quellisya's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/Misc/">Misc</a><a class="post-meta__tags" href="/tags/Wireshark/">Wireshark</a><a class="post-meta__tags" href="/tags/HTTP/">HTTP</a><a class="post-meta__tags" href="/tags/POST/">POST</a><a class="post-meta__tags" href="/tags/%E6%B5%81%E9%87%8F%E5%88%86%E6%9E%90/">流量分析</a><a class="post-meta__tags" href="/tags/%E8%A1%A8%E5%8D%95/">表单</a><a class="post-meta__tags" href="/tags/JBCTF/">JBCTF</a></div><div class="post-share"><div class="social-share" data-image="/img/avatar-seal.svg" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/2026/11/01/web-ctf-easy-tornado/" title="[CTF2] easy_tornado：SSTI、handler.settings 与 filehash 签名"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">[CTF2] easy_tornado：SSTI、handler.settings 与 filehash 签名</div></div><div class="info-2"><div class="info-item-1">首页只给了三个 txt：flag 在 /fllllllllllllag、提示 render、以及 md5(cookie_secret+md5(filename))。用 Tornado 的 handler.settings 泄露 cookie_secret，再按公式算出 filehash，就能读文件拿 flag。</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2026/11/01/misc-traffic-sniffed/" title="[BUUCTF] 被嗅探的流量：用 HTTP 过滤器从 POST 上传里捞出 flag"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-11-01</div><div class="info-item-2">[BUUCTF] 被嗅探的流量：用 HTTP 过滤器从 POST 上传里捞出 flag</div></div><div class="info-2"><div class="info-item-1">一个混杂着 DNS、SSDP、TCP 的 pcap。先用 Conversations 和 Protocol Hierarchy 看清全貌，再用 http.request.method == "POST" 把上传请求筛出来，Follow HTTP Stream 就能看到混在 JPEG 数据里的 flag。</div></div></div></a><a class="pagination-related" href="/2026/10/30/misc-traffic-easycap/" title="[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-30</div><div class="info-item-2">[BUUCTF] easycap：Wireshark 跟流，发现每包只带一个字符</div></div><div class="info-2"><div class="info-item-1">一个只有 82 个包的小 pcap。用 Wireshark 的 Follow TCP Stream 跟一下，发现客户端每个包只发一个字符，拼起来就是 FLAG:...</div></div></div></a><a class="pagination-related" href="/2026/10/30/misc-voip-rtp/" title="[BUUCTF] voip：Wireshark RTP 播放器听出 flag"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-30</div><div class="info-item-2">[BUUCTF] voip：Wireshark RTP 播放器听出 flag</div></div><div class="info-2"><div class="info-item-1">一个 SIP 通话的 pcap。用 Wireshark 的 Telephony → VoIP Calls 找到通话，再用 RTP Player 播放，音频里直接念出了 flag。</div></div></div></a></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Quellisya</div><div class="author-info-description">记录 CTF 与 Web 安全的学习笔记，把每一步讲清楚。</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">22</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">63</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">13</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/Quellisya" target="_blank" title="Github"><i class="fab fa-github" style="color: #0f2f32;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">循墨迹读代码，借微光见漏洞。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%BF%99%E9%81%93%E9%A2%98%E5%9C%A8%E8%80%83%E4%BB%80%E4%B9%88"><span class="toc-text">这道题在考什么</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%80%E6%AD%A5%EF%BC%9A%E6%89%93%E5%BC%80-pcap%EF%BC%8C%E5%85%88%E7%9C%8B%E5%85%A8%E8%B2%8C"><span class="toc-text">第一步：打开 pcap，先看全貌</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%BA%8C%E6%AD%A5%EF%BC%9A%E7%94%A8%E8%BF%87%E6%BB%A4%E5%99%A8%E6%8A%8A-password-%E7%AD%9B%E5%87%BA%E6%9D%A5"><span class="toc-text">第二步：用过滤器把 password 筛出来</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%89%E6%AD%A5%EF%BC%9A%E5%B1%95%E5%BC%80%E5%8C%85%E8%AF%A6%E6%83%85%EF%BC%8C%E8%AF%BB%E8%A1%A8%E5%8D%95%E5%AD%97%E6%AE%B5"><span class="toc-text">第三步：展开包详情，读表单字段</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#3-1-%E9%A1%BA%E4%BE%BF%E7%9C%8B%E6%87%82-x-www-form-urlencoded"><span class="toc-text">3.1 顺便看懂 x-www-form-urlencoded</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E5%9B%9B%E6%AD%A5%EF%BC%9A%E6%8D%A2%E4%B8%80%E7%A7%8D%E7%9C%8B%E6%B3%95%E2%80%94%E2%80%94Follow-HTTP-Stream"><span class="toc-text">第四步：换一种看法——Follow HTTP Stream</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%BA%94%E6%AD%A5%EF%BC%9A%E6%8F%90%E4%BA%A4-flag"><span class="toc-text">第五步：提交 flag</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E5%85%AD%E6%AD%A5%EF%BC%9A%E7%94%A8-tshark-%E9%AA%8C%E8%AF%81%EF%BC%88%E5%8F%AF%E9%80%89%EF%BC%89"><span class="toc-text">第六步：用 tshark 验证（可选）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%BF%87%E6%BB%A4%E5%99%A8%E4%B8%8E%E5%AD%97%E6%AE%B5%E9%80%9F%E6%9F%A5%E5%8D%A1"><span class="toc-text">过滤器与字段速查卡</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="toc-text">新手常见问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B7%A5%E5%85%B7%E9%80%9F%E6%9F%A5%E5%8D%A1"><span class="toc-text">工具速查卡</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%EF%BC%9A%E6%98%8E%E6%96%87%E7%99%BB%E5%BD%95%E7%9A%84%E4%BB%A3%E4%BB%B7"><span class="toc-text">顺手聊聊：明文登录的代价</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/01/misc-wireshark-password/" title="[JBCTF] wireshark：从 HTTP 登录表单里找出 password">[JBCTF] wireshark：从 HTTP 登录表单里找出 password</a><time datetime="2026-11-01T02:20:00.000Z" title="发表于 2026-11-01 10:20:00">2026-11-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/01/web-ctf-easy-tornado/" title="[CTF2] easy_tornado：SSTI、handler.settings 与 filehash 签名">[CTF2] easy_tornado：SSTI、handler.settings 与 filehash 签名</a><time datetime="2026-11-01T02:00:00.000Z" title="发表于 2026-11-01 10:00:00">2026-11-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/01/web-ctf-backupfile/" title="[CTF2] BackupFile：.bak 备份文件泄露与 PHP 弱比较">[CTF2] BackupFile：.bak 备份文件泄露与 PHP 弱比较</a><time datetime="2026-11-01T01:40:00.000Z" title="发表于 2026-11-01 09:40:00">2026-11-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/01/reverse-reverse1-ida/" title="[BUUCTF] reverse1：在 IDA 里看懂 Str2 的字符替换">[BUUCTF] reverse1：在 IDA 里看懂 Str2 的字符替换</a><time datetime="2026-11-01T01:20:00.000Z" title="发表于 2026-11-01 09:20:00">2026-11-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/01/misc-traffic-sniffed/" title="[BUUCTF] 被嗅探的流量：用 HTTP 过滤器从 POST 上传里捞出 flag">[BUUCTF] 被嗅探的流量：用 HTTP 过滤器从 POST 上传里捞出 flag</a><time datetime="2026-11-01T01:00:00.000Z" title="发表于 2026-11-01 09:00:00">2026-11-01</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2025 - 2026 By Quellisya</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 8.1.2</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.7.0</a></span></div><div class="footer_custom_text">以墨为舟，以码为桨 · CTF & Web Security Notes</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.7.0"></script><script src="/js/main.js?v=5.7.0"></script><div class="js-pjax"></div><script defer src="/js/butterfly-custom.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><i class="fas fa-spinner fa-pulse" id="loading-status" hidden="hidden"></i><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="local-search-input"><input placeholder="搜索笔记、题目或 payload…" type="text"/></div><hr/><div id="local-search-results"></div><div class="ais-Pagination" id="local-search-pagination" style="display:none;"><ul class="ais-Pagination-list"></ul></div><div id="local-search-stats"></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.7.0"></script></div></div></body></html>
