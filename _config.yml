@@ -81,6 +81,7 @@ category_map:
   文件包含: file-inclusion
   源码泄露: source-disclosure
   SSTI: ssti
+  反序列化: deserialization
   Misc: misc
   隐写: steganography
   流量分析: traffic-analysis

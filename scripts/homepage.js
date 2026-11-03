@@ -18,6 +18,7 @@ hexo.extend.filter.register('after_render:html', function(html, locals) {
   const root = hexo.config.root || '/';
   const PER_TOPIC = 6;
   const NUMERALS = ['壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖', '拾'];
+  const LEVEL1_ORDER = ['Web', 'Misc', 'Pwn', 'Reverse'];
 
   const url = function(path) {
     if (!path) return '#';
@@ -86,9 +87,49 @@ hexo.extend.filter.register('after_render:html', function(html, locals) {
 
   const latest = source[0];
 
-  // ---------- 主题快捷入口 ----------
-  const chips = groups.map((group, i) =>
-    `<a href="#topic-${i + 1}">${esc(group.name)}<em>${String(group.items.length).padStart(2, '0')}</em></a>`
+  // ---------- 大类 / 子类导航 ----------
+  const catTree = new Map();
+  source.forEach(post => {
+    const cats = post.categories ? post.categories.toArray() : [];
+    const level1 = cats[1];
+    if (!level1) return;
+    const level2 = cats[2];
+
+    if (!catTree.has(level1.name)) {
+      catTree.set(level1.name, {
+        name: level1.name,
+        path: level1.path,
+        items: [],
+        topics: new Map()
+      });
+    }
+
+    const node = catTree.get(level1.name);
+    node.items.push(post);
+
+    const topicName = level2 ? level2.name : '其他';
+    if (!node.topics.has(topicName)) {
+      node.topics.set(topicName, {
+        name: topicName,
+        path: level2 ? level2.path : level1.path,
+        items: []
+      });
+    }
+    node.topics.get(topicName).items.push(post);
+  });
+
+  const level1Nodes = [...catTree.values()].map(node => Object.assign({}, node, {
+    topics: [...node.topics.values()].sort((a, b) =>
+      b.items.length - a.items.length || a.name.localeCompare(b.name, 'zh'))
+  })).sort((a, b) => {
+    const ia = LEVEL1_ORDER.indexOf(a.name);
+    const ib = LEVEL1_ORDER.indexOf(b.name);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || b.items.length - a.items.length;
+  });
+
+  // ---------- 分区快捷入口 ----------
+  const chips = level1Nodes.map((node, i) =>
+    `<a href="#ctf-explorer" data-cat-jump="${i}">${esc(node.name)}<em>${String(node.items.length).padStart(2, '0')}</em></a>`
   ).join('');
 
   // ---------- 卡片 ----------
@@ -154,10 +195,53 @@ hexo.extend.filter.register('after_render:html', function(html, locals) {
     : '';
 
   const tagHtml = chips
-    ? `<div class="home-hero__tags"><span class="home-hero__tags-label">主题</span>${chips}</div>`
+    ? `<div class="home-hero__tags"><span class="home-hero__tags-label">分区</span>${chips}</div>`
     : '';
 
   const body = sections || `<div class="home-empty">还没有文章，去写第一篇吧。</div>`;
+
+  // ---------- 分区导航：大类 → 子类卡片 ----------
+  const explorerTabs = level1Nodes.map((node, i) => {
+    const preview = node.topics.slice(0, 3).map(topic => topic.name).join(' · ');
+    return `<button type="button" class="home-explorer__tab${i === 0 ? ' is-active' : ''}" role="tab" id="home-cat-tab-${i + 1}" aria-controls="home-cat-panel-${i + 1}" aria-selected="${i === 0 ? 'true' : 'false'}" tabindex="${i === 0 ? '0' : '-1'}" data-cat-index="${i}">
+  <span class="home-explorer__tab-top">
+    <span class="home-explorer__tab-name">${esc(node.name)}</span>
+    <span class="home-explorer__tab-count">${String(node.items.length).padStart(2, '0')}</span>
+  </span>
+  <span class="home-explorer__tab-desc">${esc(preview)}</span>
+  <span class="home-explorer__tab-go">浏览分区 <i class="fas fa-arrow-right"></i></span>
+</button>`;
+  }).join('');
+
+  const explorerPanels = level1Nodes.map((node, i) => {
+    const topicCards = node.topics.map((topic, j) => `
+<a class="home-topic-card" href="${esc(url(topic.path))}">
+  <span class="home-topic-card__index">${String(j + 1).padStart(2, '0')}</span>
+  <span class="home-topic-card__name">${esc(topic.name)}</span>
+  <span class="home-topic-card__count">${String(topic.items.length).padStart(2, '0')} 篇</span>
+  <i class="fas fa-arrow-right" aria-hidden="true"></i>
+</a>`).join('');
+    return `<div class="home-explorer__panel${i === 0 ? ' is-active' : ''}" id="home-cat-panel-${i + 1}" role="tabpanel" aria-labelledby="home-cat-tab-${i + 1}"${i === 0 ? '' : ' hidden'}>
+  <div class="home-explorer__panel-head">
+    <span>${esc(node.name)} · ${node.topics.length} 个子类</span>
+    <a href="${esc(url(node.path))}">查看全部 ${String(node.items.length).padStart(2, '0')} 篇 <i class="fas fa-arrow-right"></i></a>
+  </div>
+  <div class="home-explorer__grid">${topicCards}</div>
+</div>`;
+  }).join('');
+
+  const explorer = level1Nodes.length ? `
+<div class="home-section-head home-section-head--explorer" id="ctf-explorer">
+  <div class="home-section-head__title">
+    <span class="home-section-head__numeral">类</span>
+    <h2>${esc(data.category_title || 'CTF 分区')}</h2>
+  </div>
+  <a class="home-section-head__more" href="${esc(url('/categories/'))}">按分类浏览 <i class="fas fa-arrow-right"></i></a>
+</div>
+<div class="home-explorer" data-home-explorer>
+  <div class="home-explorer__tabs" role="tablist" aria-label="CTF 大类">${explorerTabs}</div>
+  ${explorerPanels}
+</div>` : '';
 
   const hero = `
 <div class="home-shell">
@@ -190,6 +274,7 @@ CTF · Web Security
   </div>
   <div class="home-hero__scroll"><span></span>向下阅读</div>
 </section>
+${explorer}
 <div class="home-section-head home-section-head--overview">
   <div class="home-section-head__title">
     <span class="home-section-head__numeral">录</span>

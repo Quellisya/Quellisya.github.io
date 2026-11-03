@@ -228,6 +228,64 @@
     });
   }
 
+  /* ---------- 首页分区导航 ---------- */
+  function startHomeExplorer() {
+    document.querySelectorAll('[data-home-explorer]').forEach(function(root) {
+      if (root.dataset.qExplorer) return;
+      root.dataset.qExplorer = '1';
+
+      const tabs = Array.prototype.slice.call(root.querySelectorAll('.home-explorer__tab'));
+      const panels = Array.prototype.slice.call(root.querySelectorAll('.home-explorer__panel'));
+      if (!tabs.length) return;
+
+      function activate(index, focus) {
+        tabs.forEach(function(tab, i) {
+          const on = i === index;
+          tab.classList.toggle('is-active', on);
+          tab.setAttribute('aria-selected', on ? 'true' : 'false');
+          tab.tabIndex = on ? 0 : -1;
+        });
+
+        panels.forEach(function(panel, i) {
+          const on = i === index;
+          panel.classList.toggle('is-active', on);
+          if (on) {
+            panel.removeAttribute('hidden');
+          } else {
+            panel.setAttribute('hidden', '');
+          }
+        });
+
+        if (focus && tabs[index]) tabs[index].focus();
+      }
+
+      tabs.forEach(function(tab, i) {
+        tab.addEventListener('click', function() { activate(i); });
+        tab.addEventListener('keydown', function(event) {
+          if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+          event.preventDefault();
+          const step = event.key === 'ArrowRight' ? 1 : -1;
+          activate((i + step + tabs.length) % tabs.length, true);
+        });
+      });
+
+      activate(0);
+      root.__qActivate = activate;
+    });
+
+    document.querySelectorAll('[data-cat-jump]').forEach(function(link) {
+      if (link.dataset.qJump) return;
+      link.dataset.qJump = '1';
+      link.addEventListener('click', function() {
+        const root = document.querySelector('[data-home-explorer]');
+        const index = Number(link.getAttribute('data-cat-jump'));
+        if (root && root.__qActivate && !isNaN(index)) {
+          root.__qActivate(index);
+        }
+      });
+    });
+  }
+
   /* ---------- 导航滚动状态 ---------- */
   function startNavState() {
     if (!window.__qNavUpdate) {
@@ -256,6 +314,7 @@
     startReveal();
     startTilt();
     startHeroParallax();
+    startHomeExplorer();
     startNavState();
   }
 
