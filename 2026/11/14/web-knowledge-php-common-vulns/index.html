@@ -1,0 +1,937 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>PHP 常见漏洞笔记：数组报错绕过、Cookie 信任与 php://filter 读源码 | Quellisya's Blog</title><meta name="author" content="Quellisya"><meta name="copyright" content="Quellisya"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#f3fbf8"><meta name="description" content="三个小案例串起 PHP 里最常见的三类问题：用数组制造 Array to string conversion，让 set_error_handler 把 flag 打出来；服务端无条件信任 username cookie，改个值就变 admin；include 自动补 .php 时用 php:&#x2F;&#x2F;filter 读源码，顺便解释 strpos 不加 !&#x3D;&#x3D; false 的坑。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PHP 常见漏洞笔记：数组报错绕过、Cookie 信任与 php:&#x2F;&#x2F;filter 读源码">
+<meta property="og:url" content="https://quellisya.github.io/2026/11/14/web-knowledge-php-common-vulns/index.html">
+<meta property="og:site_name" content="Quellisya&#39;s Blog">
+<meta property="og:description" content="三个小案例串起 PHP 里最常见的三类问题：用数组制造 Array to string conversion，让 set_error_handler 把 flag 打出来；服务端无条件信任 username cookie，改个值就变 admin；include 自动补 .php 时用 php:&#x2F;&#x2F;filter 读源码，顺便解释 strpos 不加 !&#x3D;&#x3D; false 的坑。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://quellisya.github.io/img/avatar-seal.svg">
+<meta property="article:published_time" content="2026-11-14T01:00:00.000Z">
+<meta property="article:modified_time" content="2026-11-14T01:00:00.000Z">
+<meta property="article:author" content="Quellisya">
+<meta property="article:tag" content="Cookie">
+<meta property="article:tag" content="PHP">
+<meta property="article:tag" content="php:&#x2F;&#x2F;filter">
+<meta property="article:tag" content="伪协议">
+<meta property="article:tag" content="入门基础">
+<meta property="article:tag" content="数组绕过">
+<meta property="article:tag" content="文件包含">
+<meta property="article:tag" content="错误处理">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://quellisya.github.io/img/avatar-seal.svg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "PHP 常见漏洞笔记：数组报错绕过、Cookie 信任与 php://filter 读源码",
+  "url": "https://quellisya.github.io/2026/11/14/web-knowledge-php-common-vulns/",
+  "image": "https://quellisya.github.io/img/avatar-seal.svg",
+  "datePublished": "2026-11-14T01:00:00.000Z",
+  "dateModified": "2026-11-14T01:00:00.000Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Quellisya",
+      "url": "https://github.com/Quellisya"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/logo-seal.svg"><link rel="canonical" href="https://quellisya.github.io/2026/11/14/web-knowledge-php-common-vulns/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="stylesheet" href="/css/index.css?v=5.7.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        const data = { value }
+
+        if (ttl != null) {
+          data.expiry = Date.now() + ttl * 86400000
+        }
+
+        localStorage.setItem(key, JSON.stringify(data))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return
+
+        try {
+          const data = JSON.parse(itemStr)
+
+          if (data.expiry && Date.now() > data.expiry) {
+            localStorage.removeItem(key)
+            return
+          }
+
+          return data.value
+        } catch {
+          localStorage.removeItem(key)
+        }
+      }
+    }
+
+    const scriptCache = new Map()
+    const cssCache = new Map()
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => {
+        if (scriptCache.has(url)) {
+          return scriptCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const script = document.createElement('script')
+
+          script.src = url
+          script.async = true
+
+          for (const key in attr) {
+            script.setAttribute(key, attr[key])
+          }
+
+          script.onload = resolve
+          script.onerror = reject
+
+          document.head.appendChild(script)
+        })
+
+        scriptCache.set(url, promise)
+
+        return promise
+      },
+      getCSS: (url, id) => {
+        if (cssCache.has(url)) {
+          return cssCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const link = document.createElement('link')
+
+          link.rel = 'stylesheet'
+          link.href = url
+
+          if (id) {
+            link.id = id
+          }
+
+          link.onload = resolve
+          link.onerror = reject
+
+          document.head.appendChild(link)
+        })
+
+        cssCache.set(url, promise)
+
+        return promise
+      },
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      const activateDarkMode = () => {
+        document.documentElement.dataset.theme = 'dark'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#0f1f22')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.dataset.theme = 'light'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#f3fbf8')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"pagination":{"enable":false,"hitsPerPage":8},"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":true},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: true,
+  percent: {
+    toc: true,
+    rightside: true,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'PHP 常见漏洞笔记：数组报错绕过、Cookie 信任与 php://filter 读源码',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><link rel="stylesheet" href="/css/butterfly-custom.css"><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head><body><div class="bg-animation" id="web_bg" style="background-image: url(/img/bg-ink-tech.svg);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">32</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">98</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">18</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg fixed" id="page-header" style="background-image: url(/img/banner-ink-tech.svg);"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><img class="site-icon" src="/img/logo-seal.svg" alt="Logo"><span class="site-name">Quellisya's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">PHP 常见漏洞笔记：数组报错绕过、Cookie 信任与 php://filter 读源码</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">PHP 常见漏洞笔记：数组报错绕过、Cookie 信任与 php://filter 读源码</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-11-14T01:00:00.000Z" title="发表于 2026-11-14 09:00:00">2026-11-14</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-11-14T01:00:00.000Z" title="更新于 2026-11-14 09:00:00">2026-11-14</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/">CTF</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/web/">Web</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/web/PHP-%E5%AE%89%E5%85%A8/">PHP 安全</a></span></div><div class="meta-secondline"></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><div class="note primary flat"><p><strong>一分钟速览</strong></p>
+<ul>
+<li><strong>难度</strong>：入门（三个案例都只需要读懂十几行 PHP）</li>
+<li><strong>考点</strong>：PHP 数组与字符串转换、<code>set_error_handler</code>、Cookie 信任、<code>php://filter</code> 伪协议、<code>strpos</code> 返回值陷阱</li>
+<li><strong>案例一</strong>：<code>[Dest0g3 520迎新赛]EasyPHP</code>——时间条件走不通，用 <code>ctf[]=1</code> 触发数组转字符串警告，让错误处理器打印 flag</li>
+<li><strong>案例二</strong>：<code>[BSidesCF 2019]Kookie</code>——服务端直接信任 <code>username</code> cookie，改成 <code>admin</code> 就登录</li>
+<li><strong>案例三</strong>：<code>[BSidesCF 2020]Had a bad day</code>——<code>include</code> 自动补 <code>.php</code>，用 <code>php://filter</code> 把源码 base64 编码后读出来</li>
+<li><strong>一句话总结</strong>：PHP 的“方便”和“弱类型”是很多漏洞的源头，输入一旦越界，就可能变成代码、文件路径或身份</li>
+</ul>
+</div>
+
+<div class="note info flat"><p><strong>阅读说明</strong></p>
+<ul>
+<li><strong>前置知识</strong>：PHP 基本语法、<code>$_GET</code> &#x2F; <code>$_POST</code> &#x2F; <code>$_COOKIE</code>、<code>include</code>、HTTP 请求的基本结构</li>
+<li><strong>工具</strong>：浏览器 F12、Burp Suite（或 <code>curl</code>）、<code>base64</code> 命令</li>
+<li><strong>环境</strong>：文中的靶场地址是当时的临时环境，现在多半已经失效，请换成自己的靶场或本地 PHP 环境</li>
+<li>本文所有操作仅用于<strong>授权靶场和教学</strong>，请勿对未授权的目标做任何测试</li>
+</ul>
+</div>
+
+<div class="note default flat"><p><strong>做题路线</strong></p>
+<p><code>读源码，找可控变量</code> → <code>看有没有过滤/判断</code> → <code>找能触发错误的点</code> → <code>构造 payload</code> → <code>读回显</code> → <code>解码/拿 flag</code></p>
+</div>
+
+<h2 id="先看全貌：三类问题"><a href="#先看全貌：三类问题" class="headerlink" title="先看全貌：三类问题"></a>先看全貌：三类问题</h2><p>这篇不是一道题，而是三个小案例的合集。它们看起来没关系，但都指向同一件事：<strong>PHP 把用户输入当成了比自己想象中更“自由”的东西。</strong></p>
+<table>
+<thead>
+<tr>
+<th>案例</th>
+<th>漏洞类型</th>
+<th>一句话</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>EasyPHP</td>
+<td>类型&#x2F;错误处理</td>
+<td>数组参与字符串拼接会报错，错误处理器又把 flag 打了出来</td>
+</tr>
+<tr>
+<td>Kookie</td>
+<td>客户端状态信任</td>
+<td><code>username</code> 存在 cookie 里，服务端不验签，改成 <code>admin</code> 就是管理员</td>
+</tr>
+<tr>
+<td>Had a bad day</td>
+<td>文件包含 + 伪协议</td>
+<td><code>include</code> 自动补 <code>.php</code>，用 <code>php://filter</code> 读源码</td>
+</tr>
+</tbody></table>
+<p>下面按顺序看。</p>
+<h2 id="一、数组报错绕过：EasyPHP"><a href="#一、数组报错绕过：EasyPHP" class="headerlink" title="一、数组报错绕过：EasyPHP"></a>一、数组报错绕过：EasyPHP</h2><h3 id="题目源码"><a href="#题目源码" class="headerlink" title="题目源码"></a>题目源码</h3><p>打开页面，直接给了源码：</p>
+<p><img src="/2026/11/14/web-knowledge-php-common-vulns/image.png" alt="EasyPHP 源码"></p>
+<p><em>图 1：<code>highlight_file(__FILE__)</code> 把源码打印出来，flag 在 <code>fl4g.php</code> 里</em></p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"><span class="title function_ invoke__">highlight_file</span>(<span class="keyword">__FILE__</span>);</span><br><span class="line"><span class="keyword">include</span> <span class="string">&quot;fl4g.php&quot;</span>;</span><br><span class="line"><span class="variable">$dest0g3</span> = <span class="variable">$_POST</span>[<span class="string">&#x27;ctf&#x27;</span>];</span><br><span class="line"><span class="variable">$time</span> = <span class="title function_ invoke__">date</span>(<span class="string">&quot;H&quot;</span>);</span><br><span class="line"><span class="variable">$stimme</span> = <span class="title function_ invoke__">date</span>(<span class="string">&quot;d&quot;</span>);</span><br><span class="line"><span class="variable">$stimmme</span> = <span class="title function_ invoke__">date</span>(<span class="string">&quot;i&quot;</span>);</span><br><span class="line"><span class="keyword">if</span>((<span class="variable">$time</span> &gt; <span class="string">&quot;24&quot;</span>) <span class="keyword">or</span> (<span class="variable">$stimme</span> &gt; <span class="string">&quot;31&quot;</span>) <span class="keyword">or</span> (<span class="variable">$stimmme</span> &gt; <span class="string">&quot;60&quot;</span>))&#123;</span><br><span class="line">    <span class="keyword">echo</span> <span class="variable">$fl4g</span>;</span><br><span class="line">&#125;<span class="keyword">else</span>&#123;</span><br><span class="line">    <span class="keyword">echo</span> <span class="string">&quot;Try harder!&quot;</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="title function_ invoke__">set_error_handler</span>(</span><br><span class="line">    function() <span class="keyword">use</span>(&amp;$<span class="title">fl4g</span>) &#123;</span><br><span class="line">        <span class="title">print</span> $<span class="title">fl4g</span>;</span><br><span class="line">    &#125;</span><br><span class="line">);</span><br><span class="line"><span class="variable">$fl4g</span> .= <span class="variable">$dest0g3</span>;</span><br><span class="line"><span class="meta">?&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>先别急着找 payload，逐行读一遍。</p>
+<h3 id="逐行读源码"><a href="#逐行读源码" class="headerlink" title="逐行读源码"></a>逐行读源码</h3><table>
+<thead>
+<tr>
+<th>代码</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>highlight_file(__FILE__)</code></td>
+<td>把当前文件源码高亮输出，等于白送源码</td>
+</tr>
+<tr>
+<td><code>include &quot;fl4g.php&quot;</code></td>
+<td>把 <code>fl4g.php</code> 包含进来，里面定义了 <code>$fl4g</code></td>
+</tr>
+<tr>
+<td><code>$dest0g3 = $_POST[&#39;ctf&#39;];</code></td>
+<td>取 POST 参数 <code>ctf</code>，<strong>完全可控</strong></td>
+</tr>
+<tr>
+<td><code>date(&quot;H&quot;)</code></td>
+<td>当前小时，<code>00</code>–<code>23</code></td>
+</tr>
+<tr>
+<td><code>date(&quot;d&quot;)</code></td>
+<td>当前日期，<code>01</code>–<code>31</code></td>
+</tr>
+<tr>
+<td><code>date(&quot;i&quot;)</code></td>
+<td>当前分钟，<code>00</code>–<code>59</code></td>
+</tr>
+<tr>
+<td><code>if (...)</code></td>
+<td>三个条件只要有一个成立，就 <code>echo $fl4g</code></td>
+</tr>
+<tr>
+<td><code>else</code></td>
+<td>否则输出 <code>Try harder!</code></td>
+</tr>
+<tr>
+<td><code>set_error_handler(...)</code></td>
+<td>注册一个自定义错误处理器，打印 <code>$fl4g</code></td>
+</tr>
+<tr>
+<td><code>$fl4g .= $dest0g3;</code></td>
+<td>把用户输入拼到 <code>$fl4g</code> 后面</td>
+</tr>
+</tbody></table>
+<h3 id="时间条件为什么走不通"><a href="#时间条件为什么走不通" class="headerlink" title="时间条件为什么走不通"></a>时间条件为什么走不通</h3><p>三个判断分别是：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$time</span>    &gt; <span class="string">&quot;24&quot;</span>   <span class="comment">// H 最大 23</span></span><br><span class="line"><span class="variable">$stimme</span>  &gt; <span class="string">&quot;31&quot;</span>   <span class="comment">// d 最大 31</span></span><br><span class="line"><span class="variable">$stimmme</span> &gt; <span class="string">&quot;60&quot;</span>   <span class="comment">// i 最大 59</span></span><br></pre></td></tr></table></figure>
+
+<p><code>date()</code> 的取值范围决定了它们<strong>永远不可能成立</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>范围</th>
+<th>比较</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>$time</code></td>
+<td><code>00</code>–<code>23</code></td>
+<td><code>&gt; &quot;24&quot;</code></td>
+<td>永远假</td>
+</tr>
+<tr>
+<td><code>$stimme</code></td>
+<td><code>01</code>–<code>31</code></td>
+<td><code>&gt; &quot;31&quot;</code></td>
+<td>永远假</td>
+</tr>
+<tr>
+<td><code>$stimmme</code></td>
+<td><code>00</code>–<code>59</code></td>
+<td><code>&gt; &quot;60&quot;</code></td>
+<td>永远假</td>
+</tr>
+</tbody></table>
+<p>而且这里的比较是“数字字符串比数字字符串”，PHP 会按数值比较，不是字典序。所以 <code>&quot;23&quot; &gt; &quot;24&quot;</code> 是假，<code>&quot;31&quot; &gt; &quot;31&quot;</code> 也是假。</p>
+<p><strong>时间这条路是死的，真正可控的只有 <code>$dest0g3</code>。</strong></p>
+<h3 id="关键：让-dest0g3-变成数组"><a href="#关键：让-dest0g3-变成数组" class="headerlink" title="关键：让 $dest0g3 变成数组"></a>关键：让 <code>$dest0g3</code> 变成数组</h3><p><code>$fl4g .= $dest0g3;</code> 是字符串拼接。如果 <code>$dest0g3</code> 是普通字符串，什么事都不会发生；如果它是<strong>数组</strong>，PHP 会尝试把数组转成字符串，触发：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Warning: Array to string conversion</span><br></pre></td></tr></table></figure>
+
+<p>这个警告是 <code>E_WARNING</code>，而 <code>set_error_handler</code> 注册的处理器正好能接住它。处理器里写的是：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">function</span>(<span class="params"></span>) <span class="keyword">use</span>(<span class="params">&amp;<span class="variable">$fl4g</span></span>) </span>&#123;</span><br><span class="line">    <span class="keyword">print</span> <span class="variable">$fl4g</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>于是警告一触发，<code>$fl4g</code> 就被打印出来了。</p>
+<p>payload 很简单，把 <code>ctf</code> 写成数组：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ctf[]=1</span><br></pre></td></tr></table></figure>
+
+<p>用 Burp 发 POST：</p>
+<p><img src="/2026/11/14/web-knowledge-php-common-vulns/image-1.png" alt="发送 ctf[]&#x3D;1"></p>
+<p><em>图 2：<code>ctf[]=1</code> 触发数组转字符串警告，响应里带回 flag</em></p>
+<p>响应大概是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Try harder!CTF2&#123;fa22cb98-437b-4bbd-9ca0-0fa82d5926ed&#125;</span><br></pre></td></tr></table></figure>
+
+<p>前面的 <code>Try harder!</code> 是 <code>else</code> 分支打的，后面的 flag 是错误处理器打的。</p>
+<div class="note warning flat"><p><strong>为什么不能随便写 <code>ctf=1</code>？</strong> 因为字符串拼接不会报错，<code>set_error_handler</code> 没有机会执行。必须是“能被当成字符串、但转换时会报错”的类型，数组正好符合。</p>
+</div>
+
+<h3 id="为什么错误处理器能拿到-fl4g"><a href="#为什么错误处理器能拿到-fl4g" class="headerlink" title="为什么错误处理器能拿到 $fl4g"></a>为什么错误处理器能拿到 <code>$fl4g</code></h3><p><code>use (&amp;$fl4g)</code> 是闭包的按引用捕获。<code>$fl4g</code> 在 <code>include &quot;fl4g.php&quot;</code> 之后就已经有值了，处理器通过引用拿到它，所以 <code>print $fl4g</code> 打印的是真正包含进来的 flag。</p>
+<p>如果写成 <code>use ($fl4g)</code>（没有 <code>&amp;</code>），闭包会在定义时复制一份值；在这里值已经存在，所以也能打印，但按引用更符合“处理器随时能读最新值”的语义。</p>
+<h3 id="知识点：set-error-handler"><a href="#知识点：set-error-handler" class="headerlink" title="知识点：set_error_handler"></a>知识点：<code>set_error_handler</code></h3><p><code>set_error_handler</code> 用来接管 PHP 的运行时错误。基本用法：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_ invoke__">set_error_handler</span>(function (<span class="variable">$errno</span>, <span class="variable">$errstr</span>, <span class="variable">$errfile</span>, <span class="variable">$errline</span>) &#123;</span><br><span class="line">    <span class="keyword">echo</span> <span class="string">&quot;错误：<span class="subst">$errstr</span>&quot;</span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">true</span>; <span class="comment">// 返回 true 表示“已处理”，不再走默认处理器</span></span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>几个要点：</p>
+<table>
+<thead>
+<tr>
+<th>要点</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>能接住的错误</td>
+<td><code>E_WARNING</code>、<code>E_NOTICE</code>、<code>E_USER_*</code>、<code>E_DEPRECATED</code>、<code>E_STRICT</code> 等</td>
+</tr>
+<tr>
+<td>接不住的错误</td>
+<td><code>E_ERROR</code>、<code>E_PARSE</code>、<code>E_CORE_ERROR</code>、<code>E_COMPILE_ERROR</code> 等致命错误</td>
+</tr>
+<tr>
+<td>返回值</td>
+<td>返回 <code>false</code> 会继续走 PHP 默认处理器；返回其它值则视为已处理</td>
+</tr>
+<tr>
+<td>参数</td>
+<td><code>$errno</code>、<code>$errstr</code>、<code>$errfile</code>、<code>$errline</code>，可以只写需要的参数</td>
+</tr>
+<tr>
+<td>作用域</td>
+<td>只对注册之后发生的错误生效</td>
+</tr>
+</tbody></table>
+<p>本题的处理器只写了 <code>function() use(&amp;$fl4g)</code>，没有接收错误参数，PHP 允许这样写，多余的参数会被忽略。</p>
+<h3 id="知识点：PHP-的数组与字符串转换"><a href="#知识点：PHP-的数组与字符串转换" class="headerlink" title="知识点：PHP 的数组与字符串转换"></a>知识点：PHP 的数组与字符串转换</h3><p>PHP 是弱类型语言，很多地方会“自动转换”：</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&quot;abc&quot; . 123</code></td>
+<td><code>&quot;abc123&quot;</code></td>
+</tr>
+<tr>
+<td><code>&quot;abc&quot; . [1,2]</code></td>
+<td>警告 <code>Array to string conversion</code>，得到 <code>&quot;abcArray&quot;</code></td>
+</tr>
+<tr>
+<td><code>[1,2] == &quot;Array&quot;</code></td>
+<td>PHP 8 下为 <code>false</code>，但比较过程会有类型 juggling</td>
+</tr>
+<tr>
+<td><code>md5([])</code></td>
+<td>PHP 7 警告并返回 <code>null</code>；PHP 8 抛 <code>TypeError</code></td>
+</tr>
+<tr>
+<td><code>strpos([], &quot;a&quot;)</code></td>
+<td>PHP 8 抛 <code>TypeError</code></td>
+</tr>
+<tr>
+<td><code>in_array(&quot;1&quot;, [1])</code></td>
+<td>默认松散比较，返回 <code>true</code></td>
+</tr>
+</tbody></table>
+<p>这也是很多“数组绕过”题的来源：有些函数对数组的行为和字符串完全不同，攻击者就利用这一点让校验失效或触发错误。</p>
+<div class="note info flat"><p><strong>数组绕过不止这一种。</strong> 常见的还有：</p>
+<ul>
+<li><code>md5($a) === md5($b)</code>：传两个不同的数组，<code>md5()</code> 都返回 <code>null</code>，<code>null === null</code> 成立；</li>
+<li><code>strcmp($a, $b)</code>：传数组会返回 <code>null</code>，松散比较时可能被当成“相等”；</li>
+<li><code>preg_match</code>、<code>sha1</code>、<code>password_verify</code> 等函数对数组的参数处理也各不相同。</li>
+</ul>
+<p>遇到“输入被塞进函数”的题，先想一下：<strong>这个函数收到数组会怎样？</strong></p>
+</div>
+
+<h2 id="二、Cookie-信任：Kookie"><a href="#二、Cookie-信任：Kookie" class="headerlink" title="二、Cookie 信任：Kookie"></a>二、Cookie 信任：Kookie</h2><h3 id="题目"><a href="#题目" class="headerlink" title="题目"></a>题目</h3><p>打开页面，标题是 <code>Can you log in?</code>，下面写着：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Log in as admin!</span><br><span class="line">We found the account cookie / monster</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/14/web-knowledge-php-common-vulns/image-2.png" alt="Kookie 页面与 Console"></p>
+<p><em>图 3：页面提示 cookie 是 <code>monster</code>，Console 里改完 cookie 后直接以 admin 登录</em></p>
+<p>翻译一下：<strong>我们已经找到了你的账号 cookie，值是 <code>monster</code>。</strong> 目标是以 <code>admin</code> 身份登录。</p>
+<h3 id="改-cookie"><a href="#改-cookie" class="headerlink" title="改 cookie"></a>改 cookie</h3><p>最直接的办法是在浏览器 Console 里改：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable language_">document</span>.<span class="property">cookie</span> = <span class="string">&quot;username=admin;path=/&quot;</span>;</span><br></pre></td></tr></table></figure>
+
+<p>然后刷新页面，页面就变成了：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Congratulations! You&#x27;re logged in as admin! Your flag is:</span><br><span class="line">CTF2&#123;0a0d08f5-21e8-40dd-a918-3d3785a644b2&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="为什么-path-很重要"><a href="#为什么-path-很重要" class="headerlink" title="为什么 path=/ 很重要"></a>为什么 <code>path=/</code> 很重要</h3><p>Cookie 不是全局的，它有几个作用域属性：</p>
+<table>
+<thead>
+<tr>
+<th>属性</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Domain</code></td>
+<td>这个 cookie 发给哪个域名</td>
+</tr>
+<tr>
+<td><code>Path</code></td>
+<td>这个 cookie 发给哪个路径</td>
+</tr>
+<tr>
+<td><code>Expires</code> &#x2F; <code>Max-Age</code></td>
+<td>什么时候过期</td>
+</tr>
+<tr>
+<td><code>Secure</code></td>
+<td>只在 HTTPS 下发送</td>
+</tr>
+<tr>
+<td><code>HttpOnly</code></td>
+<td>禁止 JavaScript 读取</td>
+</tr>
+<tr>
+<td><code>SameSite</code></td>
+<td>跨站请求时是否发送</td>
+</tr>
+</tbody></table>
+<p><strong>要覆盖一个已存在的 cookie，<code>name</code>、<code>domain</code>、<code>path</code> 必须匹配。</strong> 如果原来的 <code>username</code> 是 <code>path=/</code>，你在当前页面写一个 <code>path=/</code> 的 <code>username=admin</code>，就会覆盖它；如果写成别的 path，浏览器会当成两个同名不同路径的 cookie，服务端读哪一个就不一定了。</p>
+<p><code>path=/</code> 的意思是“整个站点的所有页面和接口都带上这个 cookie”，所以刷新任意页面都能生效。</p>
+<h3 id="为什么这能成功"><a href="#为什么这能成功" class="headerlink" title="为什么这能成功"></a>为什么这能成功</h3><p>因为服务端大概率是这么写的：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (<span class="variable">$_COOKIE</span>[<span class="string">&#x27;username&#x27;</span>] === <span class="string">&#x27;admin&#x27;</span>) &#123;</span><br><span class="line">    <span class="keyword">echo</span> <span class="string">&quot;Congratulations! You&#x27;re logged in as admin!&quot;</span>;</span><br><span class="line">    <span class="keyword">echo</span> <span class="variable">$flag</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>它只检查 cookie 的<strong>值</strong>，没有签名、没有 session、没有服务端状态。<strong>cookie 存在客户端，客户端想改成什么就改成什么。</strong></p>
+<div class="note warning flat"><p><strong><code>HttpOnly</code> 不是万能的。</strong> <code>HttpOnly</code> 只能阻止 JavaScript 通过 <code>document.cookie</code> <strong>读取</strong> cookie，不能阻止用户通过开发者工具、Burp、curl 手动<strong>设置</strong> cookie。如果服务端信任 cookie 的值，<code>HttpOnly</code> 挡不住这种改包攻击；它主要防的是 XSS 偷 cookie。</p>
+</div>
+
+<h3 id="知识点：Cookie-与-Session"><a href="#知识点：Cookie-与-Session" class="headerlink" title="知识点：Cookie 与 Session"></a>知识点：Cookie 与 Session</h3><table>
+<thead>
+<tr>
+<th>方式</th>
+<th>状态存在哪</th>
+<th>安全性取决于</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Cookie 直接存身份</td>
+<td>客户端</td>
+<td>服务端是否验签&#x2F;校验</td>
+</tr>
+<tr>
+<td>Session</td>
+<td>服务端，客户端只存 Session ID</td>
+<td>Session ID 是否随机、是否泄露</td>
+</tr>
+<tr>
+<td>JWT</td>
+<td>客户端，服务端验签</td>
+<td>签名算法、密钥强度、是否校验 <code>alg</code></td>
+</tr>
+</tbody></table>
+<p>三种方式本身没有绝对好坏，关键是<strong>服务端有没有验证</strong>。这题的 cookie 是明文 <code>username=monster</code>，没有任何签名，等于把“我是谁”交给用户自己填。</p>
+<h3 id="常见变体"><a href="#常见变体" class="headerlink" title="常见变体"></a>常见变体</h3><table>
+<thead>
+<tr>
+<th>变体</th>
+<th>利用方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>role=user</code> → <code>role=admin</code></td>
+<td>直接改权限字段</td>
+</tr>
+<tr>
+<td>base64 cookie</td>
+<td>解码后改字段，再编码回去</td>
+</tr>
+<tr>
+<td>JSON cookie</td>
+<td>改 <code>&#123;&quot;is_admin&quot;:false&#125;</code> 为 <code>true</code></td>
+</tr>
+<tr>
+<td>Flask session</td>
+<td>弱密钥可爆破，或用 <code>flask-unsign</code> 伪造</td>
+</tr>
+<tr>
+<td>JWT <code>alg:none</code></td>
+<td>去掉签名，改 payload</td>
+</tr>
+<tr>
+<td>JWT 弱密钥</td>
+<td>爆破密钥后重新签名</td>
+</tr>
+</tbody></table>
+<div class="note success flat"><p><strong>判断方法</strong>：拿到 cookie 后先看它长什么样。明文、base64、JSON、JWT，各有各的玩法。<strong>能解码就先解码，能改字段就先改字段，改完看服务端认不认。</strong></p>
+</div>
+
+<h2 id="三、php-filter-读源码：Had-a-bad-day"><a href="#三、php-filter-读源码：Had-a-bad-day" class="headerlink" title="三、php:&#x2F;&#x2F;filter 读源码：Had a bad day"></a>三、php:&#x2F;&#x2F;filter 读源码：Had a bad day</h2><p>文件包含的基础（<code>include</code> &#x2F; <code>require</code>、常见伪协议、LFI 利用链）在 <a href="/2026/10/30/web-knowledge-file-inclusion-basics/">文件包含基础</a> 里讲过，这里只挑这题用到的部分。</p>
+<h3 id="题目-1"><a href="#题目-1" class="headerlink" title="题目"></a>题目</h3><p>页面叫 <code>Had a bad day?</code>，有两个按钮：</p>
+<p><img src="/2026/11/14/web-knowledge-php-common-vulns/image-3.png" alt="Had a bad day 页面"></p>
+<p><em>图 4：<code>WOOFERS</code> 和 <code>MEOWERS</code> 两个选项</em></p>
+<p>点 <code>WOOFERS</code>，URL 变成：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/index.php?category=woofers</span><br></pre></td></tr></table></figure>
+
+<p>页面显示 <code>Woof! Woof!</code> 和一张图：</p>
+<p><img src="/2026/11/14/web-knowledge-php-common-vulns/image-4.png" alt="正常的 woofers 请求"></p>
+<p><em>图 5：<code>category=woofers</code> 正常返回内容</em></p>
+<p>先看源码、跑 <code>dirsearch</code>，都没有直接结果。那就换个思路：<strong>这个 <code>category</code> 很可能被 <code>include</code> 了。</strong></p>
+<h3 id="先试-php-filter"><a href="#先试-php-filter" class="headerlink" title="先试 php:&#x2F;&#x2F;filter"></a>先试 php:&#x2F;&#x2F;filter</h3><p>PHP 的 <code>php://filter</code> 可以在读取文件时套一层过滤器。最常用的是 base64 编码：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">php://filter/read=convert.base64-encode/resource=index</span><br></pre></td></tr></table></figure>
+
+<p>放到 URL 里：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/index.php?category=php://filter/read=convert.base64-encode/resource=index</span><br></pre></td></tr></table></figure>
+
+<p><strong>为什么用 base64？</strong> 因为直接 <code>include(&quot;index.php&quot;)</code> 会让 PHP <strong>执行</strong>这个文件，你看到的是它输出的 HTML，不是源码。套上 <code>convert.base64-encode</code> 后，文件内容先被编码成 base64 字符串再交给 <code>include</code>，base64 里没有 <code>&lt;?php</code>，不会被当成 PHP 代码执行，于是整段源码就以文本形式回显出来了。</p>
+<h3 id="第一个坑：include-自动补了-php"><a href="#第一个坑：include-自动补了-php" class="headerlink" title="第一个坑：include 自动补了 .php"></a>第一个坑：include 自动补了 <code>.php</code></h3><p>如果写：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?category=php://filter/read=convert.base64-encode/resource=index.php</span><br></pre></td></tr></table></figure>
+
+<p>页面会报：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Warning: include(php://filter/read=convert.base64-encode/resource=index.php.php):</span><br><span class="line">failed to open stream: operation failed</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/14/web-knowledge-php-common-vulns/image-5.png" alt="多了一个 .php"></p>
+<p><em>图 6：<code>resource=index.php</code> 被代码又拼了一个 <code>.php</code>，变成 <code>index.php.php</code></em></p>
+<p>原因是后端代码大概是：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">include</span>(<span class="variable">$file</span> . <span class="string">&#x27;.php&#x27;</span>);</span><br></pre></td></tr></table></figure>
+
+<p>它不管你传什么，都会在后面补 <code>.php</code>。所以 <code>resource=</code> 后面要写<strong>不带后缀</strong>的文件名：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?category=php://filter/read=convert.base64-encode/resource=index</span><br></pre></td></tr></table></figure>
+
+<p>这样拼接后正好是 <code>index.php</code>。</p>
+<h3 id="读源码"><a href="#读源码" class="headerlink" title="读源码"></a>读源码</h3><p>修正后，页面回显一大段 base64：</p>
+<p><img src="/2026/11/14/web-knowledge-php-common-vulns/image-6.png" alt="base64 源码"></p>
+<p><em>图 7：<code>resource=index</code> 读取成功，源码被 base64 编码后输出</em></p>
+<p>把 base64 复制出来解码：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">echo</span> <span class="string">&#x27;PCEtLSBDYW4geW91IHJlYWQgdGhpcyBmbGFnPyAtLT4KPD9waHAKIC8vIENURjJ7NjAyYmE2YjMtNWZkYi00NGMxLWJhYjctOTU2ZDBmZDlmMDY4fQo/Pgo=&#x27;</span> | <span class="built_in">base64</span> -d</span><br></pre></td></tr></table></figure>
+
+<p>得到：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&lt;!-- Can you read this flag? --&gt;</span><br><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"><span class="comment">// CTF2&#123;602ba6b3-5fdb-44c1-bab7-956d0fd9f068&#125;</span></span><br><span class="line"><span class="meta">?&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>flag：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CTF2&#123;602ba6b3-5fdb-44c1-bab7-956d0fd9f068&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="完整源码与-strpos-的坑"><a href="#完整源码与-strpos-的坑" class="headerlink" title="完整源码与 strpos 的坑"></a>完整源码与 <code>strpos</code> 的坑</h3><p>解码出来的源码里，关键逻辑是：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line">    <span class="variable">$file</span> = <span class="variable">$_GET</span>[<span class="string">&#x27;category&#x27;</span>];</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span>(<span class="keyword">isset</span>(<span class="variable">$file</span>))</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span>( <span class="title function_ invoke__">strpos</span>( <span class="variable">$file</span>, <span class="string">&quot;woofers&quot;</span> ) !== <span class="literal">false</span></span><br><span class="line">            || <span class="title function_ invoke__">strpos</span>( <span class="variable">$file</span>, <span class="string">&quot;meowers&quot;</span> ) !== <span class="literal">false</span></span><br><span class="line">            || <span class="title function_ invoke__">strpos</span>( <span class="variable">$file</span>, <span class="string">&quot;index&quot;</span> ) )</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">include</span> (<span class="variable">$file</span> . <span class="string">&#x27;.php&#x27;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">else</span></span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">echo</span> <span class="string">&quot;Sorry, we currently only support woofers and meowers.&quot;</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"><span class="meta">?&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>前两个判断写得很规范：<code>strpos(...) !== false</code>，找不到返回 <code>false</code>，找到返回位置（包括 <code>0</code>）。</p>
+<p>第三个判断少了一截：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_ invoke__">strpos</span>(<span class="variable">$file</span>, <span class="string">&quot;index&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<p><code>strpos</code> 的返回值有三种情况：</p>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>返回值</th>
+<th>布尔值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>没找到</td>
+<td><code>false</code></td>
+<td>假</td>
+</tr>
+<tr>
+<td>在位置 0 找到</td>
+<td><code>0</code></td>
+<td><strong>假</strong></td>
+</tr>
+<tr>
+<td>在位置 &gt; 0 找到</td>
+<td>正整数</td>
+<td>真</td>
+</tr>
+</tbody></table>
+<p>所以：</p>
+<ul>
+<li>如果 <code>$file</code> 就是 <code>index</code>，<code>strpos($file, &quot;index&quot;)</code> 返回 <code>0</code>，条件为假，页面会输出 <code>Sorry...</code>；</li>
+<li>如果 <code>$file</code> 是 <code>php://filter/...resource=index</code>，<code>index</code> 出现在后面，返回值 &gt; 0，条件为真，可以包含。</li>
+</ul>
+<p>这就是为什么 <code>resource=index</code> 这个 payload 能过：<strong>不是 <code>index</code> 这个词本身有问题，而是它出现的位置刚好不是 0。</strong></p>
+<h3 id="另一种绕法：把-woofers-塞进-filter-链"><a href="#另一种绕法：把-woofers-塞进-filter-链" class="headerlink" title="另一种绕法：把 woofers 塞进 filter 链"></a>另一种绕法：把 <code>woofers</code> 塞进 filter 链</h3><p>如果想让 payload 更“名正言顺”地满足前两个条件，可以写成：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?category=php://filter/woofers/read=convert.base64-encode/resource=index</span><br></pre></td></tr></table></figure>
+
+<p><code>php://filter</code> 会把 <code>/</code> 按段解析，<code>woofers</code> 被当成一个过滤器名字。PHP 找不到这个过滤器，会警告：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Warning: include(): unable to locate filter &quot;woofers&quot;</span><br><span class="line">Warning: include(): Unable to create filter (woofers)</span><br></pre></td></tr></table></figure>
+
+<p>但后面的 <code>convert.base64-encode</code> 仍然生效，<code>resource=index.php</code> 也仍然能被读取：</p>
+<p><img src="/2026/11/14/web-knowledge-php-common-vulns/image-7.png" alt="woofers 过滤器警告"></p>
+<p><em>图 8：<code>woofers</code> 被当成过滤器名，警告不影响 base64 输出</em></p>
+<p>这个写法同时满足 <code>strpos($file, &quot;woofers&quot;) !== false</code>，所以即使第三个条件的写法是严格的 <code>!== false</code>，也能过。<strong>它利用的是“过滤器链里可以出现任意名字”这一点，而不是让 <code>woofers</code> 真的去过滤什么。</strong></p>
+<div class="note info flat"><p><strong><code>php://filter</code> 的语法</strong></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">php://filter/[read=&lt;过滤器&gt;]/[write=&lt;过滤器&gt;]/resource=&lt;目标&gt;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>read=</code>：读取时应用的过滤器；</li>
+<li><code>write=</code>：写入时应用的过滤器；</li>
+<li>不写 <code>read=</code> &#x2F; <code>write=</code>，只写过滤器名，默认读写都应用；</li>
+<li>多个过滤器用 <code>|</code> 连接，例如 <code>convert.base64-encode|string.rot13</code>；</li>
+<li><code>resource=</code> 后面是被读取的目标，可以是相对路径、绝对路径，也可以是另一个流。</li>
+</ul>
+<p>常用的过滤器：</p>
+<table>
+<thead>
+<tr>
+<th>过滤器</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>convert.base64-encode</code></td>
+<td>base64 编码</td>
+</tr>
+<tr>
+<td><code>convert.base64-decode</code></td>
+<td>base64 解码</td>
+</tr>
+<tr>
+<td><code>string.rot13</code></td>
+<td>ROT13</td>
+</tr>
+<tr>
+<td><code>string.toupper</code> &#x2F; <code>string.tolower</code></td>
+<td>大小写转换</td>
+</tr>
+<tr>
+<td><code>zlib.deflate</code> &#x2F; <code>zlib.inflate</code></td>
+<td>zlib 压缩&#x2F;解压</td>
+</tr>
+<tr>
+<td><code>convert.iconv.*</code></td>
+<td>字符集转换，常被用来构造 RCE 链</td>
+</tr>
+</tbody></table>
+</div>
+
+<h3 id="其他常见伪协议"><a href="#其他常见伪协议" class="headerlink" title="其他常见伪协议"></a>其他常见伪协议</h3><table>
+<thead>
+<tr>
+<th>伪协议</th>
+<th>用途</th>
+<th>典型场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>php://filter</code></td>
+<td>读源码、编码转换</td>
+<td>LFI 读文件</td>
+</tr>
+<tr>
+<td><code>php://input</code></td>
+<td>读取 POST body</td>
+<td>文件包含 + 代码执行</td>
+</tr>
+<tr>
+<td><code>data://</code></td>
+<td>直接把数据当文件</td>
+<td><code>data://text/plain;base64,...</code></td>
+</tr>
+<tr>
+<td><code>file://</code></td>
+<td>读本地文件</td>
+<td>路径可控时</td>
+</tr>
+<tr>
+<td><code>zip://</code></td>
+<td>读 zip 内文件</td>
+<td>上传 zip + 包含</td>
+</tr>
+<tr>
+<td><code>phar://</code></td>
+<td>触发反序列化</td>
+<td>有 <code>phar</code> 文件时</td>
+</tr>
+<tr>
+<td><code>expect://</code></td>
+<td>执行命令</td>
+<td>需要扩展，较少见</td>
+</tr>
+</tbody></table>
+<p><code>php://filter</code> 本身通常只能读，不能直接执行代码；但在 LFI 题里，它经常和日志包含、session 文件、上传文件、<code>convert.iconv</code> 链组合，变成完整的 RCE。</p>
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><div class="note info flat"><p><strong>Q1：为什么 <code>ctf[]=1</code> 能触发，<code>ctf=1</code> 不行？</strong></p>
+<p><code>ctf=1</code> 让 <code>$dest0g3</code> 是字符串，字符串拼接不会报错；<code>ctf[]=1</code> 让 <code>$dest0g3</code> 是数组，数组参与字符串拼接会触发 <code>Array to string conversion</code>，自定义错误处理器才有机会执行。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q2：<code>set_error_handler</code> 能捕获哪些错误？</strong></p>
+<p>默认能捕获 <code>E_WARNING</code>、<code>E_NOTICE</code>、<code>E_USER_*</code>、<code>E_DEPRECATED</code>、<code>E_STRICT</code> 等运行时错误；捕获不了 <code>E_ERROR</code>、<code>E_PARSE</code>、<code>E_CORE_ERROR</code>、<code>E_COMPILE_ERROR</code> 这类致命错误。数组转字符串是 <code>E_WARNING</code>，所以在捕获范围内。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q3：为什么错误处理器里能拿到 <code>$fl4g</code>？</strong></p>
+<p><code>include &quot;fl4g.php&quot;</code> 之后，<code>$fl4g</code> 已经在当前作用域里了；闭包用 <code>use (&amp;$fl4g)</code> 按引用捕获它，处理器执行时就能直接 <code>print</code>。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q4：Cookie 的 <code>path</code> 为什么重要？</strong></p>
+<p>Cookie 按 <code>domain</code> + <code>path</code> 隔离。要覆盖已有的 <code>username</code>，新 cookie 的 <code>path</code> 必须和原来一致；写 <code>path=/</code> 能覆盖全站生效的那一个。如果 path 不匹配，浏览器会保留两个同名 cookie，服务端读哪个就不确定了。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q5：<code>HttpOnly</code> 能防住改 Cookie 吗？</strong></p>
+<p>不能。<code>HttpOnly</code> 只阻止 JavaScript 读取 cookie，不阻止用户通过开发者工具、Burp、curl 设置 cookie。它防的是 XSS 偷 cookie，不是防客户端篡改。真正要防篡改，得靠签名或服务端 session。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q6：为什么 <code>resource=index.php</code> 会变成 <code>index.php.php</code>？</strong></p>
+<p>因为后端写的是 <code>include($file . &#39;.php&#39;)</code>，不管你传什么都会补 <code>.php</code>。你传 <code>index.php</code>，拼接后就是 <code>index.php.php</code>。改成 <code>resource=index</code>，拼接后正好是 <code>index.php</code>。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q7：为什么要把源码 base64？</strong></p>
+<p>直接 <code>include(&quot;index.php&quot;)</code> 会让 PHP 执行这个文件，你看到的是执行结果；<code>convert.base64-encode</code> 把文件内容先编码成 base64 文本，里面没有 <code>&lt;?php</code>，<code>include</code> 不会执行它，于是源码被原样输出。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q8：<code>strpos</code> 不加 <code>!== false</code> 为什么危险？</strong></p>
+<p><code>strpos</code> 找不到返回 <code>false</code>，在位置 0 找到返回 <code>0</code>。<code>0</code> 和 <code>false</code> 在布尔上下文里都是假。如果只写 <code>if (strpos($a, $b))</code>，那么“在开头找到”会被误判成“没找到”，校验逻辑就反了。正确写法是 <code>strpos($a, $b) !== false</code>。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q9：为什么 payload 里要带 <code>woofers</code>？</strong></p>
+<p>因为源码用 <code>strpos($file, &quot;woofers&quot;) !== false</code> 做白名单判断。把 <code>woofers</code> 塞进 <code>php://filter</code> 的过滤器链里，既能满足字符串检查，又不会影响后面的 base64 读取。PHP 会警告“找不到 woofers 过滤器”，但不会中断。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q10：<code>php://filter</code> 只能读源码吗？</strong></p>
+<p>不只能读。它可以对任意流做编码、解码、压缩、字符集转换；配合 <code>php://input</code>、<code>data://</code>、<code>zip://</code>、<code>phar://</code> 等伪协议，可以做代码执行、反序列化、文件写入。不过很多利用需要 <code>allow_url_include=On</code> 或特定扩展，实际环境要看配置。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q11：这三个漏洞有什么共同点？</strong></p>
+<p>都是“用户输入越界”：数组越过了字符串的边界，cookie 越过了服务端的信任边界，<code>category</code> 越过了“只能选 woofers&#x2F;meowers”的边界。PHP 的弱类型和动态特性让这些越界更容易发生。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q12：怎么防？</strong></p>
+<ul>
+<li>数组报错：不要用自定义错误处理器打印敏感变量；对输入做类型校验（<code>is_string</code>、<code>is_array</code>）；</li>
+<li>Cookie：不要信任客户端状态，用签名 cookie 或服务端 session；敏感字段不要放在 cookie 里；</li>
+<li>文件包含：用白名单映射（<code>woofers</code> → <code>woofers.php</code>），不要直接拼接用户输入；<code>allow_url_include=Off</code>、<code>open_basedir</code> 限制目录。</li>
+</ul>
+</div>
+
+<h2 id="完整流程速查"><a href="#完整流程速查" class="headerlink" title="完整流程速查"></a>完整流程速查</h2><table>
+<thead>
+<tr>
+<th>案例</th>
+<th>步骤</th>
+<th>操作 &#x2F; payload</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>EasyPHP</td>
+<td>1</td>
+<td>读源码，发现时间条件永远为假</td>
+<td>只能走错误处理器</td>
+</tr>
+<tr>
+<td>EasyPHP</td>
+<td>2</td>
+<td>POST <code>ctf[]=1</code></td>
+<td>触发 <code>Array to string conversion</code></td>
+</tr>
+<tr>
+<td>EasyPHP</td>
+<td>3</td>
+<td>错误处理器打印 <code>$fl4g</code></td>
+<td>拿到 flag</td>
+</tr>
+<tr>
+<td>Kookie</td>
+<td>1</td>
+<td>页面提示 cookie 是 <code>monster</code></td>
+<td>目标改成 <code>admin</code></td>
+</tr>
+<tr>
+<td>Kookie</td>
+<td>2</td>
+<td><code>document.cookie = &quot;username=admin;path=/&quot;</code></td>
+<td>覆盖 cookie</td>
+</tr>
+<tr>
+<td>Kookie</td>
+<td>3</td>
+<td>刷新页面</td>
+<td>以 admin 登录，拿到 flag</td>
+</tr>
+<tr>
+<td>Had a bad day</td>
+<td>1</td>
+<td>试 <code>?category=woofers</code></td>
+<td>正常回显，确认参数被使用</td>
+</tr>
+<tr>
+<td>Had a bad day</td>
+<td>2</td>
+<td><code>php://filter/read=convert.base64-encode/resource=index.php</code></td>
+<td>被补成 <code>.php.php</code>，报错</td>
+</tr>
+<tr>
+<td>Had a bad day</td>
+<td>3</td>
+<td>改成 <code>resource=index</code></td>
+<td>读到 base64 源码</td>
+</tr>
+<tr>
+<td>Had a bad day</td>
+<td>4</td>
+<td>base64 解码</td>
+<td>拿到 flag</td>
+</tr>
+</tbody></table>
+<h2 id="顺手聊聊怎么防"><a href="#顺手聊聊怎么防" class="headerlink" title="顺手聊聊怎么防"></a>顺手聊聊怎么防</h2><p>三个案例对应三种防护思路：</p>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>错误做法</th>
+<th>正确做法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>数组触发错误泄露 flag</td>
+<td>用 <code>set_error_handler</code> 打印敏感变量</td>
+<td>不要把 flag 放在错误处理器能碰到的作用域；对输入做类型校验</td>
+</tr>
+<tr>
+<td>Cookie 信任</td>
+<td>直接读 <code>$_COOKIE[&#39;username&#39;]</code> 判断身份</td>
+<td>用签名 cookie、JWT 验签或服务端 session；敏感字段不落客户端</td>
+</tr>
+<tr>
+<td>文件包含</td>
+<td><code>include($file . &#39;.php&#39;)</code> 直接拼接</td>
+<td>白名单映射；<code>basename()</code>；<code>allow_url_include=Off</code>；<code>open_basedir</code></td>
+</tr>
+</tbody></table>
+<p>具体的代码层面：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 1. 输入类型校验</span></span><br><span class="line"><span class="keyword">if</span> (!<span class="title function_ invoke__">is_string</span>(<span class="variable">$_POST</span>[<span class="string">&#x27;ctf&#x27;</span>])) &#123;</span><br><span class="line">    <span class="keyword">die</span>(<span class="string">&#x27;invalid input&#x27;</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 2. 不要信任 cookie 里的身份</span></span><br><span class="line"><span class="comment">// 错误：if ($_COOKIE[&#x27;username&#x27;] === &#x27;admin&#x27;)</span></span><br><span class="line"><span class="comment">// 正确：从服务端 session 取身份，cookie 只放随机的 session id</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 3. 文件包含用白名单</span></span><br><span class="line"><span class="variable">$allowed</span> = [<span class="string">&#x27;woofers&#x27;</span> =&gt; <span class="string">&#x27;woofers.php&#x27;</span>, <span class="string">&#x27;meowers&#x27;</span> =&gt; <span class="string">&#x27;meowers.php&#x27;</span>];</span><br><span class="line"><span class="variable">$key</span> = <span class="variable">$_GET</span>[<span class="string">&#x27;category&#x27;</span>] ?? <span class="string">&#x27;&#x27;</span>;</span><br><span class="line"><span class="keyword">if</span> (!<span class="keyword">isset</span>(<span class="variable">$allowed</span>[<span class="variable">$key</span>])) &#123;</span><br><span class="line">    <span class="keyword">die</span>(<span class="string">&#x27;invalid category&#x27;</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">include</span> <span class="variable">$allowed</span>[<span class="variable">$key</span>];</span><br></pre></td></tr></table></figure>
+
+<div class="note success flat"><p><strong>一条原则</strong>：PHP 的“自动转换”和“动态特性”让开发很方便，但也让边界变得模糊。<strong>凡是用户能控制的变量，进入字符串、文件路径、身份判断之前，都要先问一句：它会不会变成别的东西？</strong></p>
+</div>
+
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>三个案例，三种“越界”：</p>
+<ul>
+<li><strong>数组报错绕过</strong>：<code>ctf[]=1</code> 让字符串拼接变成数组转字符串，<code>E_WARNING</code> 被 <code>set_error_handler</code> 接住，flag 跟着错误信息一起出来；</li>
+<li><strong>Cookie 信任</strong>：<code>username=monster</code> 明文存在客户端，改成 <code>admin</code> 就是管理员；<code>path=/</code> 保证覆盖全站生效的那个 cookie；</li>
+<li><strong>php:&#x2F;&#x2F;filter 读源码</strong>：<code>include($file . &#39;.php&#39;)</code> 会自动补后缀，<code>resource=index</code> 才是正确写法；base64 让源码不执行、原样回显；</li>
+<li><strong><code>strpos</code> 的坑</strong>：返回 <code>0</code> 和返回 <code>false</code> 在布尔上下文里都是假，必须写 <code>!== false</code>；</li>
+<li><strong>共同点</strong>：用户输入越过了它本该待着的位置——从数据变成代码、从客户端状态变成服务端身份、从选项变成文件路径。</li>
+</ul>
+<p>下一题可以往这几个方向走：</p>
+<table>
+<thead>
+<tr>
+<th>方向</th>
+<th>要解决的问题</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PHP 弱类型</td>
+<td><code>==</code> &#x2F; <code>===</code>、magic hash、数组比较</td>
+</tr>
+<tr>
+<td>反序列化</td>
+<td><code>unserialize</code>、POP 链、<code>phar://</code></td>
+</tr>
+<tr>
+<td>文件包含进阶</td>
+<td>日志包含、session 文件、<code>convert.iconv</code> RCE 链</td>
+</tr>
+<tr>
+<td>签名与 JWT</td>
+<td>弱密钥、<code>alg:none</code>、密钥混淆</td>
+</tr>
+<tr>
+<td>错误处理</td>
+<td>自定义 handler 泄露、异常栈信息</td>
+</tr>
+</tbody></table>
+<div class="note success flat"><p><strong>一条经验</strong>：PHP 题先读源码，再找“用户能控制什么”。可控变量进入的每一个函数、每一个判断、每一个拼接，都是潜在的边界。<strong>漏洞往往不在你盯着的那一行，而在你以为“它只是个字符串”的地方。</strong></p>
+</div>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/Quellisya">Quellisya</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://quellisya.github.io/2026/11/14/web-knowledge-php-common-vulns/">https://quellisya.github.io/2026/11/14/web-knowledge-php-common-vulns/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://Quellisya.github.io" target="_blank">Quellisya's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E6%96%87%E4%BB%B6%E5%8C%85%E5%90%AB/">文件包含</a><a class="post-meta__tags" href="/tags/php-filter/">php://filter</a><a class="post-meta__tags" href="/tags/%E4%BC%AA%E5%8D%8F%E8%AE%AE/">伪协议</a><a class="post-meta__tags" href="/tags/%E6%95%B0%E7%BB%84%E7%BB%95%E8%BF%87/">数组绕过</a><a class="post-meta__tags" href="/tags/%E5%85%A5%E9%97%A8%E5%9F%BA%E7%A1%80/">入门基础</a><a class="post-meta__tags" href="/tags/PHP/">PHP</a><a class="post-meta__tags" href="/tags/%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86/">错误处理</a><a class="post-meta__tags" href="/tags/Cookie/">Cookie</a></div><div class="post-share"><div class="social-share" data-image="/img/avatar-seal.svg" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/11/14/web-ctf-http-geek2019/" title="[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info"><div class="info-1"><div class="info-item-1">上一篇</div><div class="info-item-2">[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步</div></div><div class="info-2"><div class="info-item-1">从 F12 里的隐藏链接开始，依次伪造 Referer、User-Agent、X-Forwarded-For。网上大多数 writeup 到 XFF 就结束了，但在 CTF2 的 openresty 网关后面这一步会失败：反代把 XFF 重写成了真实客户端 IP。改用 tcp-ctf2 直连、把 Burp 端口改成 9999 并勾上 HTTPS，就能绕过网关拿到 flag。顺便讲清楚请求头的信任边界和反代改写的原理。</div></div></div></a><a class="pagination-related" href="/2026/11/12/web-ctf-sql-bool-blind/" title="[CISCN2019 华北赛区 Day2 Web1] Hack World：空格被过滤后的布尔盲注与二分查找"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">[CISCN2019 华北赛区 Day2 Web1] Hack World：空格被过滤后的布尔盲注与二分查找</div></div><div class="info-2"><div class="info-item-1">页面只有两种回显，表名和列名还直接写在脸上。空格、and、or、union 被拦，于是用 ^ 做异或、用括号代替空格，把 flag 的每一位变成一道真假题，再用二分查找把 95 种可能压到 7 次请求。</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2026/10/30/web-knowledge-file-inclusion-basics/" title="文件包含基础：include、伪协议与 LFI 利用链"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-30</div><div class="info-item-2">文件包含基础：include、伪协议与 LFI 利用链</div></div><div class="info-2"><div class="info-item-1">文件包含题的通用知识：include 和 require 的区别、怎么判断 LFI、php://filter 读源码、常见伪协议、日志包含/图片马/zip 包含等利用链，附流程速查和防护建议。</div></div></div></a><a class="pagination-related" href="/2026/10/30/web-ctf-file-inclusion-secret-file/" title="[极客大挑战 2019] Secret File：源码注释、302 跳转与 php:&#x2F;&#x2F;filter"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-30</div><div class="info-item-2">[极客大挑战 2019] Secret File：源码注释、302 跳转与 php:&#x2F;&#x2F;filter</div></div><div class="info-2"><div class="info-item-1">首页源码里藏着 Archive_room.php，SECRET 按钮又被 302 跳转藏住了响应体。用 Burp 看穿跳转、读到 secr3t.php 源码后，再用 php://filter 把 flag.php 以 base64 读出来。</div></div></div></a><a class="pagination-related" href="/2026/10/24/web-knowledge-upload-basics/" title="文件上传基础：校验点、可执行后缀与常见坑"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-24</div><div class="info-item-2">文件上传基础：校验点、可执行后缀与常见坑</div></div><div class="info-2"><div class="info-item-1">文件上传题的通用知识：漏洞从哪来、前端校验为什么不算防线、服务端会在哪些地方拦、哪些后缀可能被解析，外加 8 个新手常踩的坑和完整流程速查。</div></div></div></a></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Quellisya</div><div class="author-info-description">记录 CTF 与 Web 安全的学习笔记，把每一步讲清楚。</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">32</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">98</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">18</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/Quellisya" target="_blank" title="Github"><i class="fab fa-github" style="color: #0f2f32;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">循墨迹读代码，借微光见漏洞。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%88%E7%9C%8B%E5%85%A8%E8%B2%8C%EF%BC%9A%E4%B8%89%E7%B1%BB%E9%97%AE%E9%A2%98"><span class="toc-text">先看全貌：三类问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E3%80%81%E6%95%B0%E7%BB%84%E6%8A%A5%E9%94%99%E7%BB%95%E8%BF%87%EF%BC%9AEasyPHP"><span class="toc-text">一、数组报错绕过：EasyPHP</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%A2%98%E7%9B%AE%E6%BA%90%E7%A0%81"><span class="toc-text">题目源码</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%80%90%E8%A1%8C%E8%AF%BB%E6%BA%90%E7%A0%81"><span class="toc-text">逐行读源码</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%97%B6%E9%97%B4%E6%9D%A1%E4%BB%B6%E4%B8%BA%E4%BB%80%E4%B9%88%E8%B5%B0%E4%B8%8D%E9%80%9A"><span class="toc-text">时间条件为什么走不通</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%85%B3%E9%94%AE%EF%BC%9A%E8%AE%A9-dest0g3-%E5%8F%98%E6%88%90%E6%95%B0%E7%BB%84"><span class="toc-text">关键：让 $dest0g3 变成数组</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86%E5%99%A8%E8%83%BD%E6%8B%BF%E5%88%B0-fl4g"><span class="toc-text">为什么错误处理器能拿到 $fl4g</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%9F%A5%E8%AF%86%E7%82%B9%EF%BC%9Aset-error-handler"><span class="toc-text">知识点：set_error_handler</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%9F%A5%E8%AF%86%E7%82%B9%EF%BC%9APHP-%E7%9A%84%E6%95%B0%E7%BB%84%E4%B8%8E%E5%AD%97%E7%AC%A6%E4%B8%B2%E8%BD%AC%E6%8D%A2"><span class="toc-text">知识点：PHP 的数组与字符串转换</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%E3%80%81Cookie-%E4%BF%A1%E4%BB%BB%EF%BC%9AKookie"><span class="toc-text">二、Cookie 信任：Kookie</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%A2%98%E7%9B%AE"><span class="toc-text">题目</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%94%B9-cookie"><span class="toc-text">改 cookie</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88-path-%E5%BE%88%E9%87%8D%E8%A6%81"><span class="toc-text">为什么 path&#x3D;&#x2F; 很重要</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%BF%99%E8%83%BD%E6%88%90%E5%8A%9F"><span class="toc-text">为什么这能成功</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%9F%A5%E8%AF%86%E7%82%B9%EF%BC%9ACookie-%E4%B8%8E-Session"><span class="toc-text">知识点：Cookie 与 Session</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%B8%B8%E8%A7%81%E5%8F%98%E4%BD%93"><span class="toc-text">常见变体</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%E3%80%81php-filter-%E8%AF%BB%E6%BA%90%E7%A0%81%EF%BC%9AHad-a-bad-day"><span class="toc-text">三、php:&#x2F;&#x2F;filter 读源码：Had a bad day</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%A2%98%E7%9B%AE-1"><span class="toc-text">题目</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%85%88%E8%AF%95-php-filter"><span class="toc-text">先试 php:&#x2F;&#x2F;filter</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%AC%AC%E4%B8%80%E4%B8%AA%E5%9D%91%EF%BC%9Ainclude-%E8%87%AA%E5%8A%A8%E8%A1%A5%E4%BA%86-php"><span class="toc-text">第一个坑：include 自动补了 .php</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%AF%BB%E6%BA%90%E7%A0%81"><span class="toc-text">读源码</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%8C%E6%95%B4%E6%BA%90%E7%A0%81%E4%B8%8E-strpos-%E7%9A%84%E5%9D%91"><span class="toc-text">完整源码与 strpos 的坑</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8F%A6%E4%B8%80%E7%A7%8D%E7%BB%95%E6%B3%95%EF%BC%9A%E6%8A%8A-woofers-%E5%A1%9E%E8%BF%9B-filter-%E9%93%BE"><span class="toc-text">另一种绕法：把 woofers 塞进 filter 链</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%85%B6%E4%BB%96%E5%B8%B8%E8%A7%81%E4%BC%AA%E5%8D%8F%E8%AE%AE"><span class="toc-text">其他常见伪协议</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="toc-text">新手常见问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%8C%E6%95%B4%E6%B5%81%E7%A8%8B%E9%80%9F%E6%9F%A5"><span class="toc-text">完整流程速查</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%E6%80%8E%E4%B9%88%E9%98%B2"><span class="toc-text">顺手聊聊怎么防</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B0%8F%E7%BB%93"><span class="toc-text">小结</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/" title="Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾">Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾</a><time datetime="2026-11-14T07:00:00.000Z" title="发表于 2026-11-14 15:00:00">2026-11-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/14/web-ctf-http-geek2019/" title="[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步">[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步</a><time datetime="2026-11-14T03:00:00.000Z" title="发表于 2026-11-14 11:00:00">2026-11-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/14/web-knowledge-php-common-vulns/" title="PHP 常见漏洞笔记：数组报错绕过、Cookie 信任与 php://filter 读源码">PHP 常见漏洞笔记：数组报错绕过、Cookie 信任与 php://filter 读源码</a><time datetime="2026-11-14T01:00:00.000Z" title="发表于 2026-11-14 09:00:00">2026-11-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/12/web-ctf-sql-bool-blind/" title="[CISCN2019 华北赛区 Day2 Web1] Hack World：空格被过滤后的布尔盲注与二分查找">[CISCN2019 华北赛区 Day2 Web1] Hack World：空格被过滤后的布尔盲注与二分查找</a><time datetime="2026-11-12T02:00:00.000Z" title="发表于 2026-11-12 10:00:00">2026-11-12</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/10/pwn-ctf-get-started-3dsctf-2016/" title="Pwn 入门：get_started_3dsctf_2016——32 位栈传参、cdecl 与用 exit 收尾">Pwn 入门：get_started_3dsctf_2016——32 位栈传参、cdecl 与用 exit 收尾</a><time datetime="2026-11-10T02:00:00.000Z" title="发表于 2026-11-10 10:00:00">2026-11-10</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2025 - 2026 By Quellisya</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 8.1.2</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.7.0</a></span></div><div class="footer_custom_text">以墨为舟，以码为桨 · CTF & Web Security Notes</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.7.0"></script><script src="/js/main.js?v=5.7.0"></script><div class="js-pjax"></div><script defer src="/js/butterfly-custom.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><i class="fas fa-spinner fa-pulse" id="loading-status" hidden="hidden"></i><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="local-search-input"><input placeholder="搜索笔记、题目或 payload…" type="text"/></div><hr/><div id="local-search-results"></div><div class="ais-Pagination" id="local-search-pagination" style="display:none;"><ul class="ais-Pagination-list"></ul></div><div id="local-search-stats"></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.7.0"></script></div></div></body></html>

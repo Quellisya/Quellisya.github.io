@@ -1,0 +1,775 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步 | Quellisya's Blog</title><meta name="author" content="Quellisya"><meta name="copyright" content="Quellisya"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#f3fbf8"><meta name="description" content="从 F12 里的隐藏链接开始，依次伪造 Referer、User-Agent、X-Forwarded-For。网上大多数 writeup 到 XFF 就结束了，但在 CTF2 的 openresty 网关后面这一步会失败：反代把 XFF 重写成了真实客户端 IP。改用 tcp-ctf2 直连、把 Burp 端口改成 9999 并勾上 HTTPS，就能绕过网关拿到 flag。顺便讲清楚请求头的信任边">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步">
+<meta property="og:url" content="https://quellisya.github.io/2026/11/14/web-ctf-http-geek2019/index.html">
+<meta property="og:site_name" content="Quellisya&#39;s Blog">
+<meta property="og:description" content="从 F12 里的隐藏链接开始，依次伪造 Referer、User-Agent、X-Forwarded-For。网上大多数 writeup 到 XFF 就结束了，但在 CTF2 的 openresty 网关后面这一步会失败：反代把 XFF 重写成了真实客户端 IP。改用 tcp-ctf2 直连、把 Burp 端口改成 9999 并勾上 HTTPS，就能绕过网关拿到 flag。顺便讲清楚请求头的信任边">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://quellisya.github.io/img/avatar-seal.svg">
+<meta property="article:published_time" content="2026-11-14T03:00:00.000Z">
+<meta property="article:modified_time" content="2026-11-14T03:00:00.000Z">
+<meta property="article:author" content="Quellisya">
+<meta property="article:tag" content="Burp Suite">
+<meta property="article:tag" content="HTTP">
+<meta property="article:tag" content="Referer">
+<meta property="article:tag" content="User-Agent">
+<meta property="article:tag" content="X-Forwarded-For">
+<meta property="article:tag" content="反向代理">
+<meta property="article:tag" content="极客大挑战">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://quellisya.github.io/img/avatar-seal.svg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步",
+  "url": "https://quellisya.github.io/2026/11/14/web-ctf-http-geek2019/",
+  "image": "https://quellisya.github.io/img/avatar-seal.svg",
+  "datePublished": "2026-11-14T03:00:00.000Z",
+  "dateModified": "2026-11-14T03:00:00.000Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Quellisya",
+      "url": "https://github.com/Quellisya"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/logo-seal.svg"><link rel="canonical" href="https://quellisya.github.io/2026/11/14/web-ctf-http-geek2019/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="stylesheet" href="/css/index.css?v=5.7.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        const data = { value }
+
+        if (ttl != null) {
+          data.expiry = Date.now() + ttl * 86400000
+        }
+
+        localStorage.setItem(key, JSON.stringify(data))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return
+
+        try {
+          const data = JSON.parse(itemStr)
+
+          if (data.expiry && Date.now() > data.expiry) {
+            localStorage.removeItem(key)
+            return
+          }
+
+          return data.value
+        } catch {
+          localStorage.removeItem(key)
+        }
+      }
+    }
+
+    const scriptCache = new Map()
+    const cssCache = new Map()
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => {
+        if (scriptCache.has(url)) {
+          return scriptCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const script = document.createElement('script')
+
+          script.src = url
+          script.async = true
+
+          for (const key in attr) {
+            script.setAttribute(key, attr[key])
+          }
+
+          script.onload = resolve
+          script.onerror = reject
+
+          document.head.appendChild(script)
+        })
+
+        scriptCache.set(url, promise)
+
+        return promise
+      },
+      getCSS: (url, id) => {
+        if (cssCache.has(url)) {
+          return cssCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const link = document.createElement('link')
+
+          link.rel = 'stylesheet'
+          link.href = url
+
+          if (id) {
+            link.id = id
+          }
+
+          link.onload = resolve
+          link.onerror = reject
+
+          document.head.appendChild(link)
+        })
+
+        cssCache.set(url, promise)
+
+        return promise
+      },
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      const activateDarkMode = () => {
+        document.documentElement.dataset.theme = 'dark'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#0f1f22')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.dataset.theme = 'light'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#f3fbf8')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"pagination":{"enable":false,"hitsPerPage":8},"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":true},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: true,
+  percent: {
+    toc: true,
+    rightside: true,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><link rel="stylesheet" href="/css/butterfly-custom.css"><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head><body><div class="bg-animation" id="web_bg" style="background-image: url(/img/bg-ink-tech.svg);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">32</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">98</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">18</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg fixed" id="page-header" style="background-image: url(/img/banner-ink-tech.svg);"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><img class="site-icon" src="/img/logo-seal.svg" alt="Logo"><span class="site-name">Quellisya's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-11-14T03:00:00.000Z" title="发表于 2026-11-14 11:00:00">2026-11-14</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-11-14T03:00:00.000Z" title="更新于 2026-11-14 11:00:00">2026-11-14</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/">CTF</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/web/">Web</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/web/HTTP-%E5%9F%BA%E7%A1%80/">HTTP 基础</a></span></div><div class="meta-secondline"></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><div class="note primary flat"><p><strong>一分钟速览</strong></p>
+<ul>
+<li><strong>难度</strong>：入门（适合刚接触 Burp Repeater 和请求头伪造的同学）</li>
+<li><strong>考点</strong>：隐藏链接、<code>Referer</code> 伪造、<code>User-Agent</code> 伪造、<code>X-Forwarded-For</code> 伪造、反向代理对请求头的改写</li>
+<li><strong>工具</strong>：浏览器 F12、Burp Suite（Repeater）、<code>curl</code></li>
+<li><strong>三道门</strong>：来源站点 <code>Referer</code> → 指定浏览器 <code>User-Agent: Syclover</code> → 本地访问 <code>X-Forwarded-For: 127.0.0.1</code></li>
+<li><strong>真正的坑</strong>：走 <code>http-ctf2</code> 网关时，openresty 会把 <code>X-Forwarded-For</code> 改写成真实客户端 IP，伪造无效</li>
+<li><strong>解法</strong>：换成 <code>tcp-ctf2</code> 直连，端口改成 <code>9999</code>，Burp 勾上 HTTPS，再重复同样的请求头</li>
+<li><strong>flag</strong>：<code>CTF2{c56bfec1-c066-4ca7-bc25-120666c2d5ac}</code></li>
+</ul>
+</div>
+
+<div class="note info flat"><p><strong>阅读说明</strong></p>
+<ul>
+<li><strong>前置知识</strong>：HTTP 请求&#x2F;响应的基本结构、会用浏览器 F12、知道 Burp 怎么抓包和重放</li>
+<li><strong>工具</strong>：浏览器、Burp Suite。没有 Burp 也能做，文末有 <code>curl</code> 版本</li>
+<li><strong>环境</strong>：文中的靶场地址是当时的临时环境，现在多半已经失效，请换成自己的靶场或本地环境</li>
+<li>本文所有操作仅用于<strong>授权靶场和教学</strong>，请勿对未授权的目标做任何测试</li>
+</ul>
+</div>
+
+<div class="note default flat"><p><strong>做题路线</strong></p>
+<p><code>F12 找隐藏链接</code> → <code>访问 Secret.php</code> → <code>伪造 Referer</code> → <code>伪造 User-Agent</code> → <code>伪造 X-Forwarded-For</code> → <code>发现被反代改写</code> → <code>换 tcp 直连</code> → <code>Burp 改端口 + HTTPS</code> → <code>重放请求</code> → <code>拿 flag</code></p>
+</div>
+
+<h2 id="题目入口：F12-里的-Secret-php"><a href="#题目入口：F12-里的-Secret-php" class="headerlink" title="题目入口：F12 里的 Secret.php"></a>题目入口：F12 里的 Secret.php</h2><p>打开靶场，页面看起来只是一个普通的安全小组介绍页。直接看源码，或者按 <code>F12</code> 打开开发者工具，能在一段 <code>&lt;section&gt;</code> 里找到这个：</p>
+<p><img src="/2026/11/14/web-ctf-http-geek2019/image.png" alt="F12 里的隐藏链接"></p>
+<p><em>图 1：<code>&lt;a&gt;</code> 标签的 <code>href</code> 指向 <code>Secret.php</code>，但被 <code>onclick=&quot;return false&quot;</code> 和样式藏了起来</em></p>
+<p>关键代码是：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">a</span> <span class="attr">style</span>=<span class="string">&quot;border:none;cursor:default;&quot;</span> <span class="attr">onclick</span>=<span class="string">&quot;return false&quot;</span> <span class="attr">href</span>=<span class="string">&quot;Secret.php&quot;</span>&gt;</span>氛围<span class="tag">&lt;/<span class="name">a</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>这里有两个“隐藏”手段：</p>
+<table>
+<thead>
+<tr>
+<th>手段</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>onclick=&quot;return false;&quot;</code></td>
+<td>点击时不跳转，看起来像普通文字</td>
+</tr>
+<tr>
+<td><code>border:none; cursor:default;</code></td>
+<td>去掉下划线和手型光标，视觉上不像链接</td>
+</tr>
+</tbody></table>
+<p>但 <code>href</code> 是骗不了人的。浏览器地址栏直接访问 <code>Secret.php</code>：</p>
+<p><img src="/2026/11/14/web-ctf-http-geek2019/image-1.png" alt="访问 Secret.php"></p>
+<p><em>图 2：页面提示 <code>It doesn&#39;t come from &#39;https://Sycsecret.buuoj.cn&#39;</code></em></p>
+<p>翻译过来就是：<strong>这个请求不是从 <code>https://Sycsecret.buuoj.cn</code> 来的。</strong></p>
+<p>这句话已经把手要伸向哪个请求头说得很清楚了——<code>Referer</code>。</p>
+<div class="note info flat"><p><strong>F12 能看到，说明“隐藏”只是前端障眼法。</strong> HTML、CSS、JavaScript 都在客户端，任何“看不见的链接”都可以在源码、Elements 面板或者网络请求里找回来。CTF 里遇到“页面上什么都没有”的题，第一步永远是看源码和请求，而不是盯着页面发呆。</p>
+</div>
+
+<h2 id="第一道门：Referer"><a href="#第一道门：Referer" class="headerlink" title="第一道门：Referer"></a>第一道门：Referer</h2><p><code>Referer</code> 是浏览器自动带上的请求头，用来告诉服务器“我是从哪个页面点过来的”。</p>
+<p>比如你在 <code>https://a.com/page</code> 里点了一个指向 <code>https://b.com/secret</code> 的链接，浏览器发往 <code>b.com</code> 的请求大概长这样：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">GET</span> <span class="string">/secret</span> <span class="meta">HTTP/1.1</span></span><br><span class="line"><span class="attribute">Host</span><span class="punctuation">: </span>b.com</span><br><span class="line"><span class="attribute">Referer</span><span class="punctuation">: </span>https://a.com/page</span><br></pre></td></tr></table></figure>
+
+<p>服务端在 PHP 里通过 <code>$_SERVER[&#39;HTTP_REFERER&#39;]</code> 读取它。题目要求来源是 <code>https://Sycsecret.buuoj.cn</code>，那就在 Burp Repeater 里手动加上：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">Referer</span><span class="punctuation">: </span>https://Sycsecret.buuoj.cn</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/14/web-ctf-http-geek2019/image-3.png" alt="加上 Referer"></p>
+<p><em>图 3：请求头里补上 <code>Referer</code>，页面回显变成 <code>Please use &quot;Syclover&quot; browser</code></em></p>
+<p>第一道门开了，但门后面还有一道。</p>
+<div class="note warning flat"><p><strong>Referer 完全可以伪造。</strong> 它只是客户端自愿带上的一个字符串，浏览器地址栏直接输入、从书签打开、HTTPS 跳 HTTP 等场景甚至根本不会带。服务端如果拿它做权限判断，等于把门禁卡交给访客自己填写。</p>
+</div>
+
+<h2 id="第二道门：User-Agent"><a href="#第二道门：User-Agent" class="headerlink" title="第二道门：User-Agent"></a>第二道门：User-Agent</h2><p><code>User-Agent</code> 用来标识客户端类型和版本。正常浏览器会发一长串：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">User-Agent</span><span class="punctuation">: </span>Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ...</span><br></pre></td></tr></table></figure>
+
+<p>题目回显 <code>Please use &quot;Syclover&quot; browser</code>，意思是要一个叫 <code>Syclover</code> 的浏览器。这个浏览器当然不存在，直接把 UA 改成：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">User-Agent</span><span class="punctuation">: </span>Syclover</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/14/web-ctf-http-geek2019/image-4.png" alt="改 User-Agent"></p>
+<p><em>图 4：<code>User-Agent: Syclover</code>，页面又变成 <code>No!!! you can only read this locally!!!</code></em></p>
+<p>服务端大概率是 <code>strpos($_SERVER[&#39;HTTP_USER_AGENT&#39;], &#39;Syclover&#39;)</code> 之类的判断。<strong>它只检查字符串里有没有 <code>Syclover</code>，不会真的去识别浏览器。</strong> 所以写 <code>Syclover</code> 可以，写 <code>Mozilla/5.0 Syclover</code> 也可以。</p>
+<p>第二道门也开了，剩下最后一句：<code>you can only read this locally</code>。</p>
+<h2 id="第三道门：X-Forwarded-For"><a href="#第三道门：X-Forwarded-For" class="headerlink" title="第三道门：X-Forwarded-For"></a>第三道门：X-Forwarded-For</h2><p>“只能本地访问”通常有两种实现：</p>
+<table>
+<thead>
+<tr>
+<th>实现方式</th>
+<th>读取的变量</th>
+<th>能不能伪造</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>看 TCP 连接的对端地址</td>
+<td><code>$_SERVER[&#39;REMOTE_ADDR&#39;]</code></td>
+<td>不能直接伪造</td>
+</tr>
+<tr>
+<td>看代理转发头</td>
+<td><code>$_SERVER[&#39;HTTP_X_FORWARDED_FOR&#39;]</code></td>
+<td>可以伪造</td>
+</tr>
+</tbody></table>
+<p><code>X-Forwarded-For</code>（简称 XFF）是代理服务器常用的头，格式是：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">X-Forwarded-For</span><span class="punctuation">: </span>客户端IP, 代理1IP, 代理2IP</span><br></pre></td></tr></table></figure>
+
+<p>按最直觉的做法，加上：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">X-Forwarded-For</span><span class="punctuation">: </span>127.0.0.1</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/14/web-ctf-http-geek2019/image-5.png" alt="加了 XFF 却没过"></p>
+<p><em>图 5：XFF 已经写上 <code>127.0.0.1</code>，页面却仍然是 <code>No!!! you can only read this locally!!!</code></em></p>
+<p>到这一步，网上大多数 writeup 就结束了。<strong>但如果你是在 CTF2 的 <code>http-ctf2</code> 环境里做，这里会卡住。</strong> 这不是 payload 写错了，而是请求在网络链路上被改过了。</p>
+<h2 id="诡异的地方：反向代理把-XFF-改掉了"><a href="#诡异的地方：反向代理把-XFF-改掉了" class="headerlink" title="诡异的地方：反向代理把 XFF 改掉了"></a>诡异的地方：反向代理把 XFF 改掉了</h2><p>先把链路画出来。直接访问题目容器时是这样的：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">浏览器  ──请求──&gt;  题目容器（PHP）</span><br><span class="line">                    ↑</span><br><span class="line">              XFF 原样送达</span><br></pre></td></tr></table></figure>
+
+<p>而通过 <code>http-ctf2</code> 网关时，中间多了一层 openresty：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">浏览器  ──请求──&gt;  openresty 网关  ──请求──&gt;  题目容器（PHP）</span><br><span class="line">                    ↑</span><br><span class="line">              这里会重写 XFF</span><br></pre></td></tr></table></figure>
+
+<p>openresty &#x2F; Nginx 作为反向代理时，通常会有类似这样的配置：</p>
+<figure class="highlight nginx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">location</span> / &#123;</span><br><span class="line">    <span class="attribute">proxy_pass</span> http://127.0.0.1:8080;</span><br><span class="line">    <span class="attribute">proxy_set_header</span> Host <span class="variable">$host</span>;</span><br><span class="line">    <span class="attribute">proxy_set_header</span> X-Real-IP <span class="variable">$remote_addr</span>;</span><br><span class="line">    <span class="attribute">proxy_set_header</span> X-Forwarded-For <span class="variable">$proxy_add_x_forwarded_for</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>$proxy_add_x_forwarded_for</code> 的语义是“<strong>在客户端已有的 XFF 后面追加真实 IP</strong>”。也就是说，你发：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">X-Forwarded-For</span><span class="punctuation">: </span>127.0.0.1</span><br></pre></td></tr></table></figure>
+
+<p>到容器时可能变成：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">X-Forwarded-For</span><span class="punctuation">: </span>127.0.0.1, 你的真实公网IP</span><br></pre></td></tr></table></figure>
+
+<p>如果后端取的是<strong>最后一个</strong>地址，看到的就是你的真实 IP，伪造自然失败。</p>
+<p>有些网关更直接，用 <code>$remote_addr</code> 整个覆盖：</p>
+<figure class="highlight nginx"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">proxy_set_header</span> X-Forwarded-For <span class="variable">$remote_addr</span>;</span><br></pre></td></tr></table></figure>
+
+<p>这种情况下，不管你在请求里写什么，容器收到的都只有真实 IP。</p>
+<div class="note warning flat"><p><strong>同一份 payload，换个网络位置结果就不同。</strong> 网上 writeup 用的是旧 BUUCTF 的 <code>nodeX:端口</code> 直连，请求直接打到题目容器；CTF2 的 <code>http-ctf2</code> 走的是统一网关，网关出于“记录真实来源”的目的改写了 XFF。<strong>不是题变了，是中间多了一个会改包的代理。</strong></p>
+</div>
+
+<h3 id="为什么代理要改-XFF"><a href="#为什么代理要改-XFF" class="headerlink" title="为什么代理要改 XFF"></a>为什么代理要改 XFF</h3><p>从平台的角度看，这是“正确”的行为：</p>
+<ul>
+<li>统一入口、统一证书、统一限流；</li>
+<li>日志里记录真实客户端 IP，而不是攻击者随手写的值；</li>
+<li>防止后端把伪造的 XFF 当成可信来源。</li>
+</ul>
+<p>问题在于，<strong>这道题恰好需要伪造 XFF</strong>。安全设计和题目考点在这里撞车了。</p>
+<h3 id="这也解释了为什么只加-XFF-不够"><a href="#这也解释了为什么只加-XFF-不够" class="headerlink" title="这也解释了为什么只加 XFF 不够"></a>这也解释了为什么只加 XFF 不够</h3><table>
+<thead>
+<tr>
+<th>请求头</th>
+<th>网关是否改写</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Referer</code></td>
+<td>一般不改</td>
+<td>伪造有效</td>
+</tr>
+<tr>
+<td><code>User-Agent</code></td>
+<td>一般不改</td>
+<td>伪造有效</td>
+</tr>
+<tr>
+<td><code>X-Forwarded-For</code></td>
+<td>可能追加或覆盖</td>
+<td>伪造可能失效</td>
+</tr>
+<tr>
+<td><code>X-Real-IP</code></td>
+<td>可能覆盖</td>
+<td>同上</td>
+</tr>
+</tbody></table>
+<p>所以前两道门能过，第三道门过不去。<strong>要绕过的不是题目的过滤，而是网关的改写。</strong></p>
+<h2 id="找到直连入口：http-ctf2-→-tcp-ctf2"><a href="#找到直连入口：http-ctf2-→-tcp-ctf2" class="headerlink" title="找到直连入口：http-ctf2 → tcp-ctf2"></a>找到直连入口：http-ctf2 → tcp-ctf2</h2><p>CTF2 其实提供了直连方式。它不在页面上放按钮，但地址是存在的：</p>
+<table>
+<thead>
+<tr>
+<th>入口</th>
+<th>地址格式</th>
+<th>端口</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>网关</td>
+<td><code>xxx.http-ctf2.dasctf.com</code></td>
+<td><code>80</code></td>
+<td>经过 openresty 反向代理</td>
+</tr>
+<tr>
+<td>直连</td>
+<td><code>xxx.tcp-ctf2.dasctf.com</code></td>
+<td><code>9999</code></td>
+<td>直接映射到题目容器，TLS 封装</td>
+</tr>
+</tbody></table>
+<p>也就是说，把主机名里的 <code>http</code> 换成 <code>tcp</code>，端口换成 <code>9999</code>：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">原地址：https://e7c236f6624602a29f3c0f5a.http-ctf2.dasctf.com/Secret.php</span><br><span class="line">新地址：https://e7c236f6624602a29f3c0f5a.tcp-ctf2.dasctf.com:9999/Secret.php</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/14/web-ctf-http-geek2019/image-6.png" alt="改成 tcp 地址"></p>
+<p><em>图 6：在地址里加上 <code>tcp</code>，端口改成 <code>9999</code></em></p>
+<p>浏览器历史里能更直观地看到两个地址的差别：</p>
+<p><img src="/2026/11/14/web-ctf-http-geek2019/image-7.png" alt="两个地址对比"></p>
+<p><em>图 7：<code>http-ctf2</code> 和 <code>tcp-ctf2</code> 是同一道题的两个入口</em></p>
+<p><code>tcp-ctf2</code> 这一层没有 HTTP 反向代理，请求会直接进入容器，<code>X-Forwarded-For</code> 不再被改写。<strong>这就是绕过“反代改包”的关键。</strong></p>
+<div class="note info flat"><p><strong>为什么直连还是 <code>https</code>？</strong> 因为平台的 TCP 入口在外面套了一层 TLS，<code>9999</code> 端口上说的不是明文 HTTP。用浏览器访问要写 <code>https://</code>，用 Burp 要勾 <code>Use HTTPS</code>，用 pwntools 要写 <code>remote(..., ssl=True, sni=HOST)</code>。这一点在 Pwn 题的远程连接里也一样。</p>
+</div>
+
+<h2 id="在-Burp-里改端口"><a href="#在-Burp-里改端口" class="headerlink" title="在 Burp 里改端口"></a>在 Burp 里改端口</h2><p>直连地址拿到后，Burp 里不能只改 URL 那一行，<strong>目标端口也要改</strong>。这是最容易漏的一步。</p>
+<p>在 Repeater 顶部点目标地址旁边的小铅笔（或 <code>Configure target details</code>）：</p>
+<p><img src="/2026/11/14/web-ctf-http-geek2019/image-8.png" alt="配置 Burp 目标"></p>
+<p><em>图 8：Host 是 <code>*.tcp-ctf2.dasctf.com</code>，Port 改成 <code>9999</code>，勾上 <code>Use HTTPS</code></em></p>
+<p>三个地方都要对：</p>
+<table>
+<thead>
+<tr>
+<th>配置项</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Host</td>
+<td><code>xxx.tcp-ctf2.dasctf.com</code></td>
+</tr>
+<tr>
+<td>Port</td>
+<td><code>9999</code></td>
+</tr>
+<tr>
+<td>Use HTTPS</td>
+<td>✅ 勾上</td>
+</tr>
+</tbody></table>
+<p>如果 Burp 提示证书错误，接受临时证书即可；如果 TLS 握手失败，可以试试勾上 <code>Override SNI</code>，把 SNI 也写成这个主机名。</p>
+<p>然后重复前面的步骤，把三个请求头都带上：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">GET</span> <span class="string">/Secret.php</span> <span class="meta">HTTP/2</span></span><br><span class="line"><span class="attribute">Host</span><span class="punctuation">: </span>e7c236f6624602a29f3c0f5a.tcp-ctf2.dasctf.com</span><br><span class="line"><span class="attribute">Referer</span><span class="punctuation">: </span>https://Sycsecret.buuoj.cn</span><br><span class="line"><span class="attribute">User-Agent</span><span class="punctuation">: </span>Syclover</span><br><span class="line"><span class="attribute">X-Forwarded-For</span><span class="punctuation">: </span>127.0.0.1</span><br></pre></td></tr></table></figure>
+
+<p>这次 <code>X-Forwarded-For</code> 不会被网关改写，容器看到的就是 <code>127.0.0.1</code>。</p>
+<h2 id="拿到-flag"><a href="#拿到-flag" class="headerlink" title="拿到 flag"></a>拿到 flag</h2><p>发送请求，响应里直接回显 flag：</p>
+<p><img src="/2026/11/14/web-ctf-http-geek2019/image-9.png" alt="拿到 flag"></p>
+<p><em>图 9：<code>X-Forwarded-For: 127.0.0.1</code> 生效，页面返回 flag</em></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CTF2&#123;c56bfec1-c066-4ca7-bc25-120666c2d5ac&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="知识点补充"><a href="#知识点补充" class="headerlink" title="知识点补充"></a>知识点补充</h2><h3 id="1-三个请求头分别在说什么"><a href="#1-三个请求头分别在说什么" class="headerlink" title="1. 三个请求头分别在说什么"></a>1. 三个请求头分别在说什么</h3><table>
+<thead>
+<tr>
+<th>请求头</th>
+<th>典型值</th>
+<th>作用</th>
+<th>能否伪造</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Referer</code></td>
+<td><code>https://a.com/page</code></td>
+<td>请求来源页面</td>
+<td>可以</td>
+</tr>
+<tr>
+<td><code>User-Agent</code></td>
+<td><code>Mozilla/5.0 ...</code></td>
+<td>客户端标识</td>
+<td>可以</td>
+</tr>
+<tr>
+<td><code>X-Forwarded-For</code></td>
+<td><code>1.2.3.4, 10.0.0.1</code></td>
+<td>代理链上的客户端 IP</td>
+<td>可以（除非被代理改写）</td>
+</tr>
+<tr>
+<td><code>X-Real-IP</code></td>
+<td><code>1.2.3.4</code></td>
+<td>单值版客户端 IP</td>
+<td>可以</td>
+</tr>
+<tr>
+<td><code>Forwarded</code></td>
+<td><code>for=1.2.3.4;proto=https</code></td>
+<td>RFC 7239 标准转发头</td>
+<td>可以</td>
+</tr>
+<tr>
+<td><code>Cookie</code></td>
+<td><code>username=admin</code></td>
+<td>客户端状态</td>
+<td>可以</td>
+</tr>
+</tbody></table>
+<p>共同点：<strong>它们都是客户端写的字符串，不是身份证明。</strong> 服务端只能把它们当“线索”，不能当“凭证”。</p>
+<h3 id="2-REMOTE-ADDR-和-HTTP-X-FORWARDED-FOR-的区别"><a href="#2-REMOTE-ADDR-和-HTTP-X-FORWARDED-FOR-的区别" class="headerlink" title="2. REMOTE_ADDR 和 HTTP_X_FORWARDED_FOR 的区别"></a>2. <code>REMOTE_ADDR</code> 和 <code>HTTP_X_FORWARDED_FOR</code> 的区别</h3><p>PHP 里这两类变量来源完全不同：</p>
+<table>
+<thead>
+<tr>
+<th>变量</th>
+<th>来源</th>
+<th>是否可信</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>$_SERVER[&#39;REMOTE_ADDR&#39;]</code></td>
+<td>TCP 连接的对端地址</td>
+<td>相对可信（除非对端是代理）</td>
+</tr>
+<tr>
+<td><code>$_SERVER[&#39;HTTP_X_FORWARDED_FOR&#39;]</code></td>
+<td>请求头 <code>X-Forwarded-For</code></td>
+<td>客户端可写，默认不可信</td>
+</tr>
+</tbody></table>
+<p>如果题目代码写的是：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (<span class="variable">$_SERVER</span>[<span class="string">&#x27;REMOTE_ADDR&#x27;</span>] !== <span class="string">&#x27;127.0.0.1&#x27;</span>) &#123;</span><br><span class="line">    <span class="keyword">die</span>(<span class="string">&#x27;No!!! you can only read this locally!!!&#x27;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>那加 XFF 是没用的，必须真的从本机发起连接。但这题在直连环境下加 XFF 能过，说明它读的是 <code>HTTP_X_FORWARDED_FOR</code>——一个典型的<strong>把客户端头当成本地判断依据</strong>的错误。</p>
+<h3 id="3-反向代理改写-XFF-的几种写法"><a href="#3-反向代理改写-XFF-的几种写法" class="headerlink" title="3. 反向代理改写 XFF 的几种写法"></a>3. 反向代理改写 XFF 的几种写法</h3><table>
+<thead>
+<tr>
+<th>配置</th>
+<th>效果</th>
+<th>对伪造的影响</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>proxy_set_header X-Forwarded-For $remote_addr;</code></td>
+<td>完全覆盖</td>
+<td>伪造无效</td>
+</tr>
+<tr>
+<td><code>proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;</code></td>
+<td>追加真实 IP</td>
+<td>看后端取第几个</td>
+</tr>
+<tr>
+<td><code>proxy_set_header X-Real-IP $remote_addr;</code></td>
+<td>覆盖单值头</td>
+<td>伪造无效</td>
+</tr>
+<tr>
+<td>不设置</td>
+<td>原样透传</td>
+<td>伪造有效</td>
+</tr>
+</tbody></table>
+<p>如果后端取 <code>X-Forwarded-For</code> 的<strong>第一个</strong>值，追加模式下伪造仍然有效；如果取<strong>最后一个</strong>，就失效。安全做法是只信任已知代理的地址，用 Nginx 的 <code>set_real_ip_from</code> + <code>real_ip_header</code> 从右往左剥掉可信代理，而不是直接取第一个。</p>
+<h3 id="4-为什么“直连”能绕过"><a href="#4-为什么“直连”能绕过" class="headerlink" title="4. 为什么“直连”能绕过"></a>4. 为什么“直连”能绕过</h3><table>
+<thead>
+<tr>
+<th>路径</th>
+<th>中间层</th>
+<th>XFF 是否被改</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>http-ctf2</code></td>
+<td>openresty 反向代理</td>
+<td>可能被追加&#x2F;覆盖</td>
+</tr>
+<tr>
+<td><code>tcp-ctf2</code></td>
+<td>直接映射容器端口</td>
+<td>不改</td>
+</tr>
+</tbody></table>
+<p>这不是 CTF 特有的东西。现实里也经常遇到：同一个应用，走公司网关和走内网直连，看到的 <code>X-Forwarded-For</code>、<code>Host</code>、<code>X-Forwarded-Proto</code> 完全不同。<strong>排查请求头问题时，先画链路，再怀疑代码。</strong></p>
+<h3 id="5-常见的本地判断绕过写法"><a href="#5-常见的本地判断绕过写法" class="headerlink" title="5. 常见的本地判断绕过写法"></a>5. 常见的本地判断绕过写法</h3><p>如果目标读的是 XFF，除了 <code>127.0.0.1</code>，还可以试：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">X-Forwarded-For: 127.0.0.1</span><br><span class="line">X-Forwarded-For: localhost</span><br><span class="line">X-Forwarded-For: 127.1</span><br><span class="line">X-Forwarded-For: ::1</span><br><span class="line">X-Forwarded-For: 127.0.0.1, 127.0.0.1</span><br><span class="line">X-Real-IP: 127.0.0.1</span><br><span class="line">Client-IP: 127.0.0.1</span><br><span class="line">X-Originating-IP: 127.0.0.1</span><br><span class="line">X-Remote-Addr: 127.0.0.1</span><br><span class="line">Forwarded: for=127.0.0.1</span><br></pre></td></tr></table></figure>
+
+<p>不同框架读的头不一样：Express 常用 <code>req.ip</code>（信任代理时读 XFF），Django 用 <code>REMOTE_ADDR</code> 或 <code>X-Forwarded-For</code>，Flask 的 <code>request.remote_addr</code> 默认不读 XFF。<strong>先枚举，再决定用哪个头。</strong></p>
+<h3 id="6-用-curl-复现"><a href="#6-用-curl-复现" class="headerlink" title="6. 用 curl 复现"></a>6. 用 curl 复现</h3><p>没有 Burp 时，一条命令就能把三个头带上：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">curl -k <span class="string">&#x27;https://&lt;host&gt;.tcp-ctf2.dasctf.com:9999/Secret.php&#x27;</span> \</span><br><span class="line">  -H <span class="string">&#x27;Referer: https://Sycsecret.buuoj.cn&#x27;</span> \</span><br><span class="line">  -H <span class="string">&#x27;User-Agent: Syclover&#x27;</span> \</span><br><span class="line">  -H <span class="string">&#x27;X-Forwarded-For: 127.0.0.1&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>-k</code>：跳过证书校验。CTF 的临时证书不受信任，不加会报 SSL 错误；<strong>只对授权靶场用</strong>；</li>
+<li><code>-H</code>：逐个头覆盖，<code>User-Agent</code> 会替换 curl 默认的 <code>curl/x.y.z</code>；</li>
+<li>如果 DNS 解析不到，可以用 <code>--resolve</code> 把域名指到 IP。</li>
+</ul>
+<p>想对比网关和直连的差异，可以分别请求两个地址，看响应头里的 <code>Server</code> 和回显：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">curl -k -s -D - <span class="string">&#x27;https://&lt;host&gt;.http-ctf2.dasctf.com/Secret.php&#x27;</span> -o /dev/null</span><br><span class="line">curl -k -s -D - <span class="string">&#x27;https://&lt;host&gt;.tcp-ctf2.dasctf.com:9999/Secret.php&#x27;</span> -o /dev/null</span><br></pre></td></tr></table></figure>
+
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><div class="note info flat"><p><strong>Q1：F12 看到的链接为什么点不动？</strong></p>
+<p>因为 <code>&lt;a&gt;</code> 上写了 <code>onclick=&quot;return false;&quot;</code>，点击事件被 JavaScript 拦掉了；样式又把下划线和手型光标去掉了。但这只是前端障眼法，<code>href</code> 还在，直接复制到地址栏就能访问。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q2：Referer 是什么？为什么能随便改？</strong></p>
+<p><code>Referer</code> 是浏览器告诉服务器“我从哪个页面点过来”的请求头。它只是 HTTP 报文里的一行文本，客户端想写什么就写什么。Burp、curl、浏览器扩展都能改。服务端只能拿它做统计或粗粒度判断，不能当权限凭证。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q3：为什么地址栏直接访问时没有 Referer？</strong></p>
+<p>因为 Referer 通常由“点击链接&#x2F;加载资源”触发。地址栏输入、书签、从 HTTPS 跳到 HTTP、或者页面设置了 <code>Referrer-Policy: no-referrer</code>，都可能不带 Referer。所以服务端如果强依赖 Referer，正常用户也可能被误伤。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q4：我加了 <code>X-Forwarded-For: 127.0.0.1</code>，为什么还是提示只能本地访问？</strong></p>
+<p>先确认链路。如果走的是 <code>http-ctf2</code> 网关，openresty 很可能把 XFF 追加或覆盖成了真实客户端 IP，后端看到的不是你写的值。换成 <code>tcp-ctf2</code> 直连、端口 <code>9999</code> 再试，这一步通常就通了。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q5：怎么判断中间有没有反向代理？</strong></p>
+<p>看响应头里的 <code>Server</code>（比如 <code>openresty</code>、<code>nginx</code>）、看主机名里的 <code>http-ctf2</code>、对比直连和网关的回显。也可以用 <code>curl -D -</code> 打印响应头。更直接的办法：同一个请求分别打两个入口，看 <code>X-Forwarded-For</code> 相关的行为是否不同。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q6：为什么直连端口是 9999？</strong></p>
+<p>这是 CTF2 平台给 TCP 直连分配的端口，不是题目代码里的端口。不同平台、不同题目的端口可能不同，以平台给出的连接信息为准。本文的 <code>9999</code> 只适用于当时的 CTF2 环境。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q7：Burp 改了 URL 还是连不上？</strong></p>
+<p>最常见的原因是只改了 URL，没改 Target 的端口和协议。检查三件事：Host 是不是 <code>*.tcp-ctf2.dasctf.com</code>、Port 是不是 <code>9999</code>、<code>Use HTTPS</code> 有没有勾上。如果还不行，试试 <code>Override SNI</code>，或者换 <code>curl -k</code> 排除 Burp 配置问题。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q8：为什么直连也要 HTTPS？</strong></p>
+<p>因为平台的 TCP 入口在外面套了 TLS，<code>9999</code> 端口上跑的不是明文 HTTP。浏览器写 <code>https://</code>，Burp 勾 <code>Use HTTPS</code>，pwntools 写 <code>ssl=True</code>。用 <code>http://</code> 去连会直接握手失败。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q9：能不能用浏览器插件改请求头？</strong></p>
+<p>可以，但不如 Burp 稳。浏览器插件改的是浏览器发出的请求，遇到 TLS、HTTP&#x2F;2、端口配置问题时不好排查。CTF 里推荐 Burp Repeater，能清楚看到最终发出去的每一个头。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q10：这题的现实意义是什么？</strong></p>
+<p>它把“请求头信任边界”讲得很直白：<code>Referer</code>、<code>User-Agent</code>、<code>X-Forwarded-For</code> 都是客户端可写的。现实里的越权、内网绕过、IP 白名单绕过，很多都是服务端错误地信任了这些头。反过来，代理改写 XFF 又是平台侧的正确防护——两边都没错，错的是“用 XFF 做本地判断”这个设计。</p>
+</div>
+
+<h2 id="完整流程速查"><a href="#完整流程速查" class="headerlink" title="完整流程速查"></a>完整流程速查</h2><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>目的</th>
+<th>操作</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>找入口</td>
+<td>F12 看源码，找 <code>href=&quot;Secret.php&quot;</code></td>
+<td>发现隐藏链接</td>
+</tr>
+<tr>
+<td>2</td>
+<td>触发第一道门</td>
+<td>访问 <code>/Secret.php</code></td>
+<td>提示来源不是 <code>Sycsecret.buuoj.cn</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>伪造来源</td>
+<td>加 <code>Referer: https://Sycsecret.buuoj.cn</code></td>
+<td>提示使用 <code>Syclover</code> 浏览器</td>
+</tr>
+<tr>
+<td>4</td>
+<td>伪造 UA</td>
+<td>加 <code>User-Agent: Syclover</code></td>
+<td>提示只能本地访问</td>
+</tr>
+<tr>
+<td>5</td>
+<td>伪造本地 IP</td>
+<td>加 <code>X-Forwarded-For: 127.0.0.1</code></td>
+<td>网关环境下失败</td>
+</tr>
+<tr>
+<td>6</td>
+<td>换直连</td>
+<td><code>http-ctf2</code> → <code>tcp-ctf2</code>，端口 <code>9999</code></td>
+<td>绕过反代改写</td>
+</tr>
+<tr>
+<td>7</td>
+<td>配置 Burp</td>
+<td>Host 改 <code>tcp</code>，Port <code>9999</code>，勾 HTTPS</td>
+<td>请求直达容器</td>
+</tr>
+<tr>
+<td>8</td>
+<td>重放</td>
+<td>三个头一起带</td>
+<td>回显 flag</td>
+</tr>
+</tbody></table>
+<h2 id="顺手聊聊怎么防"><a href="#顺手聊聊怎么防" class="headerlink" title="顺手聊聊怎么防"></a>顺手聊聊怎么防</h2><p>这道题的“漏洞”本质是<strong>把客户端可控的请求头当成了安全判断依据</strong>。防护要分两层看：</p>
+<table>
+<thead>
+<tr>
+<th>层面</th>
+<th>措施</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>应用</td>
+<td>不要用 <code>Referer</code> &#x2F; <code>User-Agent</code> 做权限判断</td>
+<td>它们只是提示信息，不是凭证</td>
+</tr>
+<tr>
+<td>应用</td>
+<td>本地接口用 <code>REMOTE_ADDR</code> 或真正的认证</td>
+<td>更好的做法是只监听 <code>127.0.0.1</code>，或加 token</td>
+</tr>
+<tr>
+<td>应用</td>
+<td>不要信任客户端传来的 <code>X-Forwarded-For</code></td>
+<td>除非请求确实来自已知代理</td>
+</tr>
+<tr>
+<td>代理</td>
+<td>覆盖或剥离客户端伪造的转发头</td>
+<td><code>proxy_set_header X-Forwarded-For $remote_addr;</code></td>
+</tr>
+<tr>
+<td>代理</td>
+<td>只信任已知代理链</td>
+<td>Nginx <code>set_real_ip_from</code> + <code>real_ip_header</code></td>
+</tr>
+<tr>
+<td>运维</td>
+<td>管理接口不要暴露在公网</td>
+<td>内网访问、VPN、零信任网关</td>
+</tr>
+<tr>
+<td>监控</td>
+<td>记录真实来源并限速</td>
+<td>方便溯源，也能挡住批量探测</td>
+</tr>
+</tbody></table>
+<p>一个相对安全的 Nginx 配置思路：</p>
+<figure class="highlight nginx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 只信任来自这些网段的 XFF</span></span><br><span class="line"><span class="attribute">set_real_ip_from</span> <span class="number">10.0.0.0</span>/<span class="number">8</span>;</span><br><span class="line"><span class="attribute">real_ip_header</span> X-Forwarded-For;</span><br><span class="line"><span class="attribute">real_ip_recursive</span> <span class="literal">on</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 发给后端时用解析后的真实 IP 覆盖，避免客户端伪造</span></span><br><span class="line"><span class="attribute">proxy_set_header</span> X-Real-IP <span class="variable">$remote_addr</span>;</span><br><span class="line"><span class="attribute">proxy_set_header</span> X-Forwarded-For <span class="variable">$remote_addr</span>;</span><br></pre></td></tr></table></figure>
+
+<div class="note success flat"><p><strong>一条原则</strong>：请求头是“客户端说的话”，不是“客户端是谁”。身份要从连接、凭证、签名里来，不能从 <code>Referer</code>、<code>User-Agent</code>、<code>X-Forwarded-For</code> 里来。</p>
+</div>
+
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>这道题的技术点不复杂，但它是理解“请求头伪造”和“网络链路”的好例子：</p>
+<ul>
+<li><strong>隐藏链接只是前端障眼法</strong>：<code>onclick=&quot;return false&quot;</code> 挡不住地址栏，F12 一看就现形；</li>
+<li><strong><code>Referer</code> 和 <code>User-Agent</code> 都是客户端可写的</strong>：题目让你伪造，你就伪造；</li>
+<li><strong><code>X-Forwarded-For</code> 的坑在链路上</strong>：同样的 payload，直连能过，走 openresty 网关就失效；</li>
+<li><strong>反向代理会改写转发头</strong>：<code>$proxy_add_x_forwarded_for</code> 追加、<code>$remote_addr</code> 覆盖，后端取第一个还是最后一个，结果完全不同；</li>
+<li><strong>换入口比换 payload 更有效</strong>：<code>http-ctf2</code> → <code>tcp-ctf2</code>，端口 <code>9999</code>，请求绕过网关直达容器；</li>
+<li><strong>Burp 改目标要改三处</strong>：Host、Port、HTTPS，少一个都连不上；</li>
+<li><strong>现实里的对应问题</strong>：IP 白名单绕过、内网接口越权、日志里的假来源，很多都源于“信任了不该信任的头”。</li>
+</ul>
+<p>下一题可以往这几个方向走：</p>
+<table>
+<thead>
+<tr>
+<th>方向</th>
+<th>要解决的问题</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>代理链与真实 IP</td>
+<td><code>X-Forwarded-For</code> 多值、<code>X-Real-IP</code>、<code>Forwarded</code> 的优先级</td>
+</tr>
+<tr>
+<td>Host 头攻击</td>
+<td>虚拟主机路由、密码重置链接污染</td>
+</tr>
+<tr>
+<td>请求走私</td>
+<td><code>Content-Length</code> &#x2F; <code>Transfer-Encoding</code> 不一致</td>
+</tr>
+<tr>
+<td>HTTP&#x2F;2 伪头</td>
+<td><code>:authority</code>、<code>Host</code> 与 SNI 的差异</td>
+</tr>
+<tr>
+<td>认证绕过</td>
+<td>Cookie、JWT、Session 的签名与校验</td>
+</tr>
+</tbody></table>
+<div class="note success flat"><p><strong>一条经验</strong>：遇到“加了某个头却没反应”的题，先别怀疑 payload。画一遍请求链路，确认这个头有没有被中间层改过、有没有真的到达后端。<strong>很多时候不是你不会绕，而是请求根本没按你以为的路线走。</strong></p>
+</div>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/Quellisya">Quellisya</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://quellisya.github.io/2026/11/14/web-ctf-http-geek2019/">https://quellisya.github.io/2026/11/14/web-ctf-http-geek2019/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://Quellisya.github.io" target="_blank">Quellisya's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/HTTP/">HTTP</a><a class="post-meta__tags" href="/tags/%E6%9E%81%E5%AE%A2%E5%A4%A7%E6%8C%91%E6%88%98/">极客大挑战</a><a class="post-meta__tags" href="/tags/Referer/">Referer</a><a class="post-meta__tags" href="/tags/User-Agent/">User-Agent</a><a class="post-meta__tags" href="/tags/X-Forwarded-For/">X-Forwarded-For</a><a class="post-meta__tags" href="/tags/%E5%8F%8D%E5%90%91%E4%BB%A3%E7%90%86/">反向代理</a><a class="post-meta__tags" href="/tags/Burp-Suite/">Burp Suite</a></div><div class="post-share"><div class="social-share" data-image="/img/avatar-seal.svg" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related" href="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/" title="Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info"><div class="info-1"><div class="info-item-1">上一篇</div><div class="info-item-2">Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾</div></div><div class="info-2"><div class="info-item-1">这道题把 32 位 ret2text 的完整链路走了一遍：get_secret 只把 flag 读进全局变量、不打印，所以要在栈上手工搭出 get_secret → printf(flag) → exit 的假调用栈。重点讲清楚 45 字节偏移怎么从 sub esp,0x3c 和 v4 的 esp+0xf 算出来、cdecl 的参数位置、为什么必须用 exit 收尾，以及 gdb 里 telescope 看到的栈布局。</div></div></div></a><a class="pagination-related" href="/2026/11/14/web-knowledge-php-common-vulns/" title="PHP 常见漏洞笔记：数组报错绕过、Cookie 信任与 php://filter 读源码"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">PHP 常见漏洞笔记：数组报错绕过、Cookie 信任与 php://filter 读源码</div></div><div class="info-2"><div class="info-item-1">三个小案例串起 PHP 里最常见的三类问题：用数组制造 Array to string conversion，让 set_error_handler 把 flag 打出来；服务端无条件信任 username cookie，改个值就变 admin；include 自动补 .php 时用 php://filter 读源码，顺便解释 strpos 不加 !== false 的坑。</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2026/10/30/web-ctf-sql-babysql/" title="[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-30</div><div class="info-item-2">[极客大挑战 2019] BabySQL：双写绕过与 UNION 注入</div></div><div class="info-2"><div class="info-item-1">关键字被过滤后怎么办？把 union、select、and、or、from、where、information、password 里的关键词各写两遍，服务器删掉一遍，正好剩下正确的 SQL。再用 UNION 一步步把 flag 拖出来。</div></div></div></a><a class="pagination-related" href="/2026/11/07/web-ctf-sql-hardsql/" title="[极客大挑战 2019] HardSQL：空格、UNION、盲注全被拦，改用 updatexml 报错注入"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-11-07</div><div class="info-item-2">[极客大挑战 2019] HardSQL：空格、UNION、盲注全被拦，改用 updatexml 报错注入</div></div><div class="info-2"><div class="info-item-1">空格、union、sleep、||、&& 全被拉黑，UNION 和时间盲注都走不通。用 Burp Intruder 摸清黑名单后，靠 or + updatexml + concat 的报错注入依次爆库、爆表、爆列；再讲清楚 32 字符截断和 substr 补全 flag 的完整过程。</div></div></div></a><a class="pagination-related" href="/2026/11/12/web-ctf-sql-bool-blind/" title="[CISCN2019 华北赛区 Day2 Web1] Hack World：空格被过滤后的布尔盲注与二分查找"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-11-12</div><div class="info-item-2">[CISCN2019 华北赛区 Day2 Web1] Hack World：空格被过滤后的布尔盲注与二分查找</div></div><div class="info-2"><div class="info-item-1">页面只有两种回显，表名和列名还直接写在脸上。空格、and、or、union 被拦，于是用 ^ 做异或、用括号代替空格，把 flag 的每一位变成一道真假题，再用二分查找把 95 种可能压到 7 次请求。</div></div></div></a></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Quellisya</div><div class="author-info-description">记录 CTF 与 Web 安全的学习笔记，把每一步讲清楚。</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">32</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">98</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">18</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/Quellisya" target="_blank" title="Github"><i class="fab fa-github" style="color: #0f2f32;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">循墨迹读代码，借微光见漏洞。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%A2%98%E7%9B%AE%E5%85%A5%E5%8F%A3%EF%BC%9AF12-%E9%87%8C%E7%9A%84-Secret-php"><span class="toc-text">题目入口：F12 里的 Secret.php</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%80%E9%81%93%E9%97%A8%EF%BC%9AReferer"><span class="toc-text">第一道门：Referer</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%BA%8C%E9%81%93%E9%97%A8%EF%BC%9AUser-Agent"><span class="toc-text">第二道门：User-Agent</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%89%E9%81%93%E9%97%A8%EF%BC%9AX-Forwarded-For"><span class="toc-text">第三道门：X-Forwarded-For</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%AF%A1%E5%BC%82%E7%9A%84%E5%9C%B0%E6%96%B9%EF%BC%9A%E5%8F%8D%E5%90%91%E4%BB%A3%E7%90%86%E6%8A%8A-XFF-%E6%94%B9%E6%8E%89%E4%BA%86"><span class="toc-text">诡异的地方：反向代理把 XFF 改掉了</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E4%BB%A3%E7%90%86%E8%A6%81%E6%94%B9-XFF"><span class="toc-text">为什么代理要改 XFF</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%BF%99%E4%B9%9F%E8%A7%A3%E9%87%8A%E4%BA%86%E4%B8%BA%E4%BB%80%E4%B9%88%E5%8F%AA%E5%8A%A0-XFF-%E4%B8%8D%E5%A4%9F"><span class="toc-text">这也解释了为什么只加 XFF 不够</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%89%BE%E5%88%B0%E7%9B%B4%E8%BF%9E%E5%85%A5%E5%8F%A3%EF%BC%9Ahttp-ctf2-%E2%86%92-tcp-ctf2"><span class="toc-text">找到直连入口：http-ctf2 → tcp-ctf2</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9C%A8-Burp-%E9%87%8C%E6%94%B9%E7%AB%AF%E5%8F%A3"><span class="toc-text">在 Burp 里改端口</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%8B%BF%E5%88%B0-flag"><span class="toc-text">拿到 flag</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9F%A5%E8%AF%86%E7%82%B9%E8%A1%A5%E5%85%85"><span class="toc-text">知识点补充</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#1-%E4%B8%89%E4%B8%AA%E8%AF%B7%E6%B1%82%E5%A4%B4%E5%88%86%E5%88%AB%E5%9C%A8%E8%AF%B4%E4%BB%80%E4%B9%88"><span class="toc-text">1. 三个请求头分别在说什么</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-REMOTE-ADDR-%E5%92%8C-HTTP-X-FORWARDED-FOR-%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="toc-text">2. REMOTE_ADDR 和 HTTP_X_FORWARDED_FOR 的区别</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-%E5%8F%8D%E5%90%91%E4%BB%A3%E7%90%86%E6%94%B9%E5%86%99-XFF-%E7%9A%84%E5%87%A0%E7%A7%8D%E5%86%99%E6%B3%95"><span class="toc-text">3. 反向代理改写 XFF 的几种写法</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-%E4%B8%BA%E4%BB%80%E4%B9%88%E2%80%9C%E7%9B%B4%E8%BF%9E%E2%80%9D%E8%83%BD%E7%BB%95%E8%BF%87"><span class="toc-text">4. 为什么“直连”能绕过</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-%E5%B8%B8%E8%A7%81%E7%9A%84%E6%9C%AC%E5%9C%B0%E5%88%A4%E6%96%AD%E7%BB%95%E8%BF%87%E5%86%99%E6%B3%95"><span class="toc-text">5. 常见的本地判断绕过写法</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-%E7%94%A8-curl-%E5%A4%8D%E7%8E%B0"><span class="toc-text">6. 用 curl 复现</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="toc-text">新手常见问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%8C%E6%95%B4%E6%B5%81%E7%A8%8B%E9%80%9F%E6%9F%A5"><span class="toc-text">完整流程速查</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%E6%80%8E%E4%B9%88%E9%98%B2"><span class="toc-text">顺手聊聊怎么防</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B0%8F%E7%BB%93"><span class="toc-text">小结</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/" title="Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾">Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾</a><time datetime="2026-11-14T07:00:00.000Z" title="发表于 2026-11-14 15:00:00">2026-11-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/14/web-ctf-http-geek2019/" title="[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步">[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步</a><time datetime="2026-11-14T03:00:00.000Z" title="发表于 2026-11-14 11:00:00">2026-11-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/14/web-knowledge-php-common-vulns/" title="PHP 常见漏洞笔记：数组报错绕过、Cookie 信任与 php://filter 读源码">PHP 常见漏洞笔记：数组报错绕过、Cookie 信任与 php://filter 读源码</a><time datetime="2026-11-14T01:00:00.000Z" title="发表于 2026-11-14 09:00:00">2026-11-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/12/web-ctf-sql-bool-blind/" title="[CISCN2019 华北赛区 Day2 Web1] Hack World：空格被过滤后的布尔盲注与二分查找">[CISCN2019 华北赛区 Day2 Web1] Hack World：空格被过滤后的布尔盲注与二分查找</a><time datetime="2026-11-12T02:00:00.000Z" title="发表于 2026-11-12 10:00:00">2026-11-12</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/10/pwn-ctf-get-started-3dsctf-2016/" title="Pwn 入门：get_started_3dsctf_2016——32 位栈传参、cdecl 与用 exit 收尾">Pwn 入门：get_started_3dsctf_2016——32 位栈传参、cdecl 与用 exit 收尾</a><time datetime="2026-11-10T02:00:00.000Z" title="发表于 2026-11-10 10:00:00">2026-11-10</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2025 - 2026 By Quellisya</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 8.1.2</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.7.0</a></span></div><div class="footer_custom_text">以墨为舟，以码为桨 · CTF & Web Security Notes</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.7.0"></script><script src="/js/main.js?v=5.7.0"></script><div class="js-pjax"></div><script defer src="/js/butterfly-custom.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><i class="fas fa-spinner fa-pulse" id="loading-status" hidden="hidden"></i><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="local-search-input"><input placeholder="搜索笔记、题目或 payload…" type="text"/></div><hr/><div id="local-search-results"></div><div class="ais-Pagination" id="local-search-pagination" style="display:none;"><ul class="ais-Pagination-list"></ul></div><div id="local-search-stats"></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.7.0"></script></div></div></body></html>

