@@ -6,12 +6,13 @@
  * 文章正文沿用了 NexT 的写法：
  *   - {% label danger@失败 %}
  *   - {% note info **Q1：...** %}...{% endnote %}  （可折叠问答）
+ *   - {% note think **思考 01｜...** %}...{% endnote %}  （思考题，可折叠答案）
  *
  * Butterfly 的 label 参数顺序不同，note 也不支持带标题的折叠形式。
  * 这里在渲染前做一次转换，正文无需逐篇修改。
  */
 
-const TITLED_NOTE = /{%\s*note\s+(primary|info|success|warning|danger|default)\s+((?:(?!%}|\n).)+?)\s*%}([\s\S]*?){%\s*endnote\s*%}/g;
+const TITLED_NOTE = /{%\s*note\s+(primary|info|success|warning|danger|default|think)\s+((?:(?!%}|\n).)+?)\s*%}([\s\S]*?){%\s*endnote\s*%}/g;
 const LABEL = /{%\s*label\s+([a-zA-Z-]+)@((?:(?!%}|\n).)+?)\s*%}/g;
 
 // 只处理代码块之外的文本，避免把示例代码里的标签也改掉

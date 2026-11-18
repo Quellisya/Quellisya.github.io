@@ -18,6 +18,9 @@
   --q-gold: #c9a227;
   --q-gold-soft: #ead9a4;
   --q-red: #b23a2e;
+  --q-think: #7c5cbf;
+  --q-think-soft: rgba(124, 92, 191, .10);
+  --q-think-line: rgba(124, 92, 191, .24);
   --q-line: rgba(43, 179, 163, .18);
   --q-shadow: 0 20px 60px rgba(18, 80, 74, .10);
   --q-shadow-hover: 0 28px 80px rgba(18, 80, 74, .16);
@@ -47,6 +50,9 @@
   --q-gold: #e0bb4e;
   --q-gold-soft: #f0dfa8;
   --q-red: #d96a5d;
+  --q-think: #c3b0f0;
+  --q-think-soft: rgba(155, 126, 220, .16);
+  --q-think-line: rgba(185, 163, 236, .30);
   --q-line: rgba(127, 216, 202, .20);
   --q-shadow: 0 20px 60px rgba(0, 0, 0, .35);
   --q-shadow-hover: 0 28px 80px rgba(0, 0, 0, .48);
@@ -1448,6 +1454,64 @@ body.q-pointer #q-cursor-glow {
 
 #article-container .nx-note__body {
   padding-top: 10px;
+}
+
+/* ---------- 思考题（可折叠答案） ---------- */
+#article-container .nx-note.think {
+  border-color: var(--q-think-line);
+  border-left-color: var(--q-think);
+  background: var(--q-think-soft);
+}
+
+#article-container .nx-note.think > summary {
+  color: var(--q-think);
+  font-weight: 700;
+  flex-wrap: wrap;
+}
+
+#article-container .nx-note.think > summary::before {
+  content: "?";
+  background: var(--q-think-soft);
+  color: var(--q-think);
+  font-weight: 800;
+}
+
+#article-container .nx-note.think[open] > summary::before {
+  content: "−";
+}
+
+#article-container .nx-note.think > summary::after {
+  content: "展开答案";
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--q-muted);
+  white-space: nowrap;
+}
+
+#article-container .nx-note.think[open] > summary::after {
+  content: "收起答案";
+}
+
+#article-container .nx-note.think .nx-note__body {
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--q-think-line);
+}
+
+#article-container .nx-note.think .nx-note__body > :first-child {
+  margin-top: 0;
+}
+
+#article-container .nx-note.think .nx-note__body > :last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 600px) {
+  #article-container .nx-note.think > summary::after {
+    display: none;
+  }
 }
 
 /* ---------- 行内标签 ---------- */
