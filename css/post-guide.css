@@ -1,9 +1,11 @@
 /* ============================================================
    做题指引：系列知识星图
    纯色圆点 = 知识点；位置越高 / 颜色越深 = 越难；圆越大 = 越重要
-   本文涉及的点会发光闪烁，像星图里被点亮的宝藏
+   本文涉及的点会发光闪烁并连成星座，支持缩放、拖拽
    ============================================================ */
 .q-guide {
+  --q-size-base: 54px;
+  --q-size-step: 12px;
   position: relative;
   margin: 0 0 34px;
   padding: 24px 26px 22px;
@@ -107,44 +109,92 @@
   color: #effaf7;
 }
 
-.q-guide__field {
+/* ---------- 可缩放星域 ---------- */
+.q-guide__viewport {
   position: relative;
   z-index: 1;
-  margin-top: 14px;
+  height: 430px;
+  margin-top: 12px;
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-/* 每一行是一个难度层：5 在最上、1 在最下 */
-.q-guide__row {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-  min-height: 76px;
+.q-guide__viewport.is-dragging {
+  cursor: grabbing;
 }
 
-/* 某一层知识点超过 8 个时，缩小圆点和间距，避免一行撑出面板 */
-.q-guide__row.is-dense {
-  --q-size-base: 40px;
-  --q-size-step: 6px;
-  gap: 9px;
+/* 边缘渐隐，外围星点被裁切时不显得生硬 */
+.q-guide__viewport::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  border-radius: 14px;
+  pointer-events: none;
+  box-shadow: inset 0 0 60px 24px rgba(8, 27, 31, .55);
 }
 
-.q-guide__slot {
-  position: relative;
-  top: var(--jy, 0);
-  left: var(--jx, 0);
-  flex: 0 0 auto;
-  animation: q-guide-float 7s ease-in-out infinite;
-  animation-delay: var(--delay, 0s);
+.q-guide__canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1000px;
+  height: 600px;
+  opacity: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+  transition: opacity .25s ease;
+}
+
+.q-guide__canvas.is-ready {
+  opacity: 1;
+}
+
+.q-guide__canvas.is-gliding {
+  transition:
+    transform .95s cubic-bezier(.2, .8, .2, 1),
+    opacity .25s ease;
+}
+
+.q-guide__lines {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.q-guide__line {
+  stroke: rgba(255, 238, 178, .55);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-dasharray: 3 7;
+  filter: drop-shadow(0 0 4px rgba(255, 224, 140, .45));
+  animation: q-guide-dash 6s linear infinite;
+}
+
+@keyframes q-guide-dash {
+  to {
+    stroke-dashoffset: -40;
+  }
 }
 
 #article-container .q-guide__bubble {
-  position: relative;
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  z-index: 1;
   display: grid;
   place-items: center;
-  width: calc(44px + var(--w) * 7px);
-  height: calc(44px + var(--w) * 7px);
-  padding: 0 13%;
+  width: calc(var(--q-size-base) + var(--w) * var(--q-size-step));
+  height: calc(var(--q-size-base) + var(--w) * var(--q-size-step));
+  padding: 0 10px;
   box-sizing: border-box;
   border: 1px solid rgba(255, 255, 255, .16);
   border-radius: 50%;
@@ -160,19 +210,24 @@
   opacity: .45;
   filter: saturate(.8);
   box-shadow: 0 6px 16px rgba(0, 0, 0, .28);
+  transform: translate(-50%, -50%) translate3d(var(--dx, 0px), var(--dy, 0px), 0);
+  -webkit-user-drag: none;
+  user-select: none;
   -webkit-tap-highlight-color: transparent;
   transition:
     opacity .3s ease,
-    transform .3s ease,
     filter .3s ease,
     box-shadow .3s ease;
+}
+
+#article-container .q-guide__bubble.is-long {
+  font-size: 8.5px;
 }
 
 #article-container .q-guide__bubble:hover,
 #article-container .q-guide__bubble:focus-visible {
   opacity: 1;
   filter: none;
-  transform: scale(1.1);
   z-index: 3;
   border-bottom: 0;
   color: var(--q-ink, #04221f);
@@ -180,15 +235,12 @@
     0 12px 28px rgba(0, 0, 0, .36),
     0 0 18px rgba(127, 216, 202, .20);
   outline: none;
+  transform: translate(-50%, -50%) translate3d(var(--dx, 0px), var(--dy, 0px), 0) scale(1.1);
 }
 
 #article-container .q-guide__bubble:focus-visible {
   outline: 2px solid var(--q-gold-soft);
   outline-offset: 4px;
-}
-
-#article-container .q-guide__bubble.is-long {
-  font-size: 8.5px;
 }
 
 .q-guide__label {
@@ -260,15 +312,41 @@
   --q-glow: rgba(197, 106, 94, .66);
 }
 
-@keyframes q-guide-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
+/* ---------- 缩放控件 ---------- */
+.q-guide__controls {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 
-  50% {
-    transform: translateY(-5px);
-  }
+.q-guide__controls button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 9px;
+  border: 1px solid rgba(127, 216, 202, .24);
+  background: rgba(7, 24, 28, .72);
+  color: #cdebe5;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: border-color .2s ease, color .2s ease, background .2s ease;
+}
+
+.q-guide__controls button:hover,
+.q-guide__controls button:focus-visible {
+  border-color: var(--q-gold);
+  color: var(--q-gold-soft);
+  background: rgba(20, 50, 54, .92);
+  outline: none;
 }
 
 @keyframes q-guide-twinkle {
@@ -334,6 +412,8 @@
 
 @media (max-width: 760px) {
   .q-guide {
+    --q-size-base: 48px;
+    --q-size-step: 10px;
     padding: 18px 14px 16px;
     border-radius: 18px;
   }
@@ -342,28 +422,35 @@
     font-size: 18px;
   }
 
-  .q-guide__field {
-    margin-top: 10px;
+  .q-guide__viewport {
+    height: 350px;
+    margin-top: 8px;
   }
 
-  .q-guide__row {
-    flex-wrap: wrap;
-    gap: 7px;
-    min-height: 0;
-    padding: 3px 0;
+  .q-guide__controls {
+    right: 8px;
+    bottom: 8px;
+  }
+
+  .q-guide__controls button {
+    width: 28px;
+    height: 28px;
+    font-size: 10px;
   }
 
   #article-container .q-guide__bubble {
-    width: calc(38px + var(--w) * 5px);
-    height: calc(38px + var(--w) * 5px);
-    padding: 0 10%;
+    padding: 0 8px;
     font-size: calc(8px + var(--w) * .32px);
+  }
+
+  #article-container .q-guide__bubble.is-long {
+    font-size: 8px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .q-guide__slot {
-    animation: none;
+  .q-guide__canvas {
+    transition: none;
   }
 
   #article-container .q-guide__bubble {
@@ -380,6 +467,10 @@
   #article-container .q-guide__bubble.is-mine::after {
     animation: none;
     opacity: .45;
+  }
+
+  .q-guide__line {
+    animation: none;
   }
 
   #article-container .q-guide-target {
