@@ -1,0 +1,381 @@
+/* ============================================================
+   做题指引：系列知识星图
+   纯色圆点 = 知识点；位置越高 / 颜色越深 = 越难；圆越大 = 越重要
+   本文涉及的点会发光闪烁，像星图里被点亮的宝藏
+   ============================================================ */
+.q-guide {
+  position: relative;
+  margin: 0 0 34px;
+  padding: 24px 26px 22px;
+  border-radius: 22px;
+  border: 1px solid rgba(127, 216, 202, .20);
+  background:
+    radial-gradient(110% 140% at 12% 0%, rgba(43, 179, 163, .28), transparent 46%),
+    radial-gradient(90% 120% at 88% 100%, rgba(201, 162, 39, .14), transparent 54%),
+    linear-gradient(160deg, #0b2428, #0d2f33 56%, #081b1f);
+  box-shadow: 0 22px 60px rgba(10, 40, 40, .16);
+  overflow: hidden;
+  color: #dff5ef;
+}
+
+[data-theme="dark"] .q-guide {
+  border-color: rgba(127, 216, 202, .24);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, .42);
+}
+
+/* 淡淡的坐标网格 */
+.q-guide::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(127, 216, 202, .05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(127, 216, 202, .05) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: radial-gradient(circle at 50% 45%, #000 0%, transparent 78%);
+  -webkit-mask-image: radial-gradient(circle at 50% 45%, #000 0%, transparent 78%);
+}
+
+/* 星图里的细碎星点 */
+.q-guide__stars {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .8;
+  background-image:
+    radial-gradient(1.6px 1.6px at 8% 22%, rgba(255, 255, 255, .65), transparent 60%),
+    radial-gradient(1.2px 1.2px at 18% 68%, rgba(127, 216, 202, .60), transparent 60%),
+    radial-gradient(1.8px 1.8px at 27% 12%, rgba(255, 255, 255, .50), transparent 60%),
+    radial-gradient(1.1px 1.1px at 38% 82%, rgba(224, 187, 78, .55), transparent 60%),
+    radial-gradient(1.4px 1.4px at 47% 28%, rgba(255, 255, 255, .55), transparent 60%),
+    radial-gradient(1px 1px at 56% 74%, rgba(127, 216, 202, .50), transparent 60%),
+    radial-gradient(1.7px 1.7px at 66% 16%, rgba(255, 255, 255, .60), transparent 60%),
+    radial-gradient(1.2px 1.2px at 74% 58%, rgba(224, 187, 78, .50), transparent 60%),
+    radial-gradient(1.5px 1.5px at 84% 30%, rgba(255, 255, 255, .55), transparent 60%),
+    radial-gradient(1.1px 1.1px at 92% 76%, rgba(127, 216, 202, .50), transparent 60%),
+    radial-gradient(1.3px 1.3px at 63% 90%, rgba(255, 255, 255, .45), transparent 60%),
+    radial-gradient(1px 1px at 33% 44%, rgba(255, 255, 255, .40), transparent 60%);
+}
+
+.q-guide__head {
+  position: relative;
+  z-index: 2;
+}
+
+.q-guide__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.q-guide__icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  border: 1px solid rgba(127, 216, 202, .24);
+  background: rgba(43, 179, 163, .14);
+  color: #9fe4da;
+  font-size: 15px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12);
+}
+
+.q-guide__text {
+  display: block;
+}
+
+.q-guide__eyebrow {
+  display: block;
+  font-family: var(--q-mono);
+  font-size: 9px;
+  letter-spacing: .22em;
+  color: var(--q-gold-soft);
+}
+
+.q-guide__name {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--q-serif);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: #effaf7;
+}
+
+.q-guide__field {
+  position: relative;
+  z-index: 1;
+  margin-top: 14px;
+}
+
+/* 每一行是一个难度层：5 在最上、1 在最下 */
+.q-guide__row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+}
+
+.q-guide__slot {
+  position: relative;
+  top: var(--jy, 0);
+  left: var(--jx, 0);
+  flex: 0 0 auto;
+  animation: q-guide-float 7s ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+#article-container .q-guide__bubble {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: calc(44px + var(--w) * 7px);
+  height: calc(44px + var(--w) * 7px);
+  padding: 0 13%;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 50%;
+  background: var(--q-solid, #2bb3a3);
+  color: var(--q-ink, #04221f);
+  font-family: inherit;
+  font-size: calc(9px + var(--w) * .35px);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  border-bottom: 0;
+  opacity: .45;
+  filter: saturate(.8);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .28);
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    opacity .3s ease,
+    transform .3s ease,
+    filter .3s ease,
+    box-shadow .3s ease;
+}
+
+#article-container .q-guide__bubble:hover,
+#article-container .q-guide__bubble:focus-visible {
+  opacity: 1;
+  filter: none;
+  transform: scale(1.1);
+  z-index: 3;
+  border-bottom: 0;
+  color: var(--q-ink, #04221f);
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, .36),
+    0 0 18px rgba(127, 216, 202, .20);
+  outline: none;
+}
+
+#article-container .q-guide__bubble:focus-visible {
+  outline: 2px solid var(--q-gold-soft);
+  outline-offset: 4px;
+}
+
+#article-container .q-guide__bubble.is-long {
+  font-size: 8.5px;
+}
+
+.q-guide__label {
+  position: relative;
+  z-index: 2;
+  max-width: 100%;
+  letter-spacing: .01em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* 本文涉及的知识点：点亮、发光、闪烁 */
+#article-container .q-guide__bubble.is-mine {
+  opacity: 1;
+  filter: none;
+  border-color: rgba(255, 238, 178, .90);
+  animation: q-guide-twinkle 3.4s ease-in-out infinite;
+}
+
+#article-container .q-guide__bubble.is-mine::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 238, 178, .55);
+  pointer-events: none;
+  animation: q-guide-halo 3.4s ease-out infinite;
+}
+
+#article-container .q-guide__bubble.is-mine.is-active {
+  outline: 2px solid rgba(255, 240, 190, .95);
+  outline-offset: 3px;
+  animation-duration: 2.2s;
+}
+
+#article-container .q-guide__bubble.is-mine.is-active::after {
+  animation-duration: 2.2s;
+}
+
+/* 难度：青瓷 → 金 → 朱砂，纯色平涂 */
+.q-guide__bubble[data-level="1"] {
+  --q-solid: #a9e4da;
+  --q-ink: #08332e;
+  --q-glow: rgba(169, 228, 218, .55);
+}
+
+.q-guide__bubble[data-level="2"] {
+  --q-solid: #6fd0c0;
+  --q-ink: #052e29;
+  --q-glow: rgba(111, 208, 192, .55);
+}
+
+.q-guide__bubble[data-level="3"] {
+  --q-solid: #2bb3a3;
+  --q-ink: #02211e;
+  --q-glow: rgba(43, 179, 163, .62);
+}
+
+.q-guide__bubble[data-level="4"] {
+  --q-solid: #d9b95c;
+  --q-ink: #3a2a05;
+  --q-glow: rgba(217, 185, 92, .62);
+}
+
+.q-guide__bubble[data-level="5"] {
+  --q-solid: #c56a5e;
+  --q-ink: #fff2ef;
+  --q-glow: rgba(197, 106, 94, .66);
+}
+
+@keyframes q-guide-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes q-guide-twinkle {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(255, 238, 178, .22),
+      0 0 10px 1px var(--q-glow, rgba(255, 255, 255, .40)),
+      0 6px 16px rgba(0, 0, 0, .28);
+  }
+
+  45% {
+    box-shadow:
+      0 0 0 3px rgba(255, 238, 178, .55),
+      0 0 28px 9px var(--q-glow, rgba(255, 255, 255, .40)),
+      0 6px 16px rgba(0, 0, 0, .28);
+  }
+}
+
+@keyframes q-guide-halo {
+  0% {
+    transform: scale(.90);
+    opacity: .70;
+  }
+
+  70%,
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+/* 悬停本文知识点时，正文里的目标章节给出轻提示 */
+#article-container h2.q-guide-hint,
+#article-container h3.q-guide-hint {
+  border-left-color: var(--q-gold);
+  background: linear-gradient(90deg, rgba(201, 162, 39, .16), transparent 72%);
+}
+
+#article-container .q-guide-target {
+  animation: q-guide-flash 1.4s ease;
+}
+
+#article-container h1,
+#article-container h2,
+#article-container h3,
+#article-container h4 {
+  scroll-margin-top: 96px;
+}
+
+@keyframes q-guide-flash {
+  0%,
+  100% {
+    box-shadow: inset 4px 0 0 var(--q-teal);
+  }
+
+  35% {
+    box-shadow:
+      inset 8px 0 0 var(--q-gold),
+      0 0 0 6px rgba(201, 162, 39, .12);
+  }
+}
+
+@media (max-width: 760px) {
+  .q-guide {
+    padding: 18px 14px 16px;
+    border-radius: 18px;
+  }
+
+  .q-guide__name {
+    font-size: 18px;
+  }
+
+  .q-guide__field {
+    margin-top: 10px;
+  }
+
+  .q-guide__row {
+    flex-wrap: wrap;
+    gap: 7px;
+    min-height: 0;
+    padding: 3px 0;
+  }
+
+  #article-container .q-guide__bubble {
+    width: calc(38px + var(--w) * 5px);
+    height: calc(38px + var(--w) * 5px);
+    padding: 0 10%;
+    font-size: calc(8px + var(--w) * .32px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .q-guide__slot {
+    animation: none;
+  }
+
+  #article-container .q-guide__bubble {
+    transition: none;
+  }
+
+  #article-container .q-guide__bubble.is-mine {
+    animation: none;
+    box-shadow:
+      0 0 0 2px rgba(255, 238, 178, .35),
+      0 0 18px 4px var(--q-glow, rgba(255, 255, 255, .40));
+  }
+
+  #article-container .q-guide__bubble.is-mine::after {
+    animation: none;
+    opacity: .45;
+  }
+
+  #article-container .q-guide-target {
+    animation: none;
+  }
+}

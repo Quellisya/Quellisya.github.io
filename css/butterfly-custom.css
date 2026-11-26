@@ -1253,7 +1253,7 @@ body.q-pointer #q-cursor-glow {
   background: rgba(17, 40, 43, .86);
 }
 
-#article-container > .series-nav:first-child {
+#article-container > .q-guide:first-child {
   margin-top: 0;
 }
 
@@ -1564,13 +1564,13 @@ body.q-pointer #q-cursor-glow {
   color: var(--q-teal-deep);
 }
 
-/* ---------- 系列导航 ---------- */
+/* ---------- 系列导航（文章末尾，折叠） ---------- */
 .series-nav {
-  margin: 0 0 30px;
-  padding: 20px 22px;
+  margin: 38px 0 4px;
   border-radius: 16px;
   border: 1px solid rgba(43, 179, 163, .18);
   background: linear-gradient(135deg, rgba(43, 179, 163, .08), rgba(255, 255, 255, .52));
+  overflow: hidden;
 }
 
 [data-theme="dark"] .series-nav {
@@ -1581,9 +1581,22 @@ body.q-pointer #q-cursor-glow {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding: 16px 20px;
   font-family: var(--q-mono);
   font-size: 11px;
   color: var(--q-teal-deep);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: background .2s ease;
+}
+
+.series-nav__head::-webkit-details-marker {
+  display: none;
+}
+
+.series-nav__head:hover {
+  background: rgba(43, 179, 163, .06);
 }
 
 .series-nav__name {
@@ -1597,10 +1610,25 @@ body.q-pointer #q-cursor-glow {
   color: var(--q-gold);
 }
 
+.series-nav__chevron {
+  font-size: 10px;
+  color: var(--q-muted);
+  transition: transform .28s ease, color .2s ease;
+}
+
+.series-nav[open] .series-nav__chevron {
+  color: var(--q-teal);
+  transform: rotate(180deg);
+}
+
+.series-nav__body {
+  padding: 0 20px 18px;
+}
+
 .series-nav__list {
   display: grid;
   gap: 4px;
-  margin: 14px 0 0;
+  margin: 8px 0 0;
   padding: 0;
   list-style: none;
   counter-reset: q-series;
@@ -1936,8 +1964,12 @@ body.q-pointer #q-cursor-glow {
     bottom: 36px;
   }
 
-  .series-nav {
-    padding: 16px;
+  .series-nav__head {
+    padding: 14px 16px;
+  }
+
+  .series-nav__body {
+    padding: 0 16px 14px;
   }
 
   .series-nav__links {
