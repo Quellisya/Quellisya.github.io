@@ -122,6 +122,13 @@
   min-height: 76px;
 }
 
+/* 某一层知识点超过 8 个时，缩小圆点和间距，避免一行撑出面板 */
+.q-guide__row.is-dense {
+  --q-size-base: 40px;
+  --q-size-step: 6px;
+  gap: 9px;
+}
+
 .q-guide__slot {
   position: relative;
   top: var(--jy, 0);
